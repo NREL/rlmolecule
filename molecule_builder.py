@@ -20,7 +20,7 @@ def get_free_valence(atom):
     return pt.GetDefaultValence(atom.GetSymbol()) - atom.GetExplicitValence()
 
 
-def build_molecules(starting_mol, atom_additions=None):
+def build_molecules(starting_mol, atom_additions=None, stereoisomers=False):
     """Return an iterator of molecules that result from a single manipulation 
     (i.e., atom / bond addition) to the starting molecule
     
@@ -83,6 +83,11 @@ def build_molecules(starting_mol, atom_additions=None):
         for partner in shuffle(get_valid_partners(atom)):
             for bond_order in shuffle(get_valid_bonds(i, partner)):
                 mol = add_bond(i, partner, bond_order)
+
                 Chem.SanitizeMol(mol)                
-                for isomer in shuffle(enumerate_stereoisomers(mol)):
-                    yield isomer
+                if not stereoisomers:
+                    yield mol
+                    
+                else:
+                    for isomer in shuffle(enumerate_stereoisomers(mol)):
+                        yield isomer
