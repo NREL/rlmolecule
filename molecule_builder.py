@@ -78,16 +78,25 @@ def build_molecules(starting_mol, atom_additions=None, stereoisomers=False):
         opts = StereoEnumerationOptions(unique=True)
         return tuple(EnumerateStereoisomers(mol, options=opts))
 
+    generated_smiles = []
+    
     # Construct the generator
     for i, atom in shuffle(enumerate(starting_mol.GetAtoms())):
         for partner in shuffle(get_valid_partners(atom)):
             for bond_order in shuffle(get_valid_bonds(i, partner)):
                 mol = add_bond(i, partner, bond_order)
 
-                Chem.SanitizeMol(mol)                
+                Chem.SanitizeMol(mol)
                 if not stereoisomers:
-                    yield mol
+                    smiles = Chem.MolToSmiles(mol)
+                    if smiles not in generated_smiles:
+                        yield mol
+                        generated_smiles += [smiles]
                     
                 else:
                     for isomer in shuffle(enumerate_stereoisomers(mol)):
-                        yield isomer
+                        smiles = Chem.MolToSmiles(mol)
+                        if smiles not in generated_smiles:                        
+                            yield isomer
+                            generated_smiles += [smiles]
+                            
