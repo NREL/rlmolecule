@@ -125,7 +125,22 @@ class Game(object):
 
     
 def save_game(game):
-    """Push the game to the buffer."""
+    """Push the game to the buffer.  Suggested data structure (dict):
+        data = {
+            "network_inputs": {
+                "mol":  fingerprints each molecule in game history,
+                "next_mols": fingerprint arrays of chilren molecules for
+                    each root molecule,
+                "pi":  child visit arrays for each root molecule,
+            }
+            "mol_smiles": smiles strings for game history (list),
+            "reward": terminal reward (float)
+        }
+
+    Erotokritos, you might want to modify the Game class to keep track of these
+    things when they are generated during MCTS, so you don't have to recreate
+    them here.
+    """
     pass
 
 
@@ -244,7 +259,7 @@ def rollout_loop(args):
     network = Network(args.checkpoint_dir)
     for _ in range(CONFIG.num_rollouts):
         print("updating network weights")
-        network.update_weights()
+        network.load_weights()
         print("playing game")
         game = play_game(network)
         print("saving game")

@@ -63,8 +63,8 @@ class Network:
                   "pi_logits": tf.nn.softmax_cross_entropy_with_logits})
 
 
-    def update_weights(self):
-        """Update the model weights using the latest checkpoint."""
+    def load_weights(self):
+        """Update the latest model weights."""
         if self.checkpoint_dir is None:
             pass
         else:
