@@ -3,6 +3,7 @@
 from functools import lru_cache
 
 import numpy as np
+import pickle
 
 from rdkit import Chem
 import rdkit.Chem.AllChem
@@ -79,6 +80,7 @@ class Game(object):
         self.fingerprint_dim = CONFIG.fingerprint_dim
         self.max_atoms = CONFIG.max_atoms
 
+        _, self.root_next_mols_fp = get_next_mols(get_mol_from_smiles(self.history[0]), fp_length=self.fingerprint_dim)
         self.next_mols, self.next_mols_fp = get_next_mols(
             self.mol, fp_length=self.fingerprint_dim)
 
@@ -88,6 +90,14 @@ class Game(object):
     def terminal_value(self, state_index):
         mol = get_mol_from_smiles(self.history[-1])
         return get_reward_from_mol(mol)
+    
+    def history_fps(self):
+        mols = [get_mol_from_smiles(self.history[i]) for i in range(len(self.history))]
+        return [get_fingerprint(mol) for mol in mols]
+    
+    def root_next_mols(self):
+        
+        return self.root_next_mols_fp
 
     def legal_actions(self):
         return range(len(self.next_mols))
@@ -124,7 +134,7 @@ class Game(object):
         return mol, next_mols, action_mask
 
     
-def save_game(game):
+def save_game(game, i):
     """Push the game to the buffer.  Suggested data structure (dict):
         data = {
             "network_inputs": {
@@ -141,7 +151,18 @@ def save_game(game):
     things when they are generated during MCTS, so you don't have to recreate
     them here.
     """
-    pass
+    data = {
+            "network_inputs": {
+                "mol":  game.history_fps(),
+                "next_mols": game.root_next_mols_fp,
+                "pi":  game.child_visits[0],
+            },
+            "mol_smiles": game.history,
+            "reward": game.terminal_value(-1)
+        }
+    
+    with open('game_{}.pickle'.format(i), 'wb') as f:
+        pickle.dump(data, f)
 
 
 def play_game(network, explore=True):
@@ -257,13 +278,14 @@ def rollout_loop(args):
     """Main rollout loop that plays games using the latest network weights,
     and pushes games to the replay buffer."""
     network = Network(args.checkpoint_dir)
-    for _ in range(CONFIG.num_rollouts):
+    pckl_list = []
+    for i in range(CONFIG.num_rollouts):
         print("updating network weights")
         network.load_weights()
         print("playing game")
         game = play_game(network)
         print("saving game")
-        save_game(game)
+        save_game(game, i)
 
 
 if __name__ == "__main__":
