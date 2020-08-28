@@ -142,7 +142,7 @@ class Game(object):
         return mol, next_mols, action_mask
 
     
-def save_game(game, i):
+def save_game(game, i, args):
     """Push the game to the buffer.  Suggested data structure (dict):
         data = {
             "network_inputs": {
@@ -171,7 +171,7 @@ def save_game(game, i):
             "reward": game.terminal_value(-1)
         }
    
-    with open('game_{}.pickle'.format(i), 'wb') as f:
+    with open('game_{}_{}.pickle'.format(i, args.id), 'wb') as f:
         pickle.dump(data, f)
 
 
@@ -295,7 +295,8 @@ def rollout_loop(args):
         print("playing game")
         game = play_game(network)
         print("saving game")
-        save_game(game, i)
+        save_game(game, i, args)
+    network.compile()
     model_training(network)
 
 if __name__ == "__main__":
@@ -305,6 +306,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint-dir", type=str, default=None,
         help="Directory containing saved network checkpoints")
+    parser.add_argument("--id", type=int, default=None, help="worker id")
     args = parser.parse_args()
     print(args)
 
