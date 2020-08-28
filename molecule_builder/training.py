@@ -17,6 +17,7 @@ def sample():
         with open('game_{}.pickle'.format(i), 'rb') as f:
             new_data = pickle.load(f)
             game_list.append(new_data)
+    # compute ranked reward here --> compute r_alpha
     move_sum = float(sum(len(g["mol_smiles"]) for g in game_list))
     games = np.random.choice(
                 game_list,
@@ -29,7 +30,7 @@ def sample():
     next_mols = [z["network_inputs"]["next_mols"][i] for (z, i) in game_pos]
     action_mask = [z["network_inputs"]["action_mask"][i] for (z, i) in game_pos]
 
-    v = [z["reward"] for (z, i) in game_pos]
+    v = [z["reward"] for (z, i) in game_pos] # here put z (ranked reward)
     pi = [z["network_inputs"]["pi"][i] for (z, i) in game_pos]
     
     return mol, next_mols, action_mask, v, pi
