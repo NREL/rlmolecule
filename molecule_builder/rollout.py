@@ -171,7 +171,7 @@ def save_game(game, i):
             "reward": game.terminal_value(-1)
         }
    
-    with open('game_{}.pickle'.format(i), 'wb') as f:
+    with open('game_{}.pickle'.format(i), 'wb') as f: # _id for worker
         pickle.dump(data, f)
 
 
