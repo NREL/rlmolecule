@@ -13,6 +13,7 @@ from molecule_builder import build_molecules
 
 from config import AlphaZeroConfig
 from network import Network
+from training import sample, model_training
 
 CONFIG = AlphaZeroConfig()
 
@@ -79,8 +80,9 @@ class Game(object):
         self.max_actions = CONFIG.max_next_mols
         self.fingerprint_dim = CONFIG.fingerprint_dim
         self.max_atoms = CONFIG.max_atoms
+        self.action_mask = np.zeros(CONFIG.max_next_mols, dtype=np.float32)
 
-        _, self.root_next_mols_fp = get_next_mols(get_mol_from_smiles(self.history[0]), fp_length=self.fingerprint_dim)
+        self.root_next_mols_fp = []
         self.next_mols, self.next_mols_fp = get_next_mols(
             self.mol, fp_length=self.fingerprint_dim)
 
@@ -96,8 +98,14 @@ class Game(object):
         return [get_fingerprint(mol) for mol in mols]
     
     def root_next_mols(self):
-        
+        for i in range(len(self.history)):
+            _, next_mols_fp = get_next_mols(get_mol_from_smiles(self.history[i]), fp_length=self.fingerprint_dim)
+            self.root_next_mols_fp.append(next_mols_fp)
         return self.root_next_mols_fp
+    
+    def get_action_mask(self):
+        self.action_mask[:len(self.next_mols)] = 1
+        return self.action_mask
 
     def legal_actions(self):
         return range(len(self.next_mols))
@@ -151,16 +159,18 @@ def save_game(game, i):
     things when they are generated during MCTS, so you don't have to recreate
     them here.
     """
+
     data = {
             "network_inputs": {
-                "mol":  game.history_fps(),
-                "next_mols": game.root_next_mols_fp,
-                "pi":  game.child_visits[0],
+                "mol":  [game.make_inputs(i)[0] for i in range(len(game.history)-1)],
+                "next_mols": [game.make_inputs(i)[1] for i in range(len(game.history)-1)],
+                "action_mask": [game.make_inputs(i)[2] for i in range(len(game.history)-1)],
+                "pi":  [game.child_visits[i] for i in range(len(game.history)-1)],
             },
             "mol_smiles": game.history,
             "reward": game.terminal_value(-1)
         }
-    
+   
     with open('game_{}.pickle'.format(i), 'wb') as f:
         pickle.dump(data, f)
 
@@ -286,7 +296,7 @@ def rollout_loop(args):
         game = play_game(network)
         print("saving game")
         save_game(game, i)
-
+    model_training(network)
 
 if __name__ == "__main__":
 
