@@ -53,9 +53,9 @@ def sample():
     
     return mol, next_mols, action_mask, v, pi
 
-def model_training(network, args):
+def model_training(network):
     for iteration in range(CONFIG.training_iterations):
-        mol, next_mols, action_mask, v, pi = sample(args)
+        mol, next_mols, action_mask, v, pi = sample()
         for _ in range(CONFIG.gradient_steps_per_batch):
             result = network.model.train_on_batch([mol, next_mols, action_mask], [v, pi])
         network.save()
