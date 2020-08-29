@@ -310,5 +310,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
 
-    rollout_loop(args)
+    rollout_loop()
 
