@@ -10,11 +10,11 @@ from network import Network
 CONFIG = AlphaZeroConfig()
 """"""
 
-def sample():
+def sample(dir_to_pickled):
 
     # Get last N pickled elements and append them to a list
-    sample = CONFIG.buffer_max_size
-    file_list = sorted(glob.glob('*[0-9].pickle'))
+    file_list = sorted(glob.glob('**/*[0-9].pickle', recursive=False))
+    sample = min(len(file_list),CONFIG.buffer_max_size)
     game_list = []
 
     for name in file_list[-sample:]:
@@ -53,17 +53,20 @@ def sample():
     
     return mol, next_mols, action_mask, v, pi
 
-def model_training(network):
+def model_training(network, args, dir_to_pickled, dir_to_models):
     for iteration in range(CONFIG.training_iterations):
-        mol, next_mols, action_mask, v, pi = sample()
+        mol, next_mols, action_mask, v, pi = sample(dir_to_pickled)
         for _ in range(CONFIG.gradient_steps_per_batch):
             result = network.model.train_on_batch([mol, next_mols, action_mask], [v, pi])
-        network.save()
+        network.model.save(os.path.join(dir_to_models,'model_{}.h5'.format(args.id)))
 
 if __name__ == "__main__":
     #mol, next_mols, action_mask, v, pi = sample()
+    current_path = os.getcwd()
+    dir_to_pickled = os.path.join(current_path,'pickled_objects')
     sample = 2
-    file_list = sorted(glob.glob('*[0-9].pickle'))
+    file_list = sorted(glob.glob('**/*[0-9].pickle', recursive=False))
+    print(file_list)
 
     for name in file_list[-sample:]: 
         with open(name, 'rb') as f:
