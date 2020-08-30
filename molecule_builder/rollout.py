@@ -4,6 +4,7 @@ from functools import lru_cache
 
 import numpy as np
 import pickle
+import os
 
 from rdkit import Chem
 import rdkit.Chem.AllChem
@@ -142,7 +143,7 @@ class Game(object):
         return mol, next_mols, action_mask
 
     
-def save_game(game, i, args):
+def save_game(game, i, args, dir):
     """Push the game to the buffer.  Suggested data structure (dict):
         data = {
             "network_inputs": {
@@ -171,7 +172,7 @@ def save_game(game, i, args):
             "reward": game.terminal_value(-1)
         }
    
-    with open('game_{}_{}.pickle'.format(i, args.id), 'wb') as f:
+    with open(os.path.join(dir,'game_{:02d}_{}.pickle'.format(i, args.id)), 'wb') as f:
         pickle.dump(data, f)
 
 
@@ -287,17 +288,35 @@ def softmax_sample(d):
 def rollout_loop(args):
     """Main rollout loop that plays games using the latest network weights,
     and pushes games to the replay buffer."""
-    network = Network(args.checkpoint_dir)
-    pckl_list = []
-    for i in range(CONFIG.num_rollouts):
+    current_path = os.getcwd()
+    path_to_pickled_objects = os.path.join(current_path,'pickled_objects')
+    path_to_saved_models = os.path.join(current_path,'saved_models')
+    if not os.path.isdir(path_to_pickled_objects):
+        try:
+            os.mkdir(path_to_pickled_objects)
+        except:
+            pass
+    else:
+        print("Pickled objects directory already exists, continue")
+    if not os.path.isdir(path_to_saved_models):
+        try:
+            os.mkdir(path_to_saved_models)
+        except:
+            pass
+    else:
+        print("Saved models directory already exists, continue")
+    
+    network = Network(path_to_saved_models)
+    for step in range(CONFIG.training_steps):
         print("updating network weights")
         network.load_weights()
-        print("playing game")
-        game = play_game(network)
-        print("saving game")
-        save_game(game, i, args)
-    network.compile()
-    model_training(network, args)
+        for i in range(CONFIG.num_rollouts):
+            print("playing game")
+            game = play_game(network)
+            print("saving game")
+            save_game(game, i, args, path_to_pickled_objects)
+        network.compile()
+        model_training(network, args, path_to_pickled_objects, path_to_saved_models)
 
 if __name__ == "__main__":
 
@@ -310,5 +329,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
 
-    rollout_loop()
+    rollout_loop(args)
 
