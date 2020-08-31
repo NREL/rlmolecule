@@ -16,7 +16,7 @@ As soon as the rollout loops finish, the policy network is compiled. Then, a num
 
 ### Notes for reconsideration:
 
-    - I think the directories should be given using *argparse* and not created during running rollouts.
-    - Games are saved as pickled objects, tf.data might be necessary later.
-    - For now, the entire model is saved (not just the weights), probably it has to be revisited.
-    - I need to check whether *network.load_weights* actually loads the latest model.
+- I think the directories should be given using *argparse* and not created during running rollouts.
+- Games are saved as pickled objects, tf.data might be necessary later.
+- For now, the entire model is saved (not just the weights), probably it has to be revisited.
+- I need to check whether *network.load_weights* actually loads the latest model.
