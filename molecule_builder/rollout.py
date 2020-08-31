@@ -5,6 +5,7 @@ from functools import lru_cache
 import numpy as np
 import pickle
 import os
+from collections import defaultdict
 
 from rdkit import Chem
 import rdkit.Chem.AllChem
@@ -306,15 +307,20 @@ def rollout_loop(args):
     else:
         print("Saved models directory already exists, continue")
     
+    log_data = defaultdict(list)
     network = Network(path_to_saved_models)
     for step in range(CONFIG.training_steps):
         print("updating network weights")
         network.load_weights()
+        rewards = []
         for i in range(CONFIG.num_rollouts):
             print("playing game")
             game = play_game(network)
+            rewards.append(game.terminal_value(-1))
             print("saving game")
             save_game(game, i, args, path_to_pickled_objects)
+        log_data["mean_reward"].append(np.mean(rewards))
+        log_data["std_reward"].append(np.std(rewards))
         network.compile()
         model_training(network, args, path_to_pickled_objects, path_to_saved_models)
 
