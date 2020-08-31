@@ -142,6 +142,18 @@ class Game(object):
             next_mols[:len(mols), :] = mols
             action_mask[:len(mols)] = 1.
         return mol, next_mols, action_mask
+    
+    def get_data(self):
+        return {
+            "network_inputs": {
+                "mol":  [self.make_inputs(i)[0] for i in range(len(self.history)-1)],
+                "next_mols": [self.make_inputs(i)[1] for i in range(len(self.history)-1)],
+                "action_mask": [self.make_inputs(i)[2] for i in range(len(self.history)-1)],
+                "pi":  [self.child_visits[i] for i in range(len(self.history)-1)],
+            },
+            "mol_smiles": self.history,
+            "reward": self.terminal_value(-1)
+        }
 
     
 def save_game(game, i, args, dir):
@@ -159,19 +171,12 @@ def save_game(game, i, args, dir):
 
     Erotokritos, you might want to modify the Game class to keep track of these
     things when they are generated during MCTS, so you don't have to recreate
-    them here.
+    them here. (This is peter, agreed. I think we should move that up to a
+    class method though, it might make it easier)
+  
     """
 
-    data = {
-            "network_inputs": {
-                "mol":  [game.make_inputs(i)[0] for i in range(len(game.history)-1)],
-                "next_mols": [game.make_inputs(i)[1] for i in range(len(game.history)-1)],
-                "action_mask": [game.make_inputs(i)[2] for i in range(len(game.history)-1)],
-                "pi":  [game.child_visits[i] for i in range(len(game.history)-1)],
-            },
-            "mol_smiles": game.history,
-            "reward": game.terminal_value(-1)
-        }
+    data = game.get_data()
    
     with open(os.path.join(dir,'game_{:02d}_{}.pickle'.format(i, args.id)), 'wb') as f:
         pickle.dump(data, f)
