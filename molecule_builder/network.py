@@ -3,6 +3,9 @@ from tensorflow.keras.layers import Input, Dense, Lambda
 from tensorflow.keras import Model
 from tensorflow.keras import backend as K
 
+import os
+import glob
+
 from config import AlphaZeroConfig
 
 CONFIG = AlphaZeroConfig()
@@ -69,7 +72,13 @@ class Network:
             pass
         else:
             # Actually do something here! 
-            pass
+            if glob.glob('**/model_*', recursive=False):
+                file_list = glob.glob('**/model_*', recursive=False)
+                latest_file = max(file_list, key=os.path.getctime)
+                tf.keras.models.load_model(latest_file, compile=False)
+                #print(new_model.summary())
+            else:
+                self.create_model()
 
 
     def inference(self, mol, next_mols, action_mask):
@@ -77,3 +86,12 @@ class Network:
         v, pi = self.model([mol[None, :], next_mols[None, :], action_mask[None, :]])
         return tf.squeeze(v), tf.squeeze(pi)
 
+if __name__ == "__main__":
+    current_path = os.getcwd()
+    path_to_saved_models = os.path.join(current_path,'saved_models')
+    if not os.path.isdir(path_to_saved_models):
+        os.mkdir(path_to_saved_models)
+    else:
+        print("Saved models directory already exists, continue")
+    network = Network(path_to_saved_models)
+    network.load_weights()

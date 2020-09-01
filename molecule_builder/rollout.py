@@ -3,6 +3,9 @@
 from functools import lru_cache
 
 import numpy as np
+import pickle
+import os
+from collections import defaultdict
 
 from rdkit import Chem
 import rdkit.Chem.AllChem
@@ -12,6 +15,7 @@ from molecule_builder import build_molecules
 
 from config import AlphaZeroConfig
 from network import Network
+from training import sample, model_training
 
 CONFIG = AlphaZeroConfig()
 
@@ -78,7 +82,9 @@ class Game(object):
         self.max_actions = CONFIG.max_next_mols
         self.fingerprint_dim = CONFIG.fingerprint_dim
         self.max_atoms = CONFIG.max_atoms
+        self.action_mask = np.zeros(CONFIG.max_next_mols, dtype=np.float32)
 
+        self.root_next_mols_fp = []
         self.next_mols, self.next_mols_fp = get_next_mols(
             self.mol, fp_length=self.fingerprint_dim)
 
@@ -88,6 +94,20 @@ class Game(object):
     def terminal_value(self, state_index):
         mol = get_mol_from_smiles(self.history[-1])
         return get_reward_from_mol(mol)
+    
+    def history_fps(self):
+        mols = [get_mol_from_smiles(self.history[i]) for i in range(len(self.history))]
+        return [get_fingerprint(mol) for mol in mols]
+    
+    def root_next_mols(self):
+        for i in range(len(self.history)):
+            _, next_mols_fp = get_next_mols(get_mol_from_smiles(self.history[i]), fp_length=self.fingerprint_dim)
+            self.root_next_mols_fp.append(next_mols_fp)
+        return self.root_next_mols_fp
+    
+    def get_action_mask(self):
+        self.action_mask[:len(self.next_mols)] = 1
+        return self.action_mask
 
     def legal_actions(self):
         return range(len(self.next_mols))
@@ -124,7 +144,7 @@ class Game(object):
         return mol, next_mols, action_mask
 
     
-def save_game(game):
+def save_game(game, i, args, dir):
     """Push the game to the buffer.  Suggested data structure (dict):
         data = {
             "network_inputs": {
@@ -141,7 +161,20 @@ def save_game(game):
     things when they are generated during MCTS, so you don't have to recreate
     them here.
     """
-    pass
+
+    data = {
+            "network_inputs": {
+                "mol":  [game.make_inputs(i)[0] for i in range(len(game.history)-1)],
+                "next_mols": [game.make_inputs(i)[1] for i in range(len(game.history)-1)],
+                "action_mask": [game.make_inputs(i)[2] for i in range(len(game.history)-1)],
+                "pi":  [game.child_visits[i] for i in range(len(game.history)-1)],
+            },
+            "mol_smiles": game.history,
+            "reward": game.terminal_value(-1)
+        }
+   
+    with open(os.path.join(dir,'game_{:02d}_{}.pickle'.format(i, args.id)), 'wb') as f:
+        pickle.dump(data, f)
 
 
 def play_game(network, explore=True):
@@ -256,15 +289,40 @@ def softmax_sample(d):
 def rollout_loop(args):
     """Main rollout loop that plays games using the latest network weights,
     and pushes games to the replay buffer."""
-    network = Network(args.checkpoint_dir)
-    for _ in range(CONFIG.num_rollouts):
+    current_path = os.getcwd()
+    path_to_pickled_objects = os.path.join(current_path,'pickled_objects')
+    path_to_saved_models = os.path.join(current_path,'saved_models')
+    if not os.path.isdir(path_to_pickled_objects):
+        try:
+            os.mkdir(path_to_pickled_objects)
+        except:
+            pass
+    else:
+        print("Pickled objects directory already exists, continue")
+    if not os.path.isdir(path_to_saved_models):
+        try:
+            os.mkdir(path_to_saved_models)
+        except:
+            pass
+    else:
+        print("Saved models directory already exists, continue")
+    
+    log_data = defaultdict(list)
+    network = Network(path_to_saved_models)
+    for step in range(CONFIG.training_steps):
         print("updating network weights")
         network.load_weights()
-        print("playing game")
-        game = play_game(network)
-        print("saving game")
-        save_game(game)
-
+        rewards = []
+        for i in range(CONFIG.num_rollouts):
+            print("playing game")
+            game = play_game(network)
+            rewards.append(game.terminal_value(-1))
+            print("saving game")
+            save_game(game, i, args, path_to_pickled_objects)
+        log_data["mean_reward"].append(np.mean(rewards))
+        log_data["std_reward"].append(np.std(rewards))
+        network.compile()
+        model_training(network, args, path_to_pickled_objects, path_to_saved_models)
 
 if __name__ == "__main__":
 
@@ -273,6 +331,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint-dir", type=str, default=None,
         help="Directory containing saved network checkpoints")
+    parser.add_argument("--id", type=int, default=None, help="worker id")
     args = parser.parse_args()
     print(args)
 
