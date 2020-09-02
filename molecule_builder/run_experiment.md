@@ -24,6 +24,6 @@ As soon as the rollout loops finish, the policy network is compiled. Then, a num
 ### Notes for reconsideration:
 
 - We'll want to generate an experiment id at runtime, and use this to name/create directories, and also possibly namespaces in whatever DB we end up using (esp for Yuma which is shared).
-- Games are saved as pickled objects, tf.data might be necessary later - let's get @pstjohn input here, but i think the two things can co-exist ... as long as you have a data generator then it seems a tf.data pipeline can be built around it. we could have one for pickled inputs (testing), and another for DBs (experiments)
+- Games are saved as pickled objects, tf.data might be necessary later - Peter can help on that, but probably the two things can co-exist. As long as you have a data generator then it seems a tf.data pipeline can be built around it. we could have one for pickled inputs (testing), and another for DBs (experiments)
 - For now, the entire model is saved (not just the weights), probably it has to be revisited.
 - I need to check whether ```network.load_weights``` actually loads the latest model.
