@@ -72,17 +72,13 @@ class Network:
             pass
         else:
             # Actually do something here! 
-<<<<<<< Updated upstream
-            glob_pattern = os.path.join(model_dir, model_*)
-=======
             glob_pattern = os.path.join(model_dir, 'model_*')
->>>>>>> Stashed changes
             file_list = glob.glob(glob_pattern, recursive=False)
             if file_list:
-                #latest_file = max(file_list, key=os.path.getctime)
-                latest_file = tf.train.latest_checkpoint(model_dir)
-                tf.keras.models.load_model(latest_file, compile=False)
-                #print(new_model.summary())
+                latest_file = max(file_list, key=os.path.getctime)
+                #latest_file = tf.train.latest_checkpoint(model_dir)
+                new_model = tf.keras.models.load_model(latest_file, compile=False)
+                print(new_model.summary())
             else:
                 self.create_model()
 
@@ -96,11 +92,7 @@ if __name__ == "__main__":
     current_path = os.getcwd()
     model_dir = os.path.join(current_path, 'saved_models')
     if not os.path.isdir(model_dir):
-<<<<<<< Updated upstream
-        os.mkdirs(model_dir, exist_ok=True)
-=======
         os.makedirs(model_dir, exist_ok=True)
->>>>>>> Stashed changes
     else:
         print("Saved models directory already exists, continue")
     network = Network(model_dir)

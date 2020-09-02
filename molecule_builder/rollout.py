@@ -5,9 +5,10 @@ from collections import defaultdict
 import os
 import pickle
 import numpy as np
+import pandas as pd
 
-
-from rdkit import Chem
+import rdkit
+from rdkit import Chem, DataStructs
 import rdkit.Chem.AllChem
 from rdkit.Chem.Descriptors import qed
 
@@ -18,6 +19,16 @@ from network import Network
 from training import train_model
 
 CONFIG = AlphaZeroConfig()
+
+def read_radicals():
+    radical_fps = pd.read_pickle('/q2_milestone/binary_fps.p.gz').apply(
+        DataStructs.CreateFromBinaryText)
+    radicals = pd.read_csv('/q2_milestone/radicals.csv.gz')['0']
+
+    radical_set = set(radicals)
+
+    return radical_fps, radical_set
+
 
 # Create cached functions
 @lru_cache(maxsize=CONFIG.lru_cache_maxsize)
@@ -34,6 +45,21 @@ def get_smiles_from_mol(mol):
 def get_reward_from_mol(mol):
     """Returns the reward."""
     return qed(mol)
+
+@lru_cache(maxsize=CONFIG.lru_cache_maxsize)
+def evaluate_max_similarity(mol):
+    """ This is the function we'll need to maximize. At least find new molecules
+    tindex are < 1; but greater than 0.7 """
+
+    radical_fps, radical_set = read_radicals()
+    
+    if Chem.MolToSmiles(mol) in radical_set:
+        return 0.  
+    
+    target_fp = Chem.RDKFingerprint(mol)
+    max_similarity = max(DataStructs.BulkTanimotoSimilarity(target_fp, radical_fps.values))
+    
+    return max_similarity
 
 @lru_cache(maxsize=CONFIG.lru_cache_maxsize)
 def get_next_mols(mol, fp_length):
