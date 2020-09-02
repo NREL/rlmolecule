@@ -137,13 +137,13 @@ class Game(object):
     def get_data(self):
         return {
             "network_inputs": {
-                "mol":  [game.make_inputs(game_idx)[0] for game_idx in range(len(game.history)-1)],
-                "next_mols": [game.make_inputs(game_idx)[1] for game_idx in range(len(game.history)-1)],
-                "action_mask": [game.make_inputs(game_idx)[2] for game_idx in range(len(game.history)-1)],
-                "pi":  [game.child_visits[game_idx] for game_idx in range(len(game.history)-1)],
+                "mol":  [self.make_inputs(game_idx)[0] for game_idx in range(len(self.history)-1)],
+                "next_mols": [self.make_inputs(game_idx)[1] for game_idx in range(len(self.history)-1)],
+                "action_mask": [self.make_inputs(game_idx)[2] for game_idx in range(len(self.history)-1)],
+                "pi":  [self.child_visits[game_idx] for game_idx in range(len(self.history)-1)],
             },
-            "mol_smiles": game.history,
-            "reward": game.terminal_value(-1)
+            "mol_smiles": self.history,
+            "reward": self.terminal_value(-1)
         }
 
     
@@ -286,8 +286,8 @@ def create_directories():
     
     if not os.path.isdir(buffer_dir):
         try:
-            os.mkdirs(buffer_dir, exist_ok=True)
-        except OSError, e:
+            os.makedirs(buffer_dir, exist_ok=True)
+        except OSError:
             if os.path.exists(buffer_dir):
                 print("Buffer directory already exists")
     else:
@@ -295,8 +295,8 @@ def create_directories():
     
     if not os.path.isdir(model_dir):
         try:
-            os.mkdirs(model_dir, exist_ok=True)
-        except OSError, e:
+            os.makedirs(model_dir, exist_ok=True)
+        except OSError:
             if os.path.exists(model_dir):
                 print("Model directory already exists")
     else:
