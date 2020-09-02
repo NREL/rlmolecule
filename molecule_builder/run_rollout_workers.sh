@@ -29,7 +29,7 @@ export PROMPT_COMMAND=conda_auto_env
 
 num_workers=2
 
-for (( i=1; i<=num_workers; i++ ))
+for (( i=1; i<=$num_workers; i++ ))
 do
     python rollout.py --id "$i"  &
 done
