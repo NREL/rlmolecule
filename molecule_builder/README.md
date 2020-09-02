@@ -1,11 +1,18 @@
 # Run rollout with multiple CPUs
 
-The file `run_rollout_workers.sh` can be used for running multiple instances of rollout on different workers for a **single machine/node** (the procedure has not been used on Eagle yet). Depending on the number of workers you want to run experiments, you can edit the file and change the following variable in up to as many core you want (default value is set to 2):
-```shell
+The file `run_rollout_workers.sh` can be used for running multiple instances of rollout on different workers for a **single machine/node** (the procedure has not been used on Eagle yet). Depending on the number of workers you want to run experiments, open (e.g. using nano or vim) and edit the file, and change the following variable in up to as many workers as you want (the current default value is set to 2):
+```
 num_workers=2
 ```
 
-After setting the number of workers, run the following
+After setting the number of workers, you have to include the path to the environment you already created for the experiments:
+```
+conda activate path-to-env
+```
+
+For example, if you are running the code on a local machine, and your environment's name is *molecule*, you can change the previous line to `conda activate molecule`.
+
+After finishing editing the shell file, run experiments as:
 
 ```
 source run_rollout_workers.sh
