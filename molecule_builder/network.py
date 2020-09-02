@@ -66,15 +66,17 @@ class Network:
                   "pi_logits": tf.nn.softmax_cross_entropy_with_logits})
 
 
-    def load_weights(self):
+    def load_weights(self, model_dir):
         """Update the latest model weights."""
         if self.checkpoint_dir is None:
             pass
         else:
             # Actually do something here! 
-            if glob.glob('**/model_*', recursive=False):
-                file_list = glob.glob('**/model_*', recursive=False)
-                latest_file = max(file_list, key=os.path.getctime)
+            glob_pattern = os.path.join(model_dir, model_*)
+            file_list = glob.glob(glob_pattern, recursive=False)
+            if file_list:
+                #latest_file = max(file_list, key=os.path.getctime)
+                latest_file = tf.train.latest_checkpoint(model_dir)
                 tf.keras.models.load_model(latest_file, compile=False)
                 #print(new_model.summary())
             else:
@@ -88,10 +90,10 @@ class Network:
 
 if __name__ == "__main__":
     current_path = os.getcwd()
-    path_to_saved_models = os.path.join(current_path,'saved_models')
-    if not os.path.isdir(path_to_saved_models):
-        os.mkdir(path_to_saved_models)
+    model_dir = os.path.join(current_path, 'saved_models')
+    if not os.path.isdir(model_dir):
+        os.mkdirs(model_dir, exist_ok=True)
     else:
         print("Saved models directory already exists, continue")
-    network = Network(path_to_saved_models)
-    network.load_weights()
+    network = Network(model_dir)
+    network.load_weights(model_dir)
