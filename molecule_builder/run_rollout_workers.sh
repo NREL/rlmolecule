@@ -3,9 +3,8 @@
  Function conda_auto_env enables the user to automatically activate an environment once they enter into
  a project directory, assuming an <environment_name>.yaml already exists in the directory. If that is not
  the case, then conda_auto_env will automatically create one based on the existing yaml file.
-Information
 
-function conda_auto_env() {
+ function conda_auto_env() {
   if [ -e "molecule_environment.yml" ]; then
     # echo "molecule_environment.yml file found"
     ENV=$(head -n 1 molecule_environment.yml | cut -f2 -d ' ')
@@ -26,6 +25,9 @@ function conda_auto_env() {
 }
 
 export PROMPT_COMMAND=conda_auto_env
+Information
+
+conda activate path-to-env-eagle
 
 num_workers=2
 
