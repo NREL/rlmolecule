@@ -51,7 +51,7 @@ def train_model(network, buffer_dir, model_dir):
         mol, next_mols, action_mask, v, pi = sample_batch(buffer_dir)
         for gs in range(CONFIG.gradient_steps_per_batch):
             loss = network.model.train_on_batch([mol, next_mols, action_mask], [v, pi])
-            print("grad step:{}, loss:{}".format(gs, loss))
+            #print("grad step:{}, loss:{}".format(gs, loss))
         network.model.save(os.path.join(model_dir,'model_{}.h5'.format(time.strftime("%Y%m%d-%H%M%S"))))
 
 if __name__ == "__main__":
