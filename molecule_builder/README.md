@@ -1,6 +1,6 @@
 # Run rollout with multiple CPUs
 
-The file ```multiple_workers.sh``` can be used for running multiple instances of rollout on different workers for a **single machine/node** (the procedure has not been used on Eagle yet). Depending on the number of workers you want to run experiments, you can edit the file and change the following variable in up to as many core you want (default value is set to 2):
+The file ```run_rollout_workers.sh``` can be used for running multiple instances of rollout on different workers for a **single machine/node** (the procedure has not been used on Eagle yet). Depending on the number of workers you want to run experiments, you can edit the file and change the following variable in up to as many core you want (default value is set to 2):
 ```shell
 num_workers=2
 ```
