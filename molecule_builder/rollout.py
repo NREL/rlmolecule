@@ -335,7 +335,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint-dir", type=str, default=None,
         help="Directory containing saved network checkpoints")
-    parser.add_argument("--id", type=int, default=0, help="worker id")
+    parser.add_argument("--id", type=int, default=1, help="worker id")
     args = parser.parse_args()
     print(args)
 
