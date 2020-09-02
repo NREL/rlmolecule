@@ -20,14 +20,11 @@ from training import train_model
 
 CONFIG = AlphaZeroConfig()
 
-def read_radicals():
-    radical_fps = pd.read_pickle('/q2_milestone/binary_fps.p.gz').apply(
-        DataStructs.CreateFromBinaryText)
-    radicals = pd.read_csv('/q2_milestone/radicals.csv.gz')['0']
+radical_fps = pd.read_pickle('/q2_milestone/binary_fps.p.gz').apply(
+    DataStructs.CreateFromBinaryText)
+radicals = pd.read_csv('/q2_milestone/radicals.csv.gz')['0']
 
-    radical_set = set(radicals)
-
-    return radical_fps, radical_set
+radical_set = set(radicals)
 
 
 # Create cached functions
