@@ -3,8 +3,10 @@ import os
 import pickle
 import time
 import numpy as np
+import tensorflow as tf
 
 from config import AlphaZeroConfig
+from network import Network
 
 CONFIG = AlphaZeroConfig()
 
@@ -47,24 +49,30 @@ def sample_batch(buffer_dir):
     return mol, next_mols, action_mask, v, pi
 
 def train_model(network, buffer_dir, model_dir):
-    for _ in range(CONFIG.training_iterations):
+    for iteration in range(CONFIG.training_iterations):
         mol, next_mols, action_mask, v, pi = sample_batch(buffer_dir)
-        for gs in range(CONFIG.gradient_steps_per_batch):
-            loss = network.model.train_on_batch([mol, next_mols, action_mask], [v, pi])
-            #print("grad step:{}, loss:{}".format(gs, loss))
-        network.model.save(os.path.join(model_dir,'model_{}.h5'.format(time.strftime("%Y%m%d-%H%M%S"))))
+        #for gs in range(CONFIG.gradient_steps_per_batch):
+            #loss = network.model.train_on_batch([mol, next_mols, action_mask], [v, pi])
+        checkpoint_filepath = os.path.join(model_dir,'cp.ckpt')
+        cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_filepath,
+                                                            save_weights_only=True,
+                                                            save_best_only=False,
+                                                            verbose=0,
+                                                            period=2)
+        history = network.model.fit([np.asarray(mol), np.asarray(next_mols), np.asarray(action_mask)], 
+                                    [np.asarray(v), np.asarray(pi)],
+                                    epochs=CONFIG.gradient_steps_per_batch,
+                                    callbacks=[cp_callback],
+                                    verbose=0)
+        network.model.save_weights(checkpoint_filepath.format(epoch=0))
+        #network.model.save(os.path.join(model_dir,'model_{}.h5'.format(time.strftime("%Y%m%d-%H%M%S"))))
 
 if __name__ == "__main__":
-    #mol, next_mols, action_mask, v, pi = sample()
+
     current_path = os.getcwd()
     buffer_dir = os.path.join(current_path, 'pickled_objects')
-    glob_pattern = os.path.join(buffer_dir, '*[0-9].pickle')
-    file_list = sorted(glob.glob(glob_pattern, recursive=False))
-    print(file_list)
+    model_dir = os.path.join(current_path, 'saved_models')
 
-    num_samples = 2
-
-    for name in file_list[-num_samples:]: 
-        with open(name, 'rb') as f:
-            new_data = pickle.load(f)
-        print(name) 
+    network = Network(model_dir)
+    network.compile()
+    train_model(network, buffer_dir, model_dir)

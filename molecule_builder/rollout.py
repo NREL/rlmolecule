@@ -20,12 +20,15 @@ from training import train_model
 
 CONFIG = AlphaZeroConfig()
 
-radical_fps = pd.read_pickle('/q2_milestone/binary_fps.p.gz').apply(
+"""
+# The following will be used as a reward function instead of qed(), but probably works only on Eagle
+
+radical_fps = pd.read_pickle('/Users/eskordil/git_repos/rlmolecule/q2_rl_milestone/binary_fps.p.gz').apply(
     DataStructs.CreateFromBinaryText)
 radicals = pd.read_csv('/q2_milestone/radicals.csv.gz')['0']
 
 radical_set = set(radicals)
-
+"""
 
 # Create cached functions
 @lru_cache(maxsize=CONFIG.lru_cache_maxsize)
@@ -336,20 +339,16 @@ def rollout_loop(args):
 
     log_data = defaultdict(list)
     network = Network(model_dir)
-    for _ in range(CONFIG.training_steps):
-        #print("updating network weights")
-        network.load_weights(model_dir)
-        rewards = []
-        for i in range(CONFIG.num_rollouts):
-            #print("playing game")
-            game = play_game(network)
-            rewards.append(game.terminal_value(-1))
-            #print("saving game")
-            save_game(game, i, args, buffer_dir)
-        log_data["mean_reward"].append(np.mean(rewards))
-        log_data["std_reward"].append(np.std(rewards))
-        network.compile()
-        train_model(network, buffer_dir, model_dir)
+    
+    network.load_model(model_dir)
+    rewards = []
+    for i in range(CONFIG.num_rollouts):
+        game = play_game(network)
+        rewards.append(game.terminal_value(-1))
+        save_game(game, i, args, buffer_dir)
+    log_data["mean_reward"].append(np.mean(rewards))
+    log_data["std_reward"].append(np.std(rewards))
+
 
 if __name__ == "__main__":
 
