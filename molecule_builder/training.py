@@ -57,14 +57,14 @@ def train_model(network, buffer_dir, model_dir):
         cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_filepath,
                                                             save_weights_only=True,
                                                             save_best_only=False,
-                                                            verbose=0,
-                                                            period=2)
+                                                            verbose=0
+                                                        )
         history = network.model.fit([np.asarray(mol), np.asarray(next_mols), np.asarray(action_mask)], 
                                     [np.asarray(v), np.asarray(pi)],
                                     epochs=CONFIG.gradient_steps_per_batch,
                                     callbacks=[cp_callback],
                                     verbose=0)
-        network.model.save_weights(checkpoint_filepath.format(epoch=0))
+        network.model.save_weights(checkpoint_filepath)
         #network.model.save(os.path.join(model_dir,'model_{}.h5'.format(time.strftime("%Y%m%d-%H%M%S"))))
 
 if __name__ == "__main__":
