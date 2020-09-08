@@ -27,7 +27,11 @@ def py_func(x):
     ]
 
 def ds_map_fn(x):
-    flattened_output = tf.py_function(py_func, [x], [tf.float32, tf.float32, tf.float32, tf.float32, tf.string, tf.float32])
+    flattened_output = tf.py_function(
+                            py_func, 
+                            [x], 
+                            [tf.float32, tf.float32, tf.float32, tf.float32, tf.string, tf.float32]
+                        )
     return [{
         "network_inputs": {
             "mol":  flattened_output[0],
