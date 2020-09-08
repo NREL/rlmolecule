@@ -54,7 +54,7 @@ def sample_batch(buffer_dir):
     # Set number of sampled games
     num_samples = min(file_list_len, CONFIG.buffer_max_size)
     
-    # Create a list of the sampled games, unpickled (?)
+    # Create a list of the sampled games, unpickled
     def get_last_n(x, y):
         return x >= file_list_len - num_samples
     
