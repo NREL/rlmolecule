@@ -16,7 +16,7 @@ def get_r_alpha():
     buffer_dir = os.path.join(current_path, 'pickled_objects')
     reward_glob_pattern = os.path.join(buffer_dir, 'rewards_*')
     files = glob.glob(reward_glob_pattern)
-    most_recent = sorted(files, key=os.path.getctime, reverse=True)[:min(CONFIG.num_rollouts, CONFIG.buffer_max_size)]
+    most_recent = sorted(files, key=os.path.getctime, reverse=True)[:CONFIG.buffer_max_size]
     reward_list = []
 
     for name in most_recent:
@@ -101,7 +101,7 @@ def sample_batch(buffer_dir):
 
 def train_model(network, buffer_dir, model_dir):
     dataset = sample_batch(buffer_dir)
-    full_batches = int(CONFIG.buffer_max_size // CONFIG.batch_size)
+    full_batches = CONFIG.buffer_max_size // CONFIG.batch_size
     checkpoint_filepath = os.path.join(model_dir,'cp.ckpt')
     cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_filepath,
                                                         save_weights_only=True,
