@@ -88,6 +88,13 @@ def sample_batch(buffer_dir):
                                     "action_mask": [-1],
                                     "pi_logits": [-1],
                                     "reward": [],
+                                }),
+                                padding_values=({
+                                    "mol":  0.,
+                                    "next_mols": 0.,
+                                    "action_mask": 0.,
+                                    "pi_logits": 0.,
+                                    "reward": 0.,
                                 })).prefetch(tf.data.experimental.AUTOTUNE)
 
     return file_list
