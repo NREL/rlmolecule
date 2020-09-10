@@ -16,7 +16,7 @@ from molecule_builder import build_molecules
 
 from config import AlphaZeroConfig
 from network import Network
-from training import train_model
+from training_tf import train_model
 
 CONFIG = AlphaZeroConfig()
 
@@ -25,7 +25,7 @@ CONFIG = AlphaZeroConfig()
 
 radical_fps = pd.read_pickle('/Users/eskordil/git_repos/rlmolecule/q2_rl_milestone/binary_fps.p.gz').apply(
     DataStructs.CreateFromBinaryText)
-radicals = pd.read_csv('/q2_milestone/radicals.csv.gz')['0']
+radicals = pd.read_csv('/Users/eskordil/git_repos/rlmolecule/q2_rl_milestone/radicals.csv.gz')['0']
 
 radical_set = set(radicals)
 """
@@ -50,8 +50,6 @@ def get_reward_from_mol(mol):
 def evaluate_max_similarity(mol):
     """ This is the function we'll need to maximize. At least find new molecules
     tindex are < 1; but greater than 0.7 """
-
-    radical_fps, radical_set = read_radicals()
     
     if Chem.MolToSmiles(mol) in radical_set:
         return 0.  
@@ -161,6 +159,7 @@ class Game(object):
         return mol, next_mols, action_mask
     
     def get_data(self):
+        
         return {
             "network_inputs": {
                 "mol":  [self.make_inputs(game_idx)[0] for game_idx in range(len(self.history)-1)],
@@ -174,27 +173,14 @@ class Game(object):
 
     
 def save_game(game, game_idx, args, dir):
-    """Push the game to the buffer.  Suggested data structure (dict):
-        data = {
-            "network_inputs": {
-                "mol":  fingerprints each molecule in game history,
-                "next_mols": fingerprint arrays of chilren molecules for
-                    each root molecule,
-                "pi":  child visit arrays for each root molecule,
-            }
-            "mol_smiles": smiles strings for game history (list),
-            "reward": terminal reward (float)
-        }
-
-    Erotokritos, you might want to modify the Game class to keep track of these
-    things when they are generated during MCTS, so you don't have to recreate
-    them here.
-    """
 
     data = game.get_data()
    
     with open(os.path.join(dir,'game_{:02d}_{}.pickle'.format(game_idx, args.id)), 'wb') as f:
         pickle.dump(data, f)
+    
+    with open(os.path.join(dir,'rewards_{:02d}_{}'.format(game_idx, args.id)), 'wb') as f:
+        pickle.dump(data["reward"], f)
 
 
 def play_game(network, explore=True):
