@@ -24,7 +24,7 @@ class AlphaZeroConfig:
         self.checkpoint_frequency = 1      # save new model file every N batches
         self.batch_update_frequency = 10   # get most recent data every N updates
         self.gradient_steps_per_batch = 32  # num step per batch
-        self.training_iterations = 100 # training iterations for NN
+        self.training_iterations = int(1e06) # training iterations for NN
 
         # Buffers
         self.ranked_reward_alpha = 0.9
