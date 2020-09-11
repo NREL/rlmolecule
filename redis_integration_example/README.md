@@ -67,7 +67,7 @@ very simple and attempts to perform a single, straightforward task:
 This script checks the status of jobs that are in `<prefix>_PENDING_AND_RUNNING`; depending on the current status
 reported by SLURM, it will move the job IDs from `<prefix>_PENDING_AND_RUNNING` to: `<prefix>_COMPLETED`, `<prefix>_FAILED`, `<prefix>_TIMEOUT`,
 or `<prefix>_CANCELLED` (atomic move between the sets is used within Redis). 
-Then the scripts goes to sleep and keeps repeating its loop until the process is killed. 
+Then the script goes to sleep and keeps repeating its loop until the process is killed. 
 This script can be started before running experiments or at a later time to sort out past jobs.
 
 * `test_lastjob.sh` -- Prints all keys/values produced by the last (most recent) job from `<prefix>_ALL`. 
@@ -86,7 +86,7 @@ Value: 0.6513745153655051
 ```
 
 * `test_status.sh` -- Prints all job IDs from all the job lists mentioned above: "ALL", "PENDING_AND_RUNNING", "COMPLETED", etc. to see the complete picture 
-of recent exepiments.
+of recent experiments.
 Usage and sample output:
 ```
 $ bash test_status.sh 
