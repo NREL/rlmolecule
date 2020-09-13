@@ -176,8 +176,8 @@ def save_game(game, game_idx, args, dir):
 
     data = game.get_data()
     
-    with open(os.path.join(dir,'rewards_{:02d}_{}'.format(game_idx, args.id)), 'wb') as f:
-        pickle.dump(data["reward"], f)
+    with open(os.path.join(dir,'game_{:02d}_{}.pickle'.format(game_idx, args.id)), 'wb') as f:
+        pickle.dump(data, f)
 
 
 def play_game(network, explore=True):

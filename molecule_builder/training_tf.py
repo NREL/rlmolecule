@@ -14,14 +14,15 @@ CONFIG = AlphaZeroConfig()
 def get_r_alpha():
     current_path = os.getcwd()
     buffer_dir = os.path.join(current_path, 'pickled_objects')
-    reward_glob_pattern = os.path.join(buffer_dir, 'rewards_*')
-    files = glob.glob(reward_glob_pattern)
+    glob_pattern = os.path.join(buffer_dir, '*[0-9].pickle')
+    files = glob.glob(glob_pattern)
     most_recent = sorted(files, key=os.path.getctime, reverse=True)[:CONFIG.buffer_max_size]
     reward_list = []
 
     for name in most_recent:
         with open(name, 'rb') as f:
-            reward_list.append(pickle.load(f))
+            data = pickle.load(f)
+            reward_list.append(data["reward"])
     
     return np.percentile(reward_list, 100.*CONFIG.ranked_reward_alpha)
 
@@ -44,14 +45,17 @@ def parser_fn(filename):
         data = pickle.load(f)
         game_pos = np.random.randint(len(data['mol_smiles']) - 1)
                 
-        res = {}
-        res['mol'] = data['network_inputs']['mol'][game_pos]
-        res['next_mols'] = data['network_inputs']['next_mols'][game_pos]
-        res['action_mask'] = data['network_inputs']['action_mask'][game_pos]
-        res['reward'] = get_ranked_reward(data['reward'])
-        res['pi_logits'] = data['network_inputs']['pi'][game_pos]
-        
-        return res
+        inputs = {
+            "mol": np.reshape(np.array(data['network_inputs']['mol'][game_pos], dtype=np.float32),(1,-1)),
+            "next_mols": np.expand_dims(data['network_inputs']['next_mols'][game_pos],0),
+            "action_mask": np.reshape(np.array(data['network_inputs']['action_mask'][game_pos], dtype=np.float32),(1,-1))
+            }
+        outputs = {
+            "v": get_ranked_reward(data['reward']),
+            "pi_logits": np.reshape(np.array(data['network_inputs']['pi'][game_pos], dtype=np.float32),(1,-1))
+            }
+
+        return (inputs, outputs)
 
 def sample_batch(buffer_dir):
 
@@ -68,35 +72,40 @@ def sample_batch(buffer_dir):
                     output_types=({
                         "mol":  tf.float32,
                         "next_mols": tf.float32,
-                        "action_mask": tf.float32,
+                        "action_mask": tf.float32
+                    },{
                         "pi_logits":  tf.float32,
-                        "reward": tf.float32,
+                        "v": tf.float32,
                     }),
                     output_shapes=({
-                        "mol": [None,],
-                        "next_mols": [None, CONFIG.fingerprint_dim],
-                        "action_mask": [None,],
-                        "pi_logits": [None,],
-                        "reward": [],
+                        "mol": [None, CONFIG.fingerprint_dim],
+                        "next_mols": [None, CONFIG.max_next_mols, CONFIG.fingerprint_dim],
+                        "action_mask": [None, CONFIG.max_next_mols]
+                    },{
+                        "pi_logits": [None, CONFIG.max_next_mols],
+                        "v": [],
                     })
-                    ).shuffle(buffer_size=CONFIG.batch_size, reshuffle_each_iteration=True).repeat(-1).\
+                    ).repeat().shuffle(buffer_size=CONFIG.batch_size, reshuffle_each_iteration=True).\
                         padded_batch(
-                            batch_size=CONFIG.batch_size,
-                                padded_shapes=({
-                                    "mol":  [-1],
-                                    "next_mols": [-1, CONFIG.fingerprint_dim],
-                                    "action_mask": [-1],
-                                    "pi_logits": [-1],
-                                    "reward": [],
-                                }),
-                                padding_values=({
-                                    "mol":  0.,
-                                    "next_mols": 0.,
-                                    "action_mask": 0.,
-                                    "pi_logits": 0.,
-                                    "reward": 0.,
-                                })).prefetch(tf.data.experimental.AUTOTUNE)
-
+                        batch_size=CONFIG.batch_size,
+                            padded_shapes=({
+                                "mol":  [-1, CONFIG.fingerprint_dim],
+                                "next_mols": [-1, CONFIG.max_next_mols, CONFIG.fingerprint_dim],
+                                "action_mask": [-1, CONFIG.max_next_mols]
+                            },{
+                                "pi_logits": [-1, CONFIG.max_next_mols],
+                                "v": [],
+                            }),
+                            padding_values=({
+                                "mol":  0.,
+                                "next_mols": 0.,
+                                "action_mask": 0.
+                            },{
+                                "pi_logits": 0.,
+                                "v": 0.,
+                            }),
+                            drop_remainder=True).prefetch(tf.data.experimental.AUTOTUNE)
+    
     return file_list
 
 def train_model(network, buffer_dir, model_dir):
@@ -112,7 +121,7 @@ def train_model(network, buffer_dir, model_dir):
                                 steps_per_epoch=full_batches,
                                 epochs=CONFIG.training_iterations,
                                 callbacks=[cp_callback],
-                                verbose=1)
+                                verbose=True)
 
 if __name__ == "__main__":
 
