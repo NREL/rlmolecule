@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Input, Dense, Lambda
+from tensorflow.keras.layers import Input, Dense, Lambda, GlobalAveragePooling1D
 from tensorflow.keras import Model
 from tensorflow.keras import backend as K
 
@@ -34,13 +34,14 @@ class Network:
             return Dense(num_hidden_units, kernel_regularizer=kreg, kernel_initializer=kini)
 
         # Inputs
-        mol = Input(shape=(fingerprint_dim,), name="mol")
-        next_mols = Input(shape=(max_actions, fingerprint_dim,), name="next_mols")
-        action_mask = Input(shape=(max_actions,), name="action_mask")
+        mol = Input(shape=[None, fingerprint_dim], name="mol")
+        next_mols = Input(shape=[None, max_actions, fingerprint_dim], name="next_mols")
+        action_mask = Input(shape=[None, max_actions], name="action_mask")
 
         # Value network
         x = dense()(mol)
         x = dense()(x)
+        x = GlobalAveragePooling1D()(x)
         v = Dense(1, activation="tanh", name="v", kernel_regularizer=kreg, 
                     kernel_initializer=kini)(x)
 
@@ -49,10 +50,11 @@ class Network:
         y = dense()(y)
         action_embed = Dense(fingerprint_dim, kernel_regularizer=kreg, 
             kernel_initializer=kini, activation="linear", name="action_embed")(y)
-        intent_vector = tf.expand_dims(action_embed, 1)
-        pi_logits = tf.reduce_sum(next_mols * intent_vector, axis=2)
+        intent_vector = tf.expand_dims(action_embed, 2)
+        pi_logits = tf.reduce_sum(next_mols * intent_vector, axis=-1)
         inf_mask = tf.maximum(K.log(action_mask), tf.float32.min)
         pi_logits = pi_logits + inf_mask
+        pi_logits = GlobalAveragePooling1D()(pi_logits)
         pi_logits = Lambda(lambda x: x, name="pi_logits")(pi_logits)
 
         self.model = Model(inputs=[mol, next_mols, action_mask], outputs=[v, pi_logits])
@@ -82,7 +84,7 @@ class Network:
 
     def inference(self, mol, next_mols, action_mask):
         """Forward pass."""
-        v, pi = self.model([mol[None, :], next_mols[None, :], action_mask[None, :]])
+        v, pi = self.model([mol[None, None, :], next_mols[None, None, :], action_mask[None, None, :]])
         return tf.squeeze(v), tf.squeeze(pi)
 
 if __name__ == "__main__":
