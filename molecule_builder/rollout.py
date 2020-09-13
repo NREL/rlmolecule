@@ -157,6 +157,20 @@ class Game(object):
             next_mols[:len(mols), :] = mols
             action_mask[:len(mols)] = 1.
         return mol, next_mols, action_mask
+
+    
+    def get_data(self):
+        return {
+            "network_inputs": {
+                "mol":  [self.make_inputs(i)[0] for i in range(len(self.history)-1)],
+                "next_mols": [self.make_inputs(i)[1] for i in range(len(self.history)-1)],
+                "action_mask": [self.make_inputs(i)[2] for i in range(len(self.history)-1)],
+                "pi":  [self.child_visits[i] for i in range(len(self.history)-1)],
+            },
+            "mol_smiles": self.history,
+            "reward": self.terminal_value(-1)
+        }
+
     
     def get_data(self):
         
@@ -170,7 +184,6 @@ class Game(object):
             "mol_smiles": self.history,
             "reward": self.terminal_value(-1)
         }
-
     
 def save_game(game, game_idx, args, dir):
 
@@ -345,3 +358,4 @@ if __name__ == "__main__":
     print(args)
 
     rollout_loop(args)
+    
