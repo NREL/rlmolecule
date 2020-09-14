@@ -170,20 +170,6 @@ class Game(object):
             "mol_smiles": self.history,
             "reward": self.terminal_value(-1)
         }
-
-    
-    def get_data(self):
-        
-        return {
-            "network_inputs": {
-                "mol":  [self.make_inputs(game_idx)[0] for game_idx in range(len(self.history)-1)],
-                "next_mols": [self.make_inputs(game_idx)[1] for game_idx in range(len(self.history)-1)],
-                "action_mask": [self.make_inputs(game_idx)[2] for game_idx in range(len(self.history)-1)],
-                "pi":  [self.child_visits[game_idx] for game_idx in range(len(self.history)-1)],
-            },
-            "mol_smiles": self.history,
-            "reward": self.terminal_value(-1)
-        }
     
 def save_game(game, game_idx, args, dir):
 
