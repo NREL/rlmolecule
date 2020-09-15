@@ -46,13 +46,13 @@ def parser_fn(filename):
         game_pos = np.random.randint(len(data['mol_smiles']) - 1)
                 
         inputs = {
-            "mol": np.reshape(np.array(data['network_inputs']['mol'][game_pos], dtype=np.float32),(1,-1)),
-            "next_mols": np.expand_dims(data['network_inputs']['next_mols'][game_pos],0),
-            "action_mask": np.reshape(np.array(data['network_inputs']['action_mask'][game_pos], dtype=np.float32),(1,-1))
+            "mol": data['network_inputs']['mol'][game_pos],
+            "next_mols": data['network_inputs']['next_mols'][game_pos],
+            "action_mask": data['network_inputs']['action_mask'][game_pos]
             }
         outputs = {
             "v": get_ranked_reward(data['reward']),
-            "pi_logits": np.reshape(np.array(data['network_inputs']['pi'][game_pos], dtype=np.float32),(1,-1))
+            "pi_logits": data['network_inputs']['pi'][game_pos]
             }
 
         return (inputs, outputs)
