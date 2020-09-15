@@ -21,6 +21,9 @@ from training_tf import train_model
 CONFIG = AlphaZeroConfig()
 
 # The following is used as a reward function instead of qed(), works with current pandas version (1.1.1)
+# To run on Eagle, change the next two paths to: 
+# /projects/rlmolecule/pstjohn/q2_milestone/binary_fps.p.gz, 
+# /projects/rlmolecule/pstjohn/q2_milestone/radicals.csv.gz
 
 radical_fps = pd.read_pickle('/Users/eskordil/git_repos/rlmolecule/q2_rl_milestone/binary_fps.p.gz').apply(
     DataStructs.CreateFromBinaryText)
