@@ -20,15 +20,14 @@ from training_tf import train_model
 
 CONFIG = AlphaZeroConfig()
 
-"""
-# The following will be used as a reward function instead of qed(), but probably works only on Eagle
+# The following is used as a reward function instead of qed(), works with current pandas version (1.1.1)
 
 radical_fps = pd.read_pickle('/Users/eskordil/git_repos/rlmolecule/q2_rl_milestone/binary_fps.p.gz').apply(
     DataStructs.CreateFromBinaryText)
 radicals = pd.read_csv('/Users/eskordil/git_repos/rlmolecule/q2_rl_milestone/radicals.csv.gz')['0']
 
 radical_set = set(radicals)
-"""
+
 
 # Create cached functions
 @lru_cache(maxsize=CONFIG.lru_cache_maxsize)
@@ -56,9 +55,12 @@ def evaluate_max_similarity(mol):
     
     target_fp = Chem.RDKFingerprint(mol)
     max_similarity = max(DataStructs.BulkTanimotoSimilarity(target_fp, radical_fps.values))
-    
-    return max_similarity
 
+    if (max_similarity > 0.7) and (max_similarity < 1.0):
+        return 1.
+    else:
+        return -1.
+    
 @lru_cache(maxsize=CONFIG.lru_cache_maxsize)
 def get_next_mols(mol, fp_length):
     """Returns list of next SMILES strings and fingerprints."""
@@ -116,7 +118,7 @@ class Game(object):
 
     def terminal_value(self, state_index):
         mol = get_mol_from_smiles(self.history[-1])
-        return get_reward_from_mol(mol)
+        return evaluate_max_similarity(mol)
      
     def root_next_mols(self):
         for smiles in self.history:
@@ -160,12 +162,20 @@ class Game(object):
 
     
     def get_data(self):
+        
+        mol, next_mols, action_mask= [], [], []
+
+        for i in range(len(self.history)-1):
+            mol.append(self.make_inputs(i)[0])
+            next_mols.append(self.make_inputs(i)[1])
+            action_mask.append(self.make_inputs(i)[2])
+       
         return {
             "network_inputs": {
-                "mol":  [self.make_inputs(i)[0] for i in range(len(self.history)-1)],
-                "next_mols": [self.make_inputs(i)[1] for i in range(len(self.history)-1)],
-                "action_mask": [self.make_inputs(i)[2] for i in range(len(self.history)-1)],
-                "pi":  [self.child_visits[i] for i in range(len(self.history)-1)],
+                "mol":  [np.reshape(np.array(mol[i], dtype=np.float32),(1,-1)) for i in range(len(self.history)-1)],
+                "next_mols": [np.expand_dims(next_mols[i],0) for i in range(len(self.history)-1)],
+                "action_mask": [np.reshape(np.array(action_mask[i], dtype=np.float32),(1,-1)) for i in range(len(self.history)-1)],
+                "pi":  [np.reshape(np.array(self.child_visits[i], dtype=np.float32),(1,-1)) for i in range(len(self.history)-1)],
             },
             "mol_smiles": self.history,
             "reward": self.terminal_value(-1)
