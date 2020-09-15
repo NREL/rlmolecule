@@ -10,4 +10,4 @@
 source ~/.bashrc
 conda activate /scratch/eskordil/conda-envs/rlmolecule
 
-srun python train_model.py
+srun python training_tf.py
