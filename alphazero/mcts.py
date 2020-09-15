@@ -1,9 +1,6 @@
-import itertools
-
 import networkx as nx
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 
 from alphazero.node import Node
 from alphazero.policy import policy_model
@@ -40,13 +37,8 @@ def expand(G: nx.DiGraph, parent: Node) -> float:
     # Create the children nodes and add them to the graph
     G.add_edges_from(((parent, child) for child in parent.build_children()))
     
-    # Build the network inputs from the parent and child nodes
-    policy_inputs = [node.policy_inputs for node in itertools.chain((parent,), parent.successors)]
-    batched_inputs = {key: pad_sequences([elem[key] for elem in policy_inputs], padding='post')
-                      for key in policy_inputs[0].keys()}
-    
     # Run the policy network to get value and prior_logit predictions
-    values, prior_logits = model(batched_inputs)
+    values, prior_logits = model(parent.policy_inputs_with_children())
     
     # Update child nodes with predicted prior_logits
     for child, prior_logit in zip(parent.successors, prior_logits[1:]):

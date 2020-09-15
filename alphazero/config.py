@@ -18,8 +18,8 @@ class AlphaZeroConfig:
 
         # Network
         self.l2_regularization_coef = 1e-4  
-        self.features = 32     # used by all network layers
-        self.num_messages = 3
+        self.features = 16     # used by all network layers
+        self.num_messages = 1
         self.num_heads = 4        # Number of attention heads
         self.batch_size = 32           # for gradient updates
         self.checkpoint_frequency = 1      # save new model file every N batches

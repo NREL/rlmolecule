@@ -1,7 +1,11 @@
+import io
+import itertools
 from math import exp
 
+import networkx as nx
 import numpy as np
 import rdkit.Chem
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 from alphazero.config import AlphaZeroConfig
 from alphazero.molecule import build_molecules, build_radicals
@@ -40,13 +44,17 @@ class Node(rdkit.Chem.Mol):
         self.terminal = terminal
         
     def __hash__(self):
-        return hash(rdkit.Chem.MolToSmiles(self))
+        return hash(self.smiles)
 
     def __eq__(self, other):
         return self.__hash__() == other.__hash__()
     
+    @property
+    def smiles(self):
+        return rdkit.Chem.MolToSmiles(self)
+    
     def __repr__(self):
-        return '<{}>'.format(rdkit.Chem.MolToSmiles(self))
+        return '<{}>'.format(self.smiles)
     
     def build_children(self):
         if self.terminal:
@@ -140,12 +148,45 @@ class Node(rdkit.Chem.Mol):
             
     @property
     def policy_inputs(self):
+        """Constructs GNN inputs for the node, or returns them if they've
+        been previously cached"""
         try:
             return self._policy_inputs
         except AttributeError:
             self._policy_inputs = preprocessor.construct_feature_matrices(self)
             return self._policy_inputs
 
+        
+    def policy_inputs_with_children(self):
+        """Return the given nodes policy inputs, concatenated together with the 
+        inputs of its successor nodes. Used as the inputs for the policy neural
+        network"""
+        
+        policy_inputs = [node.policy_inputs for node in itertools.chain((self,), self.successors)]
+        return {key: pad_sequences([elem[key] for elem in policy_inputs], padding='post')
+                for key in policy_inputs[0].keys()}
+
+    
+    def get_action_inputs_as_binary(self):
+        """Returns the output of `self.policy_inputs_with_children` and child visit probabilities 
+        as a numpy compressed binary data string.
+        
+        save and load using the following:
+        >>> binary_data = self.get_action_inputs_as_binary()
+        >>> with io.BytesIO(binary_data) as f:
+            data = dict(np.load(f, allow_pickle=True).items())        
+        
+        """
+        
+        data = self.policy_inputs_with_children()
+        visit_counts = np.array([child.visits for child in self.successors])
+        data['visit_probs'] = visit_counts / visit_counts.sum()
+        
+        with io.BytesIO() as f:
+            np.savez_compressed(f, **data)
+            binary_data = f.getvalue()
+        return binary_data
+    
     @property        
     def reward(self):
         assert self.terminal, "Accessing reward of non-terminal state"
@@ -156,5 +197,7 @@ class Node(rdkit.Chem.Mol):
             return self._reward
     
     def get_reward(self):
-        """This should get overwritten by a subclass's reward function"""
+        """This should get overwritten by a subclass's reward function.
+        (Should this be using ranked rewards?)
+        """
         pass
