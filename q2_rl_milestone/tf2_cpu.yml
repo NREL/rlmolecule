@@ -1,0 +1,20 @@
+name: tf2_cpu
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.7
+  - jupyterlab
+  - rdkit
+  - seaborn
+  - pandas
+  - scikit-learn
+  - jupyter
+  - notebook
+  - pymatgen
+  - xlrd
+  - tqdm
+  - psycopg2
+  - pip
+  - pip:
+    - nfp
