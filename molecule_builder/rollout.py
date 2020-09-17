@@ -2,8 +2,10 @@
 
 from functools import lru_cache
 from collections import defaultdict
+import io
 import os
 import pickle
+import psycopg2
 import numpy as np
 import pandas as pd
 
@@ -13,10 +15,10 @@ import rdkit.Chem.AllChem
 from rdkit.Chem.Descriptors import qed
 
 from molecule_builder import build_molecules
+from tqdm import tqdm
 
 from config import AlphaZeroConfig
 from network import Network
-from training_tf import train_model
 
 CONFIG = AlphaZeroConfig()
 
@@ -31,6 +33,14 @@ radicals = pd.read_csv('/Users/eskordil/git_repos/rlmolecule/q2_rl_milestone/rad
 
 radical_set = set(radicals)
 
+dbparams = {
+    'dbname': 'bde',
+    'port': 5432,
+    'host': 'yuma.hpc.nrel.gov',
+    'user': 'rlops',
+    'password': 'jTeL85L!',
+    'options': f'-c search_path=rl',
+}
 
 # Create cached functions
 @lru_cache(maxsize=CONFIG.lru_cache_maxsize)
@@ -191,6 +201,18 @@ def save_game(game, game_idx, args, dir):
     with open(os.path.join(dir,'game_{:02d}_{}.pickle'.format(game_idx, args.id)), 'wb') as f:
         pickle.dump(data, f)
 
+def save_game_postgresql(game, conn):
+    
+    data = game.get_data()
+    
+    with io.BytesIO() as f:
+        np.savez_compressed(f, **data)
+        binary_data = f.getvalue()
+        
+    with conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO TestReplay (data) VALUES (%s)",
+                        (binary_data,))
 
 def play_game(network, explore=True):
     game = Game()
@@ -332,18 +354,27 @@ def rollout_loop(args):
     # Create saving directories
     buffer_dir, model_dir = create_directories()
 
+    # Create a new db table
+    with psycopg2.connect(**dbparams) as conn: # func connect creates new db session, returns a new connection instance
+        with conn.cursor() as cur: # in the new connection instance, create cursor to execute db commands/queries. sends commands to db using execute
+            cur.execute("""
+            DROP TABLE IF EXISTS TestReplay;
+            
+            CREATE TABLE TestReplay (
+                gameid serial PRIMARY KEY,
+                time timestamp DEFAULT CURRENT_TIMESTAMP,
+                data BYTEA);
+            """) # use placeholders %s to pass parameters to SQL statement
+
     log_data = defaultdict(list)
     network = Network(model_dir)
     
     network.load_model(model_dir)
-    rewards = []
-    for i in range(CONFIG.num_rollouts):
+    for i in tqdm(range(CONFIG.num_rollouts)):
         game = play_game(network)
-        rewards.append(game.terminal_value(-1))
-        save_game(game, i, args, buffer_dir)
-    log_data["mean_reward"].append(np.mean(rewards))
-    log_data["std_reward"].append(np.std(rewards))
-
+        save_game_postgresql(game, conn)
+        #save_game(game, i, args, buffer_dir)
+    
 
 if __name__ == "__main__":
 
