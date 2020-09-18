@@ -14,11 +14,11 @@ config = AlphaZeroConfig()
 
 class Game(nx.DiGraph):
 
-    def __init__(self, node_cls=None, start=None, checkpoint_dir=None):
+    def __init__(self, node_cls=None, start_smiles=None, checkpoint_dir=None, 
+        **node_cls_kwargs):
         super(Game, self).__init__()
 
-        mol = Chem.MolFromSmiles("C")
-        start = node_cls(mol, graph=self)
+        start = node_cls(Chem.MolFromSmiles(start_smiles), graph=self, **node_cls_kwargs)
         self.add_node(start)
         self.start = start
 
