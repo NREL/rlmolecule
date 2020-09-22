@@ -30,31 +30,32 @@ dbparams = {
 ## This creates the table used to store the rewards
 ## But, we don't want this to run every time we run the script, 
 ## just keeping it here as a reference
-
-# with psycopg2.connect(**dbparams) as conn:
-#     with conn.cursor() as cur:
-#         cur.execute("""
-#         DROP TABLE IF EXISTS Q2Reward;
+'''
+with psycopg2.connect(**dbparams) as conn:
+    with conn.cursor() as cur:
+        cur.execute("""
+        DROP TABLE IF EXISTS Q2RewardErotokritos;
         
-#         CREATE TABLE Q2Reward (
-#             id serial PRIMARY KEY,
-#             time timestamp DEFAULT CURRENT_TIMESTAMP,
-#             reward real,
-#             smiles varchar(50) UNIQUE
-#             );
+        CREATE TABLE Q2RewardErotokritos (
+            id serial PRIMARY KEY,
+            time timestamp DEFAULT CURRENT_TIMESTAMP,
+            reward real,
+            smiles varchar(50) UNIQUE
+            );
             
-#         DROP TABLE IF EXISTS Q2Replay;
+        DROP TABLE IF EXISTS Q2ReplayErotokritos;
         
-#         CREATE TABLE Q2Replay (
-#             id serial PRIMARY KEY,
-#             time timestamp DEFAULT CURRENT_TIMESTAMP,
-#             gameid varchar(8),        
-#             smiles varchar(50),
-#             reward real,
-#             position int,
-#             data BYTEA);          
-#             """)
-
+        CREATE TABLE Q2ReplayErotokritos (
+            id serial PRIMARY KEY,
+            time timestamp DEFAULT CURRENT_TIMESTAMP,
+            gameid varchar(8),        
+            smiles varchar(50),
+            binary_reward real,
+            reward real,
+            position int,
+            data BYTEA);          
+            """)
+'''
 class SimilarityNode(Node):
     
     def get_reward(self):
@@ -64,13 +65,13 @@ class SimilarityNode(Node):
         
         target_fp = Chem.RDKFingerprint(self)
         max_similarity = max(DataStructs.BulkTanimotoSimilarity(target_fp, radical_fps.values))
-        
+
         # Here's how I'm doing the reward saving. Not the most efficient method (might want
         # to check if the reward exists before calculating) but this is a pretty fast 
         # reward calculation
         with psycopg2.connect(**dbparams) as conn:
             with conn.cursor() as cur:
-                cur.execute("""INSERT INTO Q2Reward (smiles, reward) values (%s, %s)
+                cur.execute("""INSERT INTO Q2RewardErotokritos (smiles, reward) values (%s, %s)
                 on conflict (smiles) do nothing;""", (self.smiles, max_similarity))
             
         if (max_similarity > 0.7) & (max_similarity < 1.0):
@@ -89,14 +90,17 @@ def run_game():
     G.add_node(start)
 
     game = list(run_mcts(G, start))
-    reward = game[-1].reward
+    target_fp = Chem.RDKFingerprint(game[-1])
+    max_similarity = max(DataStructs.BulkTanimotoSimilarity(target_fp, radical_fps.values))
+    reward = max_similarity
+    binary_reward = game[-1].reward
 
     with psycopg2.connect(**dbparams) as conn:
         for i, node in enumerate(game[:-1]):
             with conn.cursor() as cur:
                 cur.execute(
-                    """INSERT INTO Q2Replay (gameid, smiles, reward, position, data) values %s;""",
-                    ((gameid, node.smiles, reward, i, node.get_action_inputs_as_binary()),))
+                    """INSERT INTO Q2ReplayErotokritos (gameid, smiles, binary_reward, reward, position, data) values %s;""",
+                    ((gameid, node.smiles, binary_reward, reward, i, node.get_action_inputs_as_binary()),))
 
     print(f'finishing game {gameid}', flush=True)
             
@@ -104,3 +108,4 @@ def run_game():
 if __name__ == "__main__":    
         while True:
             run_game()
+
