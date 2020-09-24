@@ -4,6 +4,7 @@ from math import exp
 
 import networkx as nx
 import numpy as np
+import rdkit
 import rdkit.Chem
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
@@ -12,6 +13,7 @@ from alphazero.molecule import build_molecules, build_radicals
 from alphazero.preprocessor import preprocessor
 
 CONFIG = AlphaZeroConfig()
+
 
 class Node(rdkit.Chem.Mol):
     
@@ -37,7 +39,6 @@ class Node(rdkit.Chem.Mol):
         terminal: whether the given node is a terminal state
         
         """
-        
         
         super(Node, self).__init__(*args, **kwargs)
         self.G = graph
@@ -130,7 +131,23 @@ class Node(rdkit.Chem.Mol):
             return node['prior_logit']
         except KeyError:
             return np.nan
-    
+            
+
+    def reset_priors(self):
+        node = self.G.nodes[self]
+        if 'prior_logit' in node:
+            del node['prior_logit']
+        
+
+    def reset_updates(self):
+        node = self.G.nodes[self]
+        if 'visits' in node:
+            del node['visits']
+            
+        if 'total_value' in node:
+            del node['total_value']
+
+
     @prior_logit.setter
     def prior_logit(self, value):
         node = self.G.nodes[self]
