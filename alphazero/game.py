@@ -14,17 +14,20 @@ config = AlphaZeroConfig()
 
 class Game(nx.DiGraph):
 
-    def __init__(self, node_cls=None, start_smiles=None, checkpoint_dir=None, 
-        **node_cls_kwargs):
+    def __init__(self, node_cls=None, start_smiles=None, checkpoint_dir=None):
         super(Game, self).__init__()
 
-        start = node_cls(Chem.MolFromSmiles(start_smiles), graph=self, **node_cls_kwargs)
+        start = node_cls(Chem.MolFromSmiles(start_smiles), graph=self)
         self.add_node(start)
         self.start = start
 
         self.checkpoint_dir = checkpoint_dir
         self.tf_checkpoint = None
         self.reset()
+        
+        self.dirichlet_noise = True
+        self.dirichlet_alpha = 1.
+        self.dirichlet_d = 0.25
 
 
     def reset(self):
@@ -75,9 +78,17 @@ class Game(nx.DiGraph):
         
         # Run the policy network to get value and prior_logit predictions
         values, prior_logits = model(parent.policy_inputs_with_children())
+        prior_logits = prior_logits[1:].numpy().flatten()
+        
+        # if we're adding noise, perturb the logits
+        if self.dirichlet_noise:
+            random_state = np.random.RandomState()
+            noise = random_state.dirichlet(
+                np.ones_like(prior_logits) * self.dirichlet_alpha)
+            prior_logits += np.exp(prior_logits).sum() * noise * self.dirichlet_d
         
         # Update child nodes with predicted prior_logits
-        for child, prior_logit in zip(parent.successors, prior_logits[1:]):
+        for child, prior_logit in zip(parent.successors, prior_logits):
             child.prior_logit = float(prior_logit)
             
         # Return the parent's predicted value
