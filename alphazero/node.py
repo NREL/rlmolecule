@@ -4,14 +4,14 @@ from math import exp
 
 import networkx as nx
 import numpy as np
+import rdkit
 import rdkit.Chem
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-from alphazero.config import AlphaZeroConfig
+import alphazero.config as config
+import alphazero.mod as mod
 from alphazero.molecule import build_molecules, build_radicals
 from alphazero.preprocessor import preprocessor
-
-CONFIG = AlphaZeroConfig()
 
 class Node(rdkit.Chem.Mol):
     
@@ -38,7 +38,6 @@ class Node(rdkit.Chem.Mol):
         
         """
         
-        
         super(Node, self).__init__(*args, **kwargs)
         self.G = graph
         self.terminal = terminal
@@ -60,7 +59,7 @@ class Node(rdkit.Chem.Mol):
         if self.terminal:
             raise RuntimeError("Attemping to get children of terminal node")
         
-        if self.GetNumAtoms() < CONFIG.max_atoms:
+        if self.GetNumAtoms() < config.max_atoms:
             for mol in build_molecules(self, stereoisomers=False):
                 if self.G.has_node(mol):
                     # Check if the graph already has the current mol
@@ -68,7 +67,7 @@ class Node(rdkit.Chem.Mol):
                 else:
                     yield self.__class__(mol, graph=self.G)
         
-        if self.GetNumAtoms() >= CONFIG.min_atoms:
+        if self.GetNumAtoms() >= config.min_atoms:
             for radical in build_radicals(self):
                 yield self.__class__(radical, graph=self.G, terminal=True)
 
@@ -113,8 +112,8 @@ class Node(rdkit.Chem.Mol):
     
     def ucb_score(self, parent):
         
-        pb_c = np.log((parent.visits + CONFIG.pb_c_base + 1) /
-                      CONFIG.pb_c_base) + CONFIG.pb_c_init
+        pb_c = np.log((parent.visits + config.pb_c_base + 1) /
+                      config.pb_c_base) + config.pb_c_init
         
         pb_c *= np.sqrt(parent.visits) / (self.visits + 1)
         
@@ -130,7 +129,23 @@ class Node(rdkit.Chem.Mol):
             return node['prior_logit']
         except KeyError:
             return np.nan
-    
+            
+
+    def reset_priors(self):
+        node = self.G.nodes[self]
+        if 'prior_logit' in node:
+            del node['prior_logit']
+        
+
+    def reset_updates(self):
+        node = self.G.nodes[self]
+        if 'visits' in node:
+            del node['visits']
+            
+        if 'total_value' in node:
+            del node['total_value']
+
+
     @prior_logit.setter
     def prior_logit(self, value):
         node = self.G.nodes[self]
