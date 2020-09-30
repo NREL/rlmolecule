@@ -11,6 +11,7 @@ from alphazero.policy import policy_model
 
 model = policy_model()
 
+
 class Game(nx.DiGraph):
 
     def __init__(self, node_cls=None, start_smiles=None, checkpoint_dir=None):

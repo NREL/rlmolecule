@@ -1,20 +1,46 @@
 """AlphaZero rollout worker script."""
 
 from functools import lru_cache
-
+from collections import defaultdict
+import io
+import os
+import pickle
+import psycopg2
 import numpy as np
+import pandas as pd
 
-from rdkit import Chem
+import rdkit
+from rdkit import Chem, DataStructs
 import rdkit.Chem.AllChem
 from rdkit.Chem.Descriptors import qed
 
 from molecule_builder import build_molecules
+from tqdm import tqdm
 
 from config import AlphaZeroConfig
 from network import Network
 
 CONFIG = AlphaZeroConfig()
 
+# The following is used as a reward function instead of qed(), works with current pandas version (1.1.1)
+# To run on Eagle, change the next two paths to: 
+# /projects/rlmolecule/pstjohn/q2_milestone/binary_fps.p.gz, 
+# /projects/rlmolecule/pstjohn/q2_milestone/radicals.csv.gz
+
+radical_fps = pd.read_pickle('/Users/eskordil/git_repos/rlmolecule/q2_rl_milestone/binary_fps.p.gz').apply(
+    DataStructs.CreateFromBinaryText)
+radicals = pd.read_csv('/Users/eskordil/git_repos/rlmolecule/q2_rl_milestone/radicals.csv.gz')['0']
+
+radical_set = set(radicals)
+
+dbparams = {
+    'dbname': 'bde',
+    'port': 5432,
+    'host': 'yuma.hpc.nrel.gov',
+    'user': 'rlops',
+    'password': 'jTeL85L!',
+    'options': f'-c search_path=rl',
+}
 
 # Create cached functions
 @lru_cache(maxsize=CONFIG.lru_cache_maxsize)
@@ -32,6 +58,22 @@ def get_reward_from_mol(mol):
     """Returns the reward."""
     return qed(mol)
 
+@lru_cache(maxsize=CONFIG.lru_cache_maxsize)
+def evaluate_max_similarity(mol):
+    """ This is the function we'll need to maximize. At least find new molecules
+    tindex are < 1; but greater than 0.7 """
+    
+    if Chem.MolToSmiles(mol) in radical_set:
+        return 0.  
+    
+    target_fp = Chem.RDKFingerprint(mol)
+    max_similarity = max(DataStructs.BulkTanimotoSimilarity(target_fp, radical_fps.values))
+
+    if (max_similarity > 0.7) and (max_similarity < 1.0):
+        return 1.
+    else:
+        return -1.
+    
 @lru_cache(maxsize=CONFIG.lru_cache_maxsize)
 def get_next_mols(mol, fp_length):
     """Returns list of next SMILES strings and fingerprints."""
@@ -78,7 +120,9 @@ class Game(object):
         self.max_actions = CONFIG.max_next_mols
         self.fingerprint_dim = CONFIG.fingerprint_dim
         self.max_atoms = CONFIG.max_atoms
+        self.action_mask = np.zeros(CONFIG.max_next_mols, dtype=np.float32)
 
+        self.root_next_mols_fp = []
         self.next_mols, self.next_mols_fp = get_next_mols(
             self.mol, fp_length=self.fingerprint_dim)
 
@@ -87,8 +131,14 @@ class Game(object):
 
     def terminal_value(self, state_index):
         mol = get_mol_from_smiles(self.history[-1])
-        return get_reward_from_mol(mol)
-
+        return evaluate_max_similarity(mol)
+     
+    def root_next_mols(self):
+        for smiles in self.history:
+            _, next_mols_fp = get_next_mols(get_mol_from_smiles(smiles), fp_length=self.fingerprint_dim)
+            self.root_next_mols_fp.append(next_mols_fp)
+        return self.root_next_mols_fp
+    
     def legal_actions(self):
         return range(len(self.next_mols))
 
@@ -122,41 +172,47 @@ class Game(object):
             next_mols[:len(mols), :] = mols
             action_mask[:len(mols)] = 1.
         return mol, next_mols, action_mask
+
     
     def get_data(self):
+        
+        mol, next_mols, action_mask= [], [], []
+
+        for i in range(len(self.history)-1):
+            mol.append(self.make_inputs(i)[0])
+            next_mols.append(self.make_inputs(i)[1])
+            action_mask.append(self.make_inputs(i)[2])
+       
         return {
             "network_inputs": {
-                "mol":  [self.make_inputs(i)[0] for i in range(len(self.history)-1)],
-                "next_mols": [self.make_inputs(i)[1] for i in range(len(self.history)-1)],
-                "action_mask": [self.make_inputs(i)[2] for i in range(len(self.history)-1)],
-                "pi":  [self.child_visits[i] for i in range(len(self.history)-1)],
+                "mol":  [np.reshape(np.array(mol[i], dtype=np.float32),(1,-1)) for i in range(len(self.history)-1)],
+                "next_mols": [np.expand_dims(next_mols[i],0) for i in range(len(self.history)-1)],
+                "action_mask": [np.reshape(np.array(action_mask[i], dtype=np.float32),(1,-1)) for i in range(len(self.history)-1)],
+                "pi":  [np.reshape(np.array(self.child_visits[i], dtype=np.float32),(1,-1)) for i in range(len(self.history)-1)],
             },
             "mol_smiles": self.history,
             "reward": self.terminal_value(-1)
         }
-
     
-def save_game(game):
-    """Push the game to the buffer.  Suggested data structure (dict):
-        data = {
-            "network_inputs": {
-                "mol":  fingerprints each molecule in game history,
-                "next_mols": fingerprint arrays of chilren molecules for
-                    each root molecule,
-                "pi":  child visit arrays for each root molecule,
-            }
-            "mol_smiles": smiles strings for game history (list),
-            "reward": terminal reward (float)
-        }
+def save_game(game, game_idx, args, dir):
 
-    Erotokritos, you might want to modify the Game class to keep track of these
-    things when they are generated during MCTS, so you don't have to recreate
-    them here. (This is peter, agreed. I think we should move that up to a
-    class method though, it might make it easier)
-  
-    """
-    pass
+    data = game.get_data()
+    
+    with open(os.path.join(dir,'game_{:02d}_{}.pickle'.format(game_idx, args.id)), 'wb') as f:
+        pickle.dump(data, f)
 
+def save_game_postgresql(game, conn):
+    
+    data = game.get_data()
+    
+    with io.BytesIO() as f:
+        np.savez_compressed(f, **data)
+        binary_data = f.getvalue()
+        
+    with conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO TestReplay (data) VALUES (%s)",
+                        (binary_data,))
 
 def play_game(network, explore=True):
     game = Game()
@@ -266,19 +322,59 @@ def softmax_sample(d):
     d_sum = d.sum()
     return np.random.choice(range(len(d)), size=1, p=d/d_sum)[0]
 
+def create_directories():
+    current_path = os.getcwd()
+    buffer_dir = os.path.join(current_path, 'pickled_objects')
+    model_dir = os.path.join(current_path, 'saved_models')
+    
+    if not os.path.isdir(buffer_dir):
+        try:
+            os.makedirs(buffer_dir, exist_ok=True)
+        except OSError:
+            if os.path.exists(buffer_dir):
+                print("Buffer directory already exists")
+    else:
+        print("Buffer directory already exists")
+    
+    if not os.path.isdir(model_dir):
+        try:
+            os.makedirs(model_dir, exist_ok=True)
+        except OSError:
+            if os.path.exists(model_dir):
+                print("Model directory already exists")
+    else:
+        print("Model directory already exists")
+    
+    return buffer_dir, model_dir
 
 def rollout_loop(args):
     """Main rollout loop that plays games using the latest network weights,
     and pushes games to the replay buffer."""
-    network = Network(args.checkpoint_dir)
-    for _ in range(CONFIG.num_rollouts):
-        print("updating network weights")
-        network.load_weights()
-        print("playing game")
-        game = play_game(network)
-        print("saving game")
-        save_game(game)
+    
+    # Create saving directories
+    buffer_dir, model_dir = create_directories()
 
+    # Create a new db table
+    with psycopg2.connect(**dbparams) as conn: # func connect creates new db session, returns a new connection instance
+        with conn.cursor() as cur: # in the new connection instance, create cursor to execute db commands/queries. sends commands to db using execute
+            cur.execute("""
+            DROP TABLE IF EXISTS TestReplay;
+            
+            CREATE TABLE TestReplay (
+                gameid serial PRIMARY KEY,
+                time timestamp DEFAULT CURRENT_TIMESTAMP,
+                data BYTEA);
+            """) # use placeholders %s to pass parameters to SQL statement
+
+    log_data = defaultdict(list)
+    network = Network(model_dir)
+    
+    network.load_model(model_dir)
+    for i in tqdm(range(CONFIG.num_rollouts)):
+        game = play_game(network)
+        save_game_postgresql(game, conn)
+        #save_game(game, i, args, buffer_dir)
+    
 
 if __name__ == "__main__":
 
@@ -287,8 +383,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint-dir", type=str, default=None,
         help="Directory containing saved network checkpoints")
+    parser.add_argument("--id", type=int, default=1, help="worker id")
     args = parser.parse_args()
     print(args)
 
     rollout_loop(args)
-
+    
