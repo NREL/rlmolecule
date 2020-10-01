@@ -10,8 +10,7 @@ from rdkit import Chem
 from rdkit import DataStructs
 import networkx as nx
 
-import alphazero.config as config
-import alphazero.mod as mod
+import stable_rad_config as config
 from alphazero.node import Node
 from alphazero.game import Game
 
@@ -32,51 +31,33 @@ dbparams = {
     'options': f'-c search_path=rl',
 }
 
-reward_table = config.sql_basename + "_reward"
-replay_table = config.sql_basename + "_replay"
-game_table = config.sql_basename + "_game"
+def get_ranked_rewards(reward, conn=None):
 
-## This creates the table used to store the rewards
-## But, we don't want this to run every time we run the script, 
-## just keeping it here as a reference
+    if conn in None:
+        conn = psycopg2.connect(**dbparams)
+    
+    with conn:
+        n_rewards = pd.read_sql_query("""
+        select count(*) from {table}_reward
+        """.format(table=config.sql_basename), conn)
 
-with psycopg2.connect(**dbparams) as conn:
-    with conn.cursor() as cur:
-        cur.execute("""
-        DROP TABLE IF EXISTS {table0};
-        
-        CREATE TABLE {table0} (
-            id serial PRIMARY KEY,
-            time timestamp DEFAULT CURRENT_TIMESTAMP,
-            reward real,
-            smiles varchar(50) UNIQUE,
-            atom_type varchar(2),
-            buried_vol real,
-            max_spin real,
-            atom_index int
-            );
-            
-        DROP TABLE IF EXISTS {table1};
-        
-        CREATE TABLE {table1} (
-            id serial PRIMARY KEY,
-            time timestamp DEFAULT CURRENT_TIMESTAMP,
-            experiment_id varchar(50),
-            gameid varchar(8),        
-            smiles varchar(50),
-            final_smiles varchar(50),
-            ranked_reward real,
-            position int,
-            data BYTEA); 
-
-        DROP TABLE IF EXISTS {table2};
-        
-        CREATE TABLE {table2} (
-            id serial PRIMARY KEY,
-            time timestamp DEFAULT CURRENT_TIMESTAMP,
-            experiment_id varchar(50),
-            reward real);          
-            """.format(table0=reward_table, table1=replay_table, table2=game_table))
+        if n_rewards < config.batch_size:
+            return np.random.choice([-1.,1.])
+        else:
+            param = {config.ranked_reward_alpha, config.batch_size}
+            r_alpha = pd.read_sql_query("""
+                select percentile_cont(%s) within group (order by real_reward) from (
+                    select real_reward 
+                    from {table}_reward
+                    order by id desc limit %s) as finals  
+                """.format(table=config.sql_basename), conn, params=param)
+            if reward > r_alpha['percentile_cont'][0]:
+                return 1.
+            elif reward < r_alpha['percentile_cont'][0]:
+                return -1.
+            else:
+                return np.random.choice([-1.,1.])
+    
 
 class StabilityNode(Node):
     
@@ -84,7 +65,7 @@ class StabilityNode(Node):
         
         with psycopg2.connect(**dbparams) as conn:
             with conn.cursor() as cur:
-                cur.execute("select reward from {table} where smiles = %s".format(table=reward_table), (self.smiles,))
+                cur.execute("select real_reward from {table}_reward where smiles = %s".format(table=config.sql_basename), (self.smiles,))
                 result = cur.fetchone()
         
         if result:
@@ -117,43 +98,14 @@ class StabilityNode(Node):
             # This is a bit of a placeholder; but the range for spin is about 1/50th that
             # of buried volume.
             reward = (1 - max_spin) * 50 + spin_buried_vol
-
-            with psycopg2.connect(**dbparams) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        INSERT INTO {table} 
-                        (experiment_id, reward) 
-                        values (%s, %s);""".format(table=game_table), (
-                            config.experiment_id, float(reward)))
-                
-                df = pd.read_sql_query("""
-                select reward from {table}
-                """.format(table=game_table), conn)
-
-                if len(df.index) < config.batch_size:
-                    reward = np.random.choice([-1.,1.])
-                else:
-                    param = {config.ranked_reward_alpha, config.batch_size}
-                    r_alpha = pd.read_sql_query("""
-                        select percentile_cont(%s) within group (order by reward) from (
-                            select reward 
-                            from {table} 
-                            order by id desc limit %s) as finals  
-                        """.format(table=game_table), conn, params=param)
-                    if reward > r_alpha['percentile_cont'][0]:
-                        reward = 1.
-                    elif reward < r_alpha['percentile_cont'][0]:
-                        reward = -1.
-                    else:
-                        reward = np.random.choice([-1.,1.])
             
             with psycopg2.connect(**dbparams) as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        INSERT INTO {table} 
-                        (smiles, reward, atom_type, buried_vol, max_spin, atom_index) 
-                        values (%s, %s, %s, %s, %s, %s);""".format(table=reward_table), (
-                            self.smiles, float(reward), atom_type,
+                        INSERT INTO {table}_reward
+                        (smiles, real_reward, atom_type, buried_vol, max_spin, atom_index) 
+                        values (%s, %s, %s, %s, %s, %s);""".format(table=config.sql_basename), (
+                            self.smiles, float(reward), atom_type, # This should be the real reward
                             float(spin_buried_vol), float(max_spin), atom_index))
             
             return reward
@@ -174,11 +126,15 @@ def run_game():
         for i, node in enumerate(game[:-1]):
             with conn.cursor() as cur:
                 cur.execute(
-                    """INSERT INTO {table} 
-                    (experiment_id, gameid, smiles, final_smiles, ranked_reward, position, data) values %s;""".format(table=replay_table),
-                    ((config.experiment_id, gameid, node.smiles, game[-1].smiles, reward, i,
-                      node.get_action_inputs_as_binary()),))
-
+                    """INSERT INTO {table}_replay
+                    (experiment_id, gameid, smiles, final_smiles, ranked_reward, position, data) values %s;
+                    
+                    INSERT INTO {table}_game
+                    (experiment_id, gameid, real_reward) values (%s, %s);
+                    """.format(table=config.sql_basename),
+                    ((config.experiment_id, gameid, node.smiles, game[-1].smiles, get_ranked_rewards(reward), i,
+                      node.get_action_inputs_as_binary()),config.experiment_id, gameid, float(reward))
+                
     print(f'finishing game {gameid}', flush=True)
             
 
