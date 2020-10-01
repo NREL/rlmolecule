@@ -5,7 +5,6 @@ import tensorflow as tf
 from rdkit import Chem
 
 import alphazero.config as config
-import alphazero.mod as mod
 from alphazero.node import Node
 from alphazero.policy import policy_model
 
