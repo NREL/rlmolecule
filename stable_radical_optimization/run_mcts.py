@@ -10,7 +10,8 @@ from rdkit import Chem
 from rdkit import DataStructs
 import networkx as nx
 
-import stable_rad_config as config
+import alphazero.config as config
+import stable_rad_config
 from alphazero.node import Node
 from alphazero.game import Game
 
@@ -62,6 +63,8 @@ def get_ranked_rewards(reward, conn=None):
 class StabilityNode(Node):
     
     def get_reward(self):
+
+        node = self.G.nodes[self]
         
         with psycopg2.connect(**dbparams) as conn:
             with conn.cursor() as cur:
@@ -70,12 +73,16 @@ class StabilityNode(Node):
         
         if result:
             # Probably would put RR code here?
-            return result[0]
+            rr = get_ranked_rewards(result[0])
+            node._true_reward = result[0]
+            return rr
         
         # Node is outside the domain of validity
         elif ((self.policy_inputs['atom'] == 1).any() | 
               (self.policy_inputs['bond'] == 1).any()):
-            return 0.
+            rr = get_ranked_rewards(0.)
+            node._true_reward = 0.
+            return rr
         
         else:           
             spins, buried_vol = model(
@@ -108,7 +115,9 @@ class StabilityNode(Node):
                             self.smiles, float(reward), atom_type, # This should be the real reward
                             float(spin_buried_vol), float(max_spin), atom_index))
             
-            return reward
+            rr = get_ranked_rewards(reward)
+            node._true_reward = reward
+            return rr
 
         
 def run_game():
@@ -120,7 +129,7 @@ def run_game():
     G = Game(StabilityNode, 'C', checkpoint_dir='.')
 
     game = list(G.run_mcts())
-    reward = game[-1].reward
+    reward = game[-1].reward # here it returns the ranked reward
 
     with psycopg2.connect(**dbparams) as conn:
         for i, node in enumerate(game[:-1]):
@@ -132,8 +141,8 @@ def run_game():
                     INSERT INTO {table}_game
                     (experiment_id, gameid, real_reward) values (%s, %s);
                     """.format(table=config.sql_basename),
-                    ((config.experiment_id, gameid, node.smiles, game[-1].smiles, get_ranked_rewards(reward), i,
-                      node.get_action_inputs_as_binary()),config.experiment_id, gameid, float(reward))
+                    ((config.experiment_id, gameid, node.smiles, game[-1].smiles, reward, i,
+                      node.get_action_inputs_as_binary()),config.experiment_id, gameid, float(game[-1]._true_reward))
                 
     print(f'finishing game {gameid}', flush=True)
             
