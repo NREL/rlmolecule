@@ -1,5 +1,10 @@
 import psycopg2
+import sys
 
+sys.path.append("..")
+
+import alphazero.config as config
+import stable_rad_config
 # Initialize PostgreSQL tables
 
 dbparams = {
