@@ -3,7 +3,6 @@ from tensorflow.keras import layers
 import nfp
 
 import alphazero.config as config
-import alphazero.mod as mod
 from alphazero.preprocessor import preprocessor
 
 # two models: 
