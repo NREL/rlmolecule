@@ -9,7 +9,6 @@ import rdkit.Chem
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 import alphazero.config as config
-import alphazero.mod as mod
 from alphazero.molecule import build_molecules, build_radicals
 from alphazero.preprocessor import preprocessor
 
