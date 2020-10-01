@@ -18,7 +18,7 @@ from alphazero.game import Game
 import tensorflow as tf
 import nfp
 
-tf.logging.set_verbosity(tf.logging.ERROR)
+#tf.logging.set_verbosity(tf.logging.ERROR)
 
 model = tf.keras.models.load_model(
     '/projects/rlmolecule/pstjohn/models/20200923_radical_stability_model')
@@ -34,15 +34,15 @@ dbparams = {
 
 def get_ranked_rewards(reward, conn=None):
 
-    if conn in None:
+    if conn is None:
         conn = psycopg2.connect(**dbparams)
     
     with conn:
         n_rewards = pd.read_sql_query("""
         select count(*) from {table}_reward
         """.format(table=config.sql_basename), conn)
-
-        if n_rewards < config.batch_size:
+        
+        if n_rewards['count'][0] < config.batch_size:
             return np.random.choice([-1.,1.])
         else:
             param = {config.ranked_reward_alpha, config.batch_size}
@@ -63,8 +63,6 @@ def get_ranked_rewards(reward, conn=None):
 class StabilityNode(Node):
     
     def get_reward(self):
-
-        node = self.G.nodes[self]
         
         with psycopg2.connect(**dbparams) as conn:
             with conn.cursor() as cur:
@@ -74,14 +72,14 @@ class StabilityNode(Node):
         if result:
             # Probably would put RR code here?
             rr = get_ranked_rewards(result[0])
-            node._true_reward = result[0]
+            self._true_reward = result[0]
             return rr
         
         # Node is outside the domain of validity
         elif ((self.policy_inputs['atom'] == 1).any() | 
               (self.policy_inputs['bond'] == 1).any()):
             rr = get_ranked_rewards(0.)
-            node._true_reward = 0.
+            self._true_reward = 0.
             return rr
         
         else:           
@@ -116,7 +114,7 @@ class StabilityNode(Node):
                             float(spin_buried_vol), float(max_spin), atom_index))
             
             rr = get_ranked_rewards(reward)
-            node._true_reward = reward
+            self._true_reward = reward
             return rr
 
         
@@ -136,13 +134,13 @@ def run_game():
             with conn.cursor() as cur:
                 cur.execute(
                     """INSERT INTO {table}_replay
-                    (experiment_id, gameid, smiles, final_smiles, ranked_reward, position, data) values %s;
+                    (experiment_id, gameid, smiles, final_smiles, ranked_reward, position, data) values (%s, %s, %s, %s, %s, %s, %s);
                     
                     INSERT INTO {table}_game
-                    (experiment_id, gameid, real_reward) values (%s, %s);
-                    """.format(table=config.sql_basename),
-                    ((config.experiment_id, gameid, node.smiles, game[-1].smiles, reward, i,
-                      node.get_action_inputs_as_binary()),config.experiment_id, gameid, float(game[-1]._true_reward))
+                    (experiment_id, gameid, real_reward) values (%s, %s, %s);
+                    """.format(table=config.sql_basename), (
+                        config.experiment_id, gameid, node.smiles, game[-1].smiles, reward, i,
+                        node.get_action_inputs_as_binary(),config.experiment_id, gameid, float(game[-1]._true_reward)))
                 
     print(f'finishing game {gameid}', flush=True)
             
