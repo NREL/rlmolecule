@@ -1,6 +1,9 @@
+import os
 import sys
 import uuid
+
 sys.path.append('..')
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import numpy as np
 import pandas as pd
@@ -10,6 +13,8 @@ from rdkit import Chem
 from rdkit import DataStructs
 import networkx as nx
 
+import alphazero.config as config
+import stable_rad_config
 from alphazero.node import Node
 from alphazero.game import Game
 
@@ -17,7 +22,8 @@ import tensorflow as tf
 import nfp
 
 model = tf.keras.models.load_model(
-    '/projects/rlmolecule/pstjohn/models/20200923_radical_stability_model')
+    '/projects/rlmolecule/pstjohn/models/20200923_radical_stability_model',
+    compile=False)
 
 dbparams = {
     'dbname': 'bde',
@@ -28,37 +34,39 @@ dbparams = {
     'options': f'-c search_path=rl',
 }
 
-## This creates the table used to store the rewards
-## But, we don't want this to run every time we run the script, 
-## just keeping it here as a reference
+def get_ranked_rewards(reward):
 
-# with psycopg2.connect(**dbparams) as conn:
-#     with conn.cursor() as cur:
-#         cur.execute("""
-#         DROP TABLE IF EXISTS StableRewardPSJ;
+    with psycopg2.connect(**dbparams) as conn:
+        with conn.cursor() as cur:
+            cur.execute("select count(*) from {table}_game;".format(
+                table=config.sql_basename))
+            n_games = cur.fetchone()[0]
         
-#         CREATE TABLE StableRewardPSJ (
-#             id serial PRIMARY KEY,
-#             time timestamp DEFAULT CURRENT_TIMESTAMP,
-#             reward real,
-#             smiles varchar(50) UNIQUE,
-#             atom_type varchar(2),
-#             buried_vol real,
-#             max_spin real,
-#             atom_index int
-#             );
+        if n_games < config.reward_buffer:
+            # Here, we don't have enough of a game buffer
+            # to decide if the move is good or not
+            return np.random.choice([-1., 1.])
+        
+        else:
+            with conn.cursor() as cur:
+                cur.execute("""
+                        select percentile_cont(%s) within group (order by real_reward) 
+                        from (select real_reward from {table}_game
+                              order by id desc limit %s) as finals  
+                        """.format(table=config.sql_basename),
+                            (config.ranked_reward_alpha, config.reward_buffer))
+                
+                r_alpha = cur.fetchone()[0]
+                
+            if reward > r_alpha:
+                return 1.
             
-#         DROP TABLE IF EXISTS StableReplayPSJ;
-        
-#         CREATE TABLE StableReplayPSJ (
-#             id serial PRIMARY KEY,
-#             time timestamp DEFAULT CURRENT_TIMESTAMP,
-#             gameid varchar(8),        
-#             smiles varchar(50),
-#             reward real,
-#             position int,
-#             data BYTEA);          
-#             """)
+            elif reward < r_alpha:
+                return -1.
+            
+            else:
+                return np.random.choice([-1., 1.])
+    
 
 class StabilityNode(Node):
     
@@ -66,25 +74,31 @@ class StabilityNode(Node):
         
         with psycopg2.connect(**dbparams) as conn:
             with conn.cursor() as cur:
-                cur.execute("select reward from StableRewardPSJ where smiles = %s", (self.smiles,))
+                cur.execute(
+                    "select real_reward from {table}_reward where smiles = %s".format(
+                        table=config.sql_basename), (self.smiles,))
                 result = cur.fetchone()
         
         if result:
             # Probably would put RR code here?
-            return result[0]
+            rr = get_ranked_rewards(result[0])
+            self._true_reward = result[0]
+            return rr
         
         # Node is outside the domain of validity
         elif ((self.policy_inputs['atom'] == 1).any() | 
               (self.policy_inputs['bond'] == 1).any()):
-            return 0.
+            self._true_reward = 0.
+            return config.min_reward
         
         else:           
-            spins, buried_vol = model(
+            
+            spins, buried_vol = model.predict(
                 {key: tf.constant(np.expand_dims(val, 0))
                  for key, val in self.policy_inputs.items()})
         
-            spins = spins.numpy().flatten()
-            buried_vol = buried_vol.numpy().flatten()
+            spins = spins.flatten()
+            buried_vol = buried_vol.flatten()
 
             atom_index = int(spins.argmax())
             max_spin = spins[atom_index]
@@ -103,13 +117,16 @@ class StabilityNode(Node):
             with psycopg2.connect(**dbparams) as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                    INSERT INTO StableRewardPSJ 
-                    (smiles, reward, atom_type, buried_vol, max_spin, atom_index) 
-                    values (%s, %s, %s, %s, %s, %s);""", (
-                        self.smiles, float(reward), atom_type,
-                        float(spin_buried_vol), float(max_spin), atom_index))
+                        INSERT INTO {table}_reward
+                        (smiles, real_reward, atom_type, buried_vol, max_spin, atom_index) 
+                        values (%s, %s, %s, %s, %s, %s)
+                        ON CONFLICT DO NOTHING;""".format(table=config.sql_basename), (
+                            self.smiles, float(reward), atom_type, # This should be the real reward
+                            float(spin_buried_vol), float(max_spin), atom_index))
             
-            return reward
+            rr = get_ranked_rewards(reward)
+            self._true_reward = reward
+            return rr
 
         
 def run_game():
@@ -121,17 +138,41 @@ def run_game():
     G = Game(StabilityNode, 'C', checkpoint_dir='.')
 
     game = list(G.run_mcts())
-    reward = game[-1].reward
-
+    reward = game[-1].reward # here it returns the ranked reward
+    
+    try:
+        terminal_true_reward = float(game[-1]._true_reward)
+        
+    except AttributeError:
+        # This is hacky until we have a better separation of `true_reward`
+        # and `ranked_reward`. This can happen if a node doesn't have any
+        # children, but still gets chosen as the final state.
+        terminal_true_reward = 0.
+    
+    
     with psycopg2.connect(**dbparams) as conn:
+
+        with conn.cursor() as cur:
+            cur.execute(
+                """                    
+                INSERT INTO {table}_game
+                (experiment_id, gameid, real_reward, final_smiles) values (%s, %s, %s, %s);
+                """.format(table=config.sql_basename), (
+                    config.experiment_id, gameid, terminal_true_reward, game[-1].smiles))
+
         for i, node in enumerate(game[:-1]):
             with conn.cursor() as cur:
                 cur.execute(
-                    """INSERT INTO StableReplayPSJ 
-                    (gameid, smiles, final_smiles, reward, position, data) values %s;""",
-                    ((gameid, node.smiles, game[-1].smiles, reward, i,
-                      node.get_action_inputs_as_binary()),))
+                    """
+                    INSERT INTO {table}_replay
+                    (experiment_id, gameid, smiles, final_smiles, ranked_reward, position, data) 
+                    values (%s, %s, %s, %s, %s, %s, %s);
+                    """.format(table=config.sql_basename), (
+                        config.experiment_id, gameid, node.smiles, game[-1].smiles, reward, i,
+                        node.get_action_inputs_as_binary()))
+                        
 
+                
     print(f'finishing game {gameid}', flush=True)
             
 
