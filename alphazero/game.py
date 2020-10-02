@@ -4,13 +4,11 @@ import tensorflow as tf
 
 from rdkit import Chem
 
+import alphazero.config as config
 from alphazero.node import Node
 from alphazero.policy import policy_model
-from alphazero.config import AlphaZeroConfig
 
 model = policy_model()
-config = AlphaZeroConfig()
-
 
 class Game(nx.DiGraph):
 
@@ -74,11 +72,18 @@ class Game(nx.DiGraph):
         """
 
         # Create the children nodes and add them to the graph
-        self.add_edges_from(((parent, child) for child in parent.build_children()))
+        children = list(parent.build_children())
+        
+        if not children:
+            parent.terminal = True
+            parent._reward = config.min_reward
+            return parent._reward
+        
+        self.add_edges_from(((parent, child) for child in children))
         
         # Run the policy network to get value and prior_logit predictions
-        values, prior_logits = model(parent.policy_inputs_with_children())
-        prior_logits = prior_logits[1:].numpy().flatten()
+        values, prior_logits = model.predict(parent.policy_inputs_with_children())
+        prior_logits = prior_logits[1:].flatten()
         
         # if we're adding noise, perturb the logits
         if self.dirichlet_noise:
