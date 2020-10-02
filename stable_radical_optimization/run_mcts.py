@@ -1,6 +1,9 @@
+import os
 import sys
 import uuid
+
 sys.path.append('..')
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import numpy as np
 import pandas as pd
@@ -18,10 +21,9 @@ from alphazero.game import Game
 import tensorflow as tf
 import nfp
 
-#tf.logging.set_verbosity(tf.logging.ERROR)
-
 model = tf.keras.models.load_model(
-    '/projects/rlmolecule/pstjohn/models/20200923_radical_stability_model')
+    '/projects/rlmolecule/pstjohn/models/20200923_radical_stability_model',
+    compile=False)
 
 dbparams = {
     'dbname': 'bde',
@@ -32,32 +34,38 @@ dbparams = {
     'options': f'-c search_path=rl',
 }
 
-def get_ranked_rewards(reward, conn=None):
+def get_ranked_rewards(reward):
 
-    if conn is None:
-        conn = psycopg2.connect(**dbparams)
-    
-    with conn:
-        n_rewards = pd.read_sql_query("""
-        select count(*) from {table}_reward
-        """.format(table=config.sql_basename), conn)
+    with psycopg2.connect(**dbparams) as conn:
+        with conn.cursor() as cur:
+            cur.execute("select count(*) from {table}_game;".format(
+                table=config.sql_basename))
+            n_games = cur.fetchone()[0]
         
-        if n_rewards['count'][0] < config.batch_size:
-            return np.random.choice([-1.,1.])
+        if n_games < config.reward_buffer:
+            # Here, we don't have enough of a game buffer
+            # to decide if the move is good or not
+            return np.random.choice([-1., 1.])
+        
         else:
-            param = {config.ranked_reward_alpha, config.batch_size}
-            r_alpha = pd.read_sql_query("""
-                select percentile_cont(%s) within group (order by real_reward) from (
-                    select real_reward 
-                    from {table}_reward
-                    order by id desc limit %s) as finals  
-                """.format(table=config.sql_basename), conn, params=param)
-            if reward > r_alpha['percentile_cont'][0]:
+            with conn.cursor() as cur:
+                cur.execute("""
+                        select percentile_cont(%s) within group (order by real_reward) 
+                        from (select real_reward from {table}_game
+                              order by id desc limit %s) as finals  
+                        """.format(table=config.sql_basename),
+                            (config.ranked_reward_alpha, config.reward_buffer))
+                
+                r_alpha = cur.fetchone()[0]
+                
+            if reward > r_alpha:
                 return 1.
-            elif reward < r_alpha['percentile_cont'][0]:
+            
+            elif reward < r_alpha:
                 return -1.
+            
             else:
-                return np.random.choice([-1.,1.])
+                return np.random.choice([-1., 1.])
     
 
 class StabilityNode(Node):
@@ -66,7 +74,9 @@ class StabilityNode(Node):
         
         with psycopg2.connect(**dbparams) as conn:
             with conn.cursor() as cur:
-                cur.execute("select real_reward from {table}_reward where smiles = %s".format(table=config.sql_basename), (self.smiles,))
+                cur.execute(
+                    "select real_reward from {table}_reward where smiles = %s".format(
+                        table=config.sql_basename), (self.smiles,))
                 result = cur.fetchone()
         
         if result:
@@ -78,17 +88,17 @@ class StabilityNode(Node):
         # Node is outside the domain of validity
         elif ((self.policy_inputs['atom'] == 1).any() | 
               (self.policy_inputs['bond'] == 1).any()):
-            rr = get_ranked_rewards(0.)
             self._true_reward = 0.
-            return rr
+            return config.min_reward
         
         else:           
-            spins, buried_vol = model(
+            
+            spins, buried_vol = model.predict(
                 {key: tf.constant(np.expand_dims(val, 0))
                  for key, val in self.policy_inputs.items()})
         
-            spins = spins.numpy().flatten()
-            buried_vol = buried_vol.numpy().flatten()
+            spins = spins.flatten()
+            buried_vol = buried_vol.flatten()
 
             atom_index = int(spins.argmax())
             max_spin = spins[atom_index]
@@ -109,7 +119,8 @@ class StabilityNode(Node):
                     cur.execute("""
                         INSERT INTO {table}_reward
                         (smiles, real_reward, atom_type, buried_vol, max_spin, atom_index) 
-                        values (%s, %s, %s, %s, %s, %s);""".format(table=config.sql_basename), (
+                        values (%s, %s, %s, %s, %s, %s)
+                        ON CONFLICT DO NOTHING;""".format(table=config.sql_basename), (
                             self.smiles, float(reward), atom_type, # This should be the real reward
                             float(spin_buried_vol), float(max_spin), atom_index))
             
@@ -128,19 +139,39 @@ def run_game():
 
     game = list(G.run_mcts())
     reward = game[-1].reward # here it returns the ranked reward
-
+    
+    try:
+        terminal_true_reward = float(game[-1]._true_reward)
+        
+    except AttributeError:
+        # This is hacky until we have a better separation of `true_reward`
+        # and `ranked_reward`. This can happen if a node doesn't have any
+        # children, but still gets chosen as the final state.
+        terminal_true_reward = 0.
+    
+    
     with psycopg2.connect(**dbparams) as conn:
+
+        with conn.cursor() as cur:
+            cur.execute(
+                """                    
+                INSERT INTO {table}_game
+                (experiment_id, gameid, real_reward, final_smiles) values (%s, %s, %s, %s);
+                """.format(table=config.sql_basename), (
+                    config.experiment_id, gameid, terminal_true_reward, game[-1].smiles))
+
         for i, node in enumerate(game[:-1]):
             with conn.cursor() as cur:
                 cur.execute(
-                    """INSERT INTO {table}_replay
-                    (experiment_id, gameid, smiles, final_smiles, ranked_reward, position, data) values (%s, %s, %s, %s, %s, %s, %s);
-                    
-                    INSERT INTO {table}_game
-                    (experiment_id, gameid, real_reward) values (%s, %s, %s);
+                    """
+                    INSERT INTO {table}_replay
+                    (experiment_id, gameid, smiles, final_smiles, ranked_reward, position, data) 
+                    values (%s, %s, %s, %s, %s, %s, %s);
                     """.format(table=config.sql_basename), (
                         config.experiment_id, gameid, node.smiles, game[-1].smiles, reward, i,
-                        node.get_action_inputs_as_binary(),config.experiment_id, gameid, float(game[-1]._true_reward)))
+                        node.get_action_inputs_as_binary()))
+                        
+
                 
     print(f'finishing game {gameid}', flush=True)
             

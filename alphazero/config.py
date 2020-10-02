@@ -10,6 +10,8 @@ root_dirichlet_alpha = 0.0  # 0.3 chess, 0.03 Go, 0.15 shogi
 root_exploration_fraction = 0.25
 pb_c_base = 1   # 19652 in pseudocode
 pb_c_init = 1.25
+min_reward = -1.  # Minimum reward to return for invalid actions
+reward_buffer = 25  # 250 in the R2 paper
 
 # Network
 l2_regularization_coef = 1e-4  

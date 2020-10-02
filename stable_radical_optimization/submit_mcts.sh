@@ -3,9 +3,9 @@
 #SBATCH --time=00:20:00
 #SBATCH --job-name=mcts_q2_debug
 #SBATCH --partition=debug
-#SBATCH -n 4
-#SBATCH -c 18
-#SBATCH --output=/scratch/eskordil/git-repos/rlmolecule_new/rlmolecule/mcts.%j.out
+#SBATCH -n 72
+#SBATCH -c 1
+#SBATCH --output=/scratch/pstjohn/rlmolecule/mcts.%j.out
 
 source ~/.bashrc
 conda activate /projects/rlmolecule/pstjohn/envs/tf2_cpu

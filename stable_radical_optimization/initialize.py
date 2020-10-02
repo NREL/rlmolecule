@@ -1,11 +1,18 @@
-import psycopg2
+import argparse
 import sys
-
 sys.path.append("..")
+
+import psycopg2
 
 import alphazero.config as config
 import stable_rad_config
 # Initialize PostgreSQL tables
+
+parser = argparse.ArgumentParser(description='Initialize the postgres tables.')
+parser.add_argument("--drop", action='store_true', help="whether to drop existing tables, if found")
+args = parser.parse_args()
+
+
 
 dbparams = {
     'dbname': 'bde',
@@ -20,25 +27,28 @@ dbparams = {
 ## But, we don't want this to run every time we run the script, 
 ## just keeping it here as a reference
 
-with psycopg2.connect(**dbparams) as conn:
+with psycopg2.connect(**dbparams) as conn:    
     with conn.cursor() as cur:
-        cur.execute("""
-        DROP TABLE IF EXISTS {table}_reward;
         
-        CREATE TABLE {table}_reward (
-            id serial PRIMARY KEY,
+        if args.drop:
+            cur.execute("""
+            DROP TABLE IF EXISTS {table}_reward;
+            DROP TABLE IF EXISTS {table}_replay;
+            DROP TABLE IF EXISTS {table}_game;
+            """.format(table=config.sql_basename))
+            
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS {table}_reward (
+            smiles varchar(50) PRIMARY KEY,
             time timestamp DEFAULT CURRENT_TIMESTAMP,
             real_reward real,
-            smiles varchar(50) UNIQUE,
             atom_type varchar(2),
             buried_vol real,
             max_spin real,
             atom_index int
             );
             
-        DROP TABLE IF EXISTS {table}_replay;
-        
-        CREATE TABLE {table}_replay (
+        CREATE TABLE IF NOT EXISTS {table}_replay (
             id serial PRIMARY KEY,
             time timestamp DEFAULT CURRENT_TIMESTAMP,
             experiment_id varchar(50),
@@ -49,12 +59,11 @@ with psycopg2.connect(**dbparams) as conn:
             position int,
             data BYTEA); 
 
-        DROP TABLE IF EXISTS {table}_game;
-        
-        CREATE TABLE {table}_game (
+        CREATE TABLE IF NOT EXISTS {table}_game (
             id serial PRIMARY KEY,
             time timestamp DEFAULT CURRENT_TIMESTAMP,
             experiment_id varchar(50),
-            gameid varchar(8),   
-            real_reward real);          
+            gameid varchar(8),
+            real_reward real,
+            final_smiles varchar(50));          
             """.format(table=config.sql_basename))
