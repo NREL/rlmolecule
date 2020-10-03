@@ -1,6 +1,8 @@
 import os
 import sys
 import uuid
+import logging
+logging.getLogger().setLevel(logging.INFO)
 
 sys.path.append('..')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -25,18 +27,10 @@ model = tf.keras.models.load_model(
     '/projects/rlmolecule/pstjohn/models/20200923_radical_stability_model',
     compile=False)
 
-dbparams = {
-    'dbname': 'bde',
-    'port': 5432,
-    'host': 'yuma.hpc.nrel.gov',
-    'user': 'rlops',
-    'password': 'jTeL85L!',
-    'options': f'-c search_path=rl',
-}
 
 def get_ranked_rewards(reward):
 
-    with psycopg2.connect(**dbparams) as conn:
+    with psycopg2.connect(**config.dbparams) as conn:
         with conn.cursor() as cur:
             cur.execute("select count(*) from {table}_game;".format(
                 table=config.sql_basename))
@@ -51,10 +45,10 @@ def get_ranked_rewards(reward):
             with conn.cursor() as cur:
                 cur.execute("""
                         select percentile_cont(%s) within group (order by real_reward) 
-                        from (select real_reward from {table}_game
-                              order by id desc limit %s) as finals  
+                        from (select real_reward from {table}_game where experiment_id = %s
+                              order by id desc limit %s) as finals
                         """.format(table=config.sql_basename),
-                            (config.ranked_reward_alpha, config.reward_buffer))
+                            (config.ranked_reward_alpha, config.experiment_id, config.reward_buffer))
                 
                 r_alpha = cur.fetchone()[0]
                 
@@ -72,7 +66,7 @@ class StabilityNode(Node):
     
     def get_reward(self):
         
-        with psycopg2.connect(**dbparams) as conn:
+        with psycopg2.connect(**config.dbparams) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select real_reward from {table}_reward where smiles = %s".format(
@@ -114,7 +108,7 @@ class StabilityNode(Node):
             # of buried volume.
             reward = (1 - max_spin) * 50 + spin_buried_vol
             
-            with psycopg2.connect(**dbparams) as conn:
+            with psycopg2.connect(**config.dbparams) as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
                         INSERT INTO {table}_reward
@@ -129,14 +123,12 @@ class StabilityNode(Node):
             return rr
 
         
-def run_game():
+def run_game(G):
     """Run game, saving the results in a Postgres replay buffer"""
 
-    gameid = uuid.uuid4().hex[:8]
-    print(f'starting game {gameid}', flush=True)
-
-    G = Game(StabilityNode, 'C', checkpoint_dir='.')
-
+    G = Game(StabilityNode, 'C')
+    logging.info(f"Starting {G.id}")
+    
     game = list(G.run_mcts())
     reward = game[-1].reward # here it returns the ranked reward
     
@@ -150,7 +142,7 @@ def run_game():
         terminal_true_reward = 0.
     
     
-    with psycopg2.connect(**dbparams) as conn:
+    with psycopg2.connect(**config.dbparams) as conn:
 
         with conn.cursor() as cur:
             cur.execute(
@@ -158,7 +150,7 @@ def run_game():
                 INSERT INTO {table}_game
                 (experiment_id, gameid, real_reward, final_smiles) values (%s, %s, %s, %s);
                 """.format(table=config.sql_basename), (
-                    config.experiment_id, gameid, terminal_true_reward, game[-1].smiles))
+                    config.experiment_id, G.id, terminal_true_reward, game[-1].smiles))
 
         for i, node in enumerate(game[:-1]):
             with conn.cursor() as cur:
@@ -168,14 +160,11 @@ def run_game():
                     (experiment_id, gameid, smiles, final_smiles, ranked_reward, position, data) 
                     values (%s, %s, %s, %s, %s, %s, %s);
                     """.format(table=config.sql_basename), (
-                        config.experiment_id, gameid, node.smiles, game[-1].smiles, reward, i,
+                        config.experiment_id, G.id, node.smiles, game[-1].smiles, reward, i,
                         node.get_action_inputs_as_binary()))
-                        
-
-                
-    print(f'finishing game {gameid}', flush=True)
-            
+                            
 
 if __name__ == "__main__":    
-        while True:
-            run_game()
+      
+    while True:
+        run_game()

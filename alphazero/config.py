@@ -1,3 +1,9 @@
+import logging
+import os
+
+loglevel = 'INFO'
+logging.basicConfig(level=os.environ.get("LOGLEVEL", loglevel))
+
 # Molecule 
 max_atoms = 10  # max atoms in molecule
 min_atoms = 4  # max atoms in molecule
@@ -12,24 +18,26 @@ pb_c_base = 1   # 19652 in pseudocode
 pb_c_init = 1.25
 min_reward = -1.  # Minimum reward to return for invalid actions
 reward_buffer = 25  # 250 in the R2 paper
+dirichlet_noise = True # whether to add dirichlet noise
+dirichlet_alpha = 1.  # dirichlet 'shape' parameter. Larger values spread out probability over more moves.
+dirichlet_x = 0.25  # percentage to favor dirichlet noise vs. prior estimation. Smaller means less noise
 
 # Network
-l2_regularization_coef = 1e-4  
-features = 16     # used by all network layers
-num_messages = 1
+features = 64     # used by all network layers
 num_heads = 4        # Number of attention heads
+num_messages = 3
 batch_size = 32           # for gradient updates
-checkpoint_frequency = 1      # save new model file every N batches
-batch_update_frequency = 10   # get most recent data every N updates
-gradient_steps_per_batch = 32  # num step per batch
-training_iterations = int(1e06) # training iterations for NN
+steps_per_epoch = 750
+policy_lr = 1E-3
 
 #assert self.features % self.num_heads == 0, \
 #   "dimension mismatch for attention heads"
 
 # Buffers
 ranked_reward_alpha = 0.9
-buffer_max_size = 512
+buffer_max_size = 1024  # Only sample from this many most recent games
+buffer_min_size = 128  # Don't start training the model until this many games have occurred
+
 
 # Training
 training_steps = 100

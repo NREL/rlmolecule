@@ -1,3 +1,6 @@
+import logging
+import uuid
+
 import networkx as nx
 import numpy as np
 import tensorflow as tf
@@ -6,44 +9,58 @@ from rdkit import Chem
 
 import alphazero.config as config
 from alphazero.node import Node
-from alphazero.policy import policy_model
+from alphazero.policy import build_policy_trainer
 
-model = policy_model()
+logger = logging.getLogger(__name__)
 
 class Game(nx.DiGraph):
 
-    def __init__(self, node_cls=None, start_smiles=None, checkpoint_dir=None):
+    def __init__(self, node_cls=None, start_smiles=None):
         super(Game, self).__init__()
+        
+        self.id = uuid.uuid4().hex[:8]      
 
         start = node_cls(Chem.MolFromSmiles(start_smiles), graph=self)
         self.add_node(start)
         self.start = start
-
-        self.checkpoint_dir = checkpoint_dir
-        self.tf_checkpoint = None
-        self.reset()
         
-        self.dirichlet_noise = True
-        self.dirichlet_alpha = 1.
-        self.dirichlet_d = 0.25
+        self.policy_trainer = build_policy_trainer()
+        self.policy_model = self.policy_trainer.layers[-1].policy_model
 
+        latest = tf.train.latest_checkpoint(config.checkpoint_filepath)
+        if latest:
+            self.policy_trainer.load_weights(latest)
+            logger.info(f'{self.id} loaded checkpoint: {latest}')
+        
 
+        
     def reset(self):
+        """ CURRENTLY UNUSED -- second guessing whether we really want this...
+        a random 10 atom game might expand to 22k nodes. I'm worried that we're going
+        to be growing local memory a lot if we cache everything.
+        """
 
         # Check for new weights.  If they exist, update the model and clear out
         # all priors on the graph.
-        latest = tf.train.latest_checkpoint(self.checkpoint_dir)
+        latest = tf.train.latest_checkpoint(config.checkpoint_filepath)
+        if latest:
+            logger.info(f'found checkpoint: {latest}')
+        
         if latest and self.tf_checkpoint != latest:
 
             # Update the latest checkpoint
             self.tf_checkpoint = latest
-            model.load_weights(latest)
+            self.policy_trainer.load_weights(latest)
+            logger.info(f'loaded checkpoint: {latest}')
 
             # Clear out node priors
             _ = [node.reset_priors() for node in self]
 
         # And no matter what, clear out visit and value data on the graph
         _ = [node.reset_updates() for node in self]
+        
+        # Reset (or initalize) the game's id
+        self.id = uuid.uuid4().hex[:8]
         
 
     def tree_policy(self, parent: Node):
@@ -82,22 +99,22 @@ class Game(nx.DiGraph):
         self.add_edges_from(((parent, child) for child in children))
         
         # Run the policy network to get value and prior_logit predictions
-        values, prior_logits = model.predict(parent.policy_inputs_with_children())
+        values, prior_logits = self.policy_model.predict(parent.policy_inputs_with_children())
         prior_logits = prior_logits[1:].flatten()
         
         # if we're adding noise, perturb the logits
-        if self.dirichlet_noise:
+        if config.dirichlet_noise:
             random_state = np.random.RandomState()
             noise = random_state.dirichlet(
-                np.ones_like(prior_logits) * self.dirichlet_alpha)
-            prior_logits += np.exp(prior_logits).sum() * noise * self.dirichlet_d
+                np.ones_like(prior_logits) * config.dirichlet_alpha)
+            prior_logits += np.exp(prior_logits).sum() * noise * config.dirichlet_x
         
         # Update child nodes with predicted prior_logits
         for child, prior_logit in zip(parent.successors, prior_logits):
             child.prior_logit = float(prior_logit)
             
         # Return the parent's predicted value
-        return float(values[0])
+        return float(tf.nn.sigmoid(values[0])*2 - 1)
 
 
     def mcts_step(self, start: Node):
@@ -145,6 +162,8 @@ class Game(nx.DiGraph):
         """
 
         node = node if node else self.start
+        
+        logger.info(f"{self.id}: selecting node {node}")
         yield node
 
         if not node.terminal:

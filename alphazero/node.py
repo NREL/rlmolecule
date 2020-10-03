@@ -143,6 +143,9 @@ class Node(rdkit.Chem.Mol):
             
         if 'total_value' in node:
             del node['total_value']
+        
+        if hasattr(self, '_reward'):
+            del self._reward
 
 
     @prior_logit.setter
