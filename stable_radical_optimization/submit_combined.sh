@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --account=rlmolecule
-#SBATCH --time=1-00
+#SBATCH --time=12:00:00
 #SBATCH --job-name az_stability
 #SBATCH --output=/scratch/pstjohn/rlmolecule/slurm.%j.out
 # --- Policy Trainer ---

@@ -50,15 +50,15 @@ def get_ranked_rewards(reward):
                             (config.ranked_reward_alpha, config.experiment_id, config.reward_buffer_max_size))
                 
                 r_alpha = cur.fetchone()[0]
-                
-            if reward > r_alpha:
+            
+            if np.isclose(reward, r_alpha):
+                return np.random.choice([-1., 1.])
+            
+            elif reward > r_alpha:
                 return 1.
             
             elif reward < r_alpha:
-                return -1.
-            
-            else:
-                return np.random.choice([-1., 1.])
+                return -1.                
     
 
 class StabilityNode(Node):

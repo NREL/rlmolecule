@@ -4,7 +4,7 @@ import alphazero.config as config
 config.sql_basename = "StablePSJ"
 
 # Experiment id
-config.experiment_id = "0004"
+config.experiment_id = "0005"
 
 config.dbparams = {
     'dbname': 'bde',
