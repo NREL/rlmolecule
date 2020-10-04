@@ -46,7 +46,7 @@ def create_dataset(sql_generator):
     
     dataset = tf.data.Dataset.from_generator(sql_generator, output_types=(tf.string, tf.float32))\
         .repeat()\
-        .shuffle(config.buffer_max_size)\
+        .shuffle(config.policy_buffer_max_size)\
         .map(parse_data_tf, num_parallel_calls=tf.data.experimental.AUTOTUNE)\
         .padded_batch(config.batch_size, 
         padding_values=({'atom': nfp.zero, 'bond': nfp.zero, 'connectivity': nfp.zero}, (nfp.zero, 0.)))\

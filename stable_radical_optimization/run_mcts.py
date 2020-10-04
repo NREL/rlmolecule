@@ -2,7 +2,6 @@ import os
 import sys
 import uuid
 import logging
-logging.getLogger().setLevel(logging.INFO)
 
 sys.path.append('..')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -32,11 +31,11 @@ def get_ranked_rewards(reward):
 
     with psycopg2.connect(**config.dbparams) as conn:
         with conn.cursor() as cur:
-            cur.execute("select count(*) from {table}_game;".format(
-                table=config.sql_basename))
+            cur.execute("select count(*) from {table}_game where experiment_id = %s;".format(
+                table=config.sql_basename), (config.experiment_id,))
             n_games = cur.fetchone()[0]
         
-        if n_games < config.reward_buffer:
+        if n_games < config.reward_buffer_min_size:
             # Here, we don't have enough of a game buffer
             # to decide if the move is good or not
             return np.random.choice([-1., 1.])
@@ -48,7 +47,7 @@ def get_ranked_rewards(reward):
                         from (select real_reward from {table}_game where experiment_id = %s
                               order by id desc limit %s) as finals
                         """.format(table=config.sql_basename),
-                            (config.ranked_reward_alpha, config.experiment_id, config.reward_buffer))
+                            (config.ranked_reward_alpha, config.experiment_id, config.reward_buffer_max_size))
                 
                 r_alpha = cur.fetchone()[0]
                 
@@ -123,7 +122,7 @@ class StabilityNode(Node):
             return rr
 
         
-def run_game(G):
+def run_game():
     """Run game, saving the results in a Postgres replay buffer"""
 
     G = Game(StabilityNode, 'C')

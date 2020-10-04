@@ -30,7 +30,9 @@ class Game(nx.DiGraph):
         latest = tf.train.latest_checkpoint(config.checkpoint_filepath)
         if latest:
             self.policy_trainer.load_weights(latest)
-            logger.info(f'{self.id} loaded checkpoint: {latest}')
+            logger.info(f'{self.id}: loaded checkpoint {latest}')
+        else:
+            logger.info(f'{self.id}: no checkpoint found')
         
 
         

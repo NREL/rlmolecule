@@ -17,7 +17,6 @@ root_exploration_fraction = 0.25
 pb_c_base = 1   # 19652 in pseudocode
 pb_c_init = 1.25
 min_reward = -1.  # Minimum reward to return for invalid actions
-reward_buffer = 25  # 250 in the R2 paper
 dirichlet_noise = True # whether to add dirichlet noise
 dirichlet_alpha = 1.  # dirichlet 'shape' parameter. Larger values spread out probability over more moves.
 dirichlet_x = 0.25  # percentage to favor dirichlet noise vs. prior estimation. Smaller means less noise
@@ -35,8 +34,11 @@ policy_lr = 1E-3
 
 # Buffers
 ranked_reward_alpha = 0.9
-buffer_max_size = 1024  # Only sample from this many most recent games
-buffer_min_size = 128  # Don't start training the model until this many games have occurred
+reward_buffer_max_size = 250  # 250 in the R2 paper
+reward_buffer_min_size = 50   # Allow R2 calculations without a full buffer
+
+policy_buffer_max_size = 1024  # Only sample from this many most recent games
+policy_buffer_min_size = 128   # Don't start training the model until this many games have occurred
 
 
 # Training
