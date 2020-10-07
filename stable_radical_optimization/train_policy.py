@@ -22,8 +22,9 @@ def psql_generator():
     """ A python generator to yield rows from the Postgres database. Note, here I'm deferring
     the actual parsing of the binary data to a later function, which we can hopefully parallelize.
     
-    The SQL command here selects 100 random game states, selected from the (unique) 100 most recent
-    games (id is the row-id, always increasing with newer games; gameid is a unique game identifier)
+    The SQL command here selects 100 random game states, selected from the (unique) 
+    config.policy_buffer_max_size most recent games (id is the row-id, always increasing with
+    newer games; gameid is a unique game identifier)
     
     Essentially when this runs out; it should get re-called to grab new data. 
     """

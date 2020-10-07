@@ -116,7 +116,7 @@ class Game(nx.DiGraph):
             child.prior_logit = float(prior_logit)
             
         # Return the parent's predicted value
-        return float(tf.nn.sigmoid(values[0])*2 - 1)
+        return float(tf.nn.sigmoid(values[0]))
 
 
     def mcts_step(self, start: Node):

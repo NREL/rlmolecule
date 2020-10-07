@@ -38,12 +38,12 @@ def get_ranked_rewards(reward):
         if n_games < config.reward_buffer_min_size:
             # Here, we don't have enough of a game buffer
             # to decide if the move is good or not
-            return np.random.choice([-1., 1.])
+            return np.random.choice([0., 1.])
         
         else:
             with conn.cursor() as cur:
                 cur.execute("""
-                        select percentile_cont(%s) within group (order by real_reward) 
+                        select percentile_disc(%s) within group (order by real_reward) 
                         from (select real_reward from {table}_game where experiment_id = %s
                               order by id desc limit %s) as finals
                         """.format(table=config.sql_basename),
@@ -52,13 +52,13 @@ def get_ranked_rewards(reward):
                 r_alpha = cur.fetchone()[0]
             
             if np.isclose(reward, r_alpha):
-                return np.random.choice([-1., 1.])
+                return np.random.choice([0., 1.])
             
             elif reward > r_alpha:
                 return 1.
             
             elif reward < r_alpha:
-                return -1.                
+                return 0.
     
 
 class StabilityNode(Node):

@@ -2,7 +2,7 @@
 #SBATCH --account=rlmolecule
 #SBATCH --time=12:00:00
 #SBATCH --job-name az_stability
-#SBATCH --output=/scratch/pstjohn/rlmolecule/slurm.%j.out
+#SBATCH --output=/scratch/$USER/rlmolecule/slurm.%j.out
 # --- Policy Trainer ---
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:2
@@ -11,7 +11,7 @@
 #SBATCH -n 90
 #SBATCH -c 4
 
-
+export WORKING_DIR=/scratch/$USER/rlmolecule
 export START_POLICY_SCRIPT="$SLURM_SUBMIT_DIR/$JOB/.policy.sh"
 export START_ROLLOUT_SCRIPT="$SLURM_SUBMIT_DIR/$JOB/.rollout.sh"
 
@@ -33,10 +33,10 @@ chmod +x "$START_POLICY_SCRIPT" "$START_ROLLOUT_SCRIPT"
 
 srun --pack-group=0 \
      --job-name="az-policy" \
-     --output=/scratch/pstjohn/rlmolecule/gpu.%j.out \
+     --output=$WORKING_DIR/gpu.%j.out \
      "$START_POLICY_SCRIPT" &
      
 srun --pack-group=1 \
      --job-name="az-rollout" \
-     --output=/scratch/pstjohn/rlmolecule/mcts.%j.out \
+     --output=$WORKING_DIR/mcts.%j.out \
      "$START_ROLLOUT_SCRIPT"
