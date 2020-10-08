@@ -165,7 +165,7 @@ class Game(nx.DiGraph):
 
         node = node if node else self.start
         
-        logger.info(f"{self.id}: selecting node {node}")
+        logger.info(f"{self.id}: selecting node {node} with value={node.value:.3f} and visits={node.visits}")
         yield node
 
         if not node.terminal:

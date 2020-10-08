@@ -38,6 +38,7 @@ def get_ranked_rewards(reward):
         if n_games < config.reward_buffer_min_size:
             # Here, we don't have enough of a game buffer
             # to decide if the move is good or not
+            logging.debug(f"ranked_reward: not enough games ({n_games})")
             return np.random.choice([0., 1.])
         
         else:
@@ -50,6 +51,8 @@ def get_ranked_rewards(reward):
                             (config.ranked_reward_alpha, config.experiment_id, config.reward_buffer_max_size))
                 
                 r_alpha = cur.fetchone()[0]
+
+            logging.debug(f"ranked_reward: r_alpha={r_alpha}, reward={reward}")
             
             if np.isclose(reward, r_alpha):
                 return np.random.choice([0., 1.])
@@ -140,6 +143,7 @@ def run_game():
         # children, but still gets chosen as the final state.
         terminal_true_reward = 0.
     
+    logging.info(f"Finishing {G.id}: true_reward={terminal_true_reward:.1f}, ranked reward={reward}")
     
     with psycopg2.connect(**config.dbparams) as conn:
 

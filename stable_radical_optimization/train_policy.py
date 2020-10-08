@@ -33,8 +33,8 @@ def psql_generator():
             
         df = pd.read_sql_query("""
         with recent_replays as (
-            select * from rl.stablepsj_replay where gameid in (
-                select gameid from {}_game where experiment_id = %s order by id desc limit %s))
+            select * from rl.{0}_replay where gameid in (
+                select gameid from {0}_game where experiment_id = %s order by id desc limit %s))
 
         select distinct on (gameid) id, ranked_reward, data
             from recent_replays order by gameid, random();

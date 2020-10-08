@@ -2,12 +2,11 @@
 #SBATCH --account=rlmolecule
 #SBATCH --time=12:00:00
 #SBATCH --job-name az_stability
-#SBATCH --output=/scratch/$USER/rlmolecule/slurm.%j.out
 # --- Policy Trainer ---
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:2
 # --- MCTS Rollouts ---
-#SBATCH packjob
+#SBATCH hetjob
 #SBATCH -n 90
 #SBATCH -c 4
 
