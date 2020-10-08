@@ -7,6 +7,7 @@ import numpy as np
 import rdkit
 import rdkit.Chem
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+import tensorflow as tf
 
 import alphazero.config as config
 from alphazero.molecule import build_molecules, build_radicals
@@ -143,6 +144,9 @@ class Node(rdkit.Chem.Mol):
             
         if 'total_value' in node:
             del node['total_value']
+        
+        if hasattr(self, '_reward'):
+            del self._reward
 
 
     @prior_logit.setter
@@ -157,9 +161,11 @@ class Node(rdkit.Chem.Mol):
 
     def prior(self, parent):
         """Prior probabilities (unlike logits) depend on the parent"""
-        return (exp(self.prior_logit) / 
-                sum((exp(child.prior_logit) for child in parent.successors)))
-            
+        siblings = list(parent.successors)
+        self_index = siblings.index(self)
+        return tf.nn.softmax(
+            [child.prior_logit for child in siblings])[self_index].numpy()
+
     @property
     def policy_inputs(self):
         """Constructs GNN inputs for the node, or returns them if they've
