@@ -161,10 +161,7 @@ class Node(rdkit.Chem.Mol):
 
     def prior(self, parent):
         """Prior probabilities (unlike logits) depend on the parent"""
-        siblings = list(parent.successors)
-        self_index = siblings.index(self)
-        return tf.nn.softmax(
-            [child.prior_logit for child in siblings])[self_index].numpy()
+        return parent.child_priors[self]
 
     @property
     def policy_inputs(self):
@@ -206,6 +203,32 @@ class Node(rdkit.Chem.Mol):
             np.savez_compressed(f, **data)
             binary_data = f.getvalue()
         return binary_data
+
+    @property        
+    def child_priors(self):
+        """Get a list of priors for the node's children, with optionally added dirichlet noise.
+        Caches the result, so the noise is consistent.
+        """
+        try:
+            return self._child_priors
+        
+        except AttributeError:
+        
+            # Perform the softmax over the children node's prior logits
+            children = list(self.successors)
+            priors = tf.nn.softmax([child.prior_logit for child in children]).numpy()
+                    
+            # Add the optional exploration noise
+            if config.dirichlet_noise:
+                random_state = np.random.RandomState()
+                noise = random_state.dirichlet(
+                    np.ones_like(priors) * config.dirichlet_alpha)
+                
+                priors = priors * (1 - config.dirichlet_x) + (noise * config.dirichlet_x)
+            
+            assert np.isclose(priors.sum(), 1.)  # Just a sanity check            
+            self._child_priors = {child: prior for child, prior in zip(children, priors)}          
+            return self._child_priors
     
     @property        
     def reward(self):
