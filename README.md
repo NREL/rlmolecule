@@ -6,6 +6,7 @@ A repository for sharing code related to End to End Optimization for Molecular a
 channels:
   - conda-forge
   - defaults
+  
 dependencies:
   - python=3.7
   - jupyterlab
