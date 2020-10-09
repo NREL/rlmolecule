@@ -104,13 +104,6 @@ class Game(nx.DiGraph):
         values, prior_logits = self.policy_model.predict(parent.policy_inputs_with_children())
         prior_logits = prior_logits[1:].flatten()
         
-        # if we're adding noise, perturb the logits
-        if config.dirichlet_noise:
-            random_state = np.random.RandomState()
-            noise = random_state.dirichlet(
-                np.ones_like(prior_logits) * config.dirichlet_alpha)
-            prior_logits += np.exp(prior_logits).sum() * noise * config.dirichlet_x
-        
         # Update child nodes with predicted prior_logits
         for child, prior_logit in zip(parent.successors, prior_logits):
             child.prior_logit = float(prior_logit)
