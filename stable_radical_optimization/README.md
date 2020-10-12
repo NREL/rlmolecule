@@ -34,8 +34,7 @@ python initialize.py
 
 Start the remote monitoring notebook.  A common choice for this is to use 
 a DAV node.  But be mindful that these are shared nodes;  in particular, if you 
-run tensorflow, make sure you [limit GPU memory growth] 
-(https://www.tensorflow.org/guide/gpu#limiting_gpu_memory_growth)! (The
+run tensorflow, make sure you [limit GPU memory growth](https://www.tensorflow.org/guide/gpu#limiting_gpu_memory_growth)! (The
 notebook here doesn't use tensorflow).
 
 ```bash
