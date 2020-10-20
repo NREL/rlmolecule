@@ -5,7 +5,7 @@ import alphazero.config as config
 config.sql_basename = "StablePSJ"
 
 # Experiment id
-config.experiment_id = "0010"
+config.experiment_id = "0003_noh"
 
 config.dbparams = {
     'dbname': 'bde',
@@ -18,3 +18,5 @@ config.dbparams = {
 
 config.checkpoint_filepath = os.path.expandvars(
     f'/scratch/$USER/policy_checkpoints/{config.sql_basename}/{config.experiment_id}')
+
+config.dirichlet_x = 0.5  # percentage to favor dirichlet noise vs. prior estimation. Smaller means less noise

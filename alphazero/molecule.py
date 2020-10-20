@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 import random
 
@@ -25,7 +27,7 @@ def get_free_valence(atom):
 
 def build_molecules(starting_mol,
                     atom_additions=None,
-                    stereoisomers=False,
+                    stereoisomers=True,
                     sa_score_threshold=3.,
                     tryEmbedding=True):
     """Return an iterator of molecules that result from a single manipulation 
@@ -116,9 +118,9 @@ def build_molecules(starting_mol,
                     if smiles not in generated_smiles:
                         generated_smiles += [smiles]
                         
-                        if sa_score_threshold is not None:
+                        if sa_score_threshold is not None:                           
                             if get_sa_score(isomer) >= sa_score_threshold:
-                                continue
+                                continue                                
                                 
                         if tryEmbedding:
                             ntm = Chem.AddHs(isomer)

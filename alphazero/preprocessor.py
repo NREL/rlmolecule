@@ -11,10 +11,11 @@ def atom_featurizer(atom):
         atom.GetSymbol(),
         atom.GetNumRadicalElectrons(),
         atom.GetFormalCharge(),
-        atom.GetChiralTag(),
+        atom.GetChiralTag().name,
         atom.GetIsAromatic(),
         nfp.get_ring_size(atom, max_size=6),
         atom.GetDegree(),
+        atom.GetTotalNumHs(includeNeighbors=True)
     ))
 
 
@@ -28,11 +29,12 @@ def bond_featurizer(bond, flipped=False):
         atoms = "{}-{}".format(
             *tuple((bond.GetEndAtom().GetSymbol(),
                     bond.GetBeginAtom().GetSymbol())))
-    
+
+    bstereo = bond.GetStereo().name
     btype = str(bond.GetBondType())
     ring = 'R{}'.format(nfp.get_ring_size(bond, max_size=6)) if bond.IsInRing() else ''
     
-    return " ".join([atoms, btype, ring]).strip()
+    return " ".join([atoms, btype, ring, bstereo]).strip()
 
 
 class MolPreprocessor(nfp.preprocessing.SmilesPreprocessor):
@@ -54,11 +56,14 @@ class MolPreprocessor(nfp.preprocessing.SmilesPreprocessor):
 
         # If its an isolated atom, add a self-link
         if n_bond == 0:
-            n_bond = 1
+            n_bond = 1            
         
         atom_feature_matrix = np.zeros(n_atom, dtype='int')
         bond_feature_matrix = np.zeros(n_bond, dtype='int')
         connectivity = np.zeros((n_bond, 2), dtype='int')
+        
+        if n_bond == 1:
+            bond_feature_matrix[0] = self.bond_tokenizer('self-link')
 
         bond_index = 0
         for n, atom in enumerate(mol.GetAtoms()):
@@ -97,7 +102,7 @@ class MolPreprocessor(nfp.preprocessing.SmilesPreprocessor):
 
 preprocessor = MolPreprocessor(atom_features=atom_featurizer,
                                bond_features=bond_featurizer,
-                               explicit_hs=True)
+                               explicit_hs=False)
 
 preprocessor.from_json(os.path.join(
     os.path.dirname(os.path.abspath(__file__)), 'preprocessor.json'))

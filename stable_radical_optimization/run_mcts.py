@@ -23,7 +23,7 @@ import tensorflow as tf
 import nfp
 
 model = tf.keras.models.load_model(
-    '/projects/rlmolecule/pstjohn/models/20200923_radical_stability_model',
+    '/projects/rlmolecule/pstjohn/models/20201020_radical_stability_model',
     compile=False)
 
 
@@ -89,20 +89,16 @@ class StabilityNode(Node):
         
         else:           
             
-            spins, buried_vol = model.predict(
+            spins, buried_vol = model.predict_step(
                 {key: tf.constant(np.expand_dims(val, 0))
                  for key, val in self.policy_inputs.items()})
         
-            spins = spins.flatten()
-            buried_vol = buried_vol.flatten()
+            spins = spins.numpy().flatten()
+            buried_vol = buried_vol.numpy().flatten()
 
             atom_index = int(spins.argmax())
             max_spin = spins[atom_index]
             spin_buried_vol = buried_vol[atom_index]
-            
-            # Hacky solution until NN trained without H's finishes
-            if atom_index >= self.GetNumAtoms():
-                return 0.
             
             atom_type = self.GetAtomWithIdx(atom_index).GetSymbol()
 
