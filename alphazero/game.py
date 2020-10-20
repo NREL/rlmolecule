@@ -131,6 +131,8 @@ class Game(nx.DiGraph):
         # perform backprop
         for node in history:
             node.update(value)
+            
+        return leaf
         
 
     @staticmethod
