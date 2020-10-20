@@ -4,6 +4,9 @@ import random
 import rdkit
 from rdkit import Chem
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
+from rdkit.Chem.rdDistGeom import EmbedMolecule
+
+from molcomplex import get_sa_score
 
 pt = Chem.GetPeriodicTable()
 
@@ -20,7 +23,11 @@ def get_free_valence(atom):
     return pt.GetDefaultValence(atom.GetSymbol()) - atom.GetExplicitValence()
 
 
-def build_molecules(starting_mol, atom_additions=None, stereoisomers=False):
+def build_molecules(starting_mol,
+                    atom_additions=None,
+                    stereoisomers=False,
+                    sa_score_threshold=3.,
+                    tryEmbedding=True):
     """Return an iterator of molecules that result from a single manipulation 
     (i.e., atom / bond addition) to the starting molecule
     
@@ -30,6 +37,17 @@ def build_molecules(starting_mol, atom_additions=None, stereoisomers=False):
         
         atom_additions: list of elements
             Types of atoms that can be added. Defaults to ('C', 'N', 'O')
+            
+        stereoisomers: bool
+            Whether to iterate over potential stereoisomers of the given molecule
+            as seperate molecules
+            
+        sa_score_threshold: float or None
+            Whether to calculate the sa_score of the given molecule, and withold 
+            molecules that have a sa_score higher than the threshold.
+            
+        tryEmbedding: bool
+            whether to try an rdkit 3D embedding of the molecule
             
     Yields:
         rdkit.Mol, corresponding to modified input
@@ -73,10 +91,16 @@ def build_molecules(starting_mol, atom_additions=None, stereoisomers=False):
 
         return rw_mol
 
-    def enumerate_stereoisomers(mol):
+    def enumerate_stereoisomers(mol, to_use):
         """ We likely want to distinguish between stereoisomers, so we do that here """
-        opts = StereoEnumerationOptions(unique=True)
-        return tuple(EnumerateStereoisomers(mol, options=opts))
+        
+        if not to_use:
+            # Give an easy way to pass through this function if this feature isn't used
+            return (mol,)
+        
+        else:
+            opts = StereoEnumerationOptions(unique=True)
+            return tuple(EnumerateStereoisomers(mol, options=opts))    
 
     generated_smiles = []
     
@@ -87,19 +111,25 @@ def build_molecules(starting_mol, atom_additions=None, stereoisomers=False):
                 mol = add_bond(i, partner, bond_order)
 
                 Chem.SanitizeMol(mol)
-                if not stereoisomers:
+                for isomer in enumerate_stereoisomers(mol, stereoisomers):
                     smiles = Chem.MolToSmiles(mol)
                     if smiles not in generated_smiles:
-                        yield mol
                         generated_smiles += [smiles]
-                    
-                else:
-                    for isomer in enumerate_stereoisomers(mol):
-                        smiles = Chem.MolToSmiles(mol)
-                        if smiles not in generated_smiles:                        
-                            yield isomer
-                            generated_smiles += [smiles]
+                        
+                        if sa_score_threshold is not None:
+                            if get_sa_score(isomer) >= sa_score_threshold:
+                                continue
+                                
+                        if tryEmbedding:
+                            ntm = Chem.AddHs(isomer)
+                            cid = EmbedMolecule(ntm)
+                            if cid < 0:
+                                # Failed a 3D embedding
+                                continue
+                                
+                        yield isomer
 
+                        
 def build_radicals(starting_mol):
     """This is a bit application-specific, as we're looking to build 
     organic radicals. """
