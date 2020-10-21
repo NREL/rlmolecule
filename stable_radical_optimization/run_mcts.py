@@ -4,7 +4,7 @@ import uuid
 import logging
 
 sys.path.append('..')
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import numpy as np
 import pandas as pd
@@ -65,7 +65,7 @@ def get_ranked_rewards(reward):
     
 
 class StabilityNode(Node):
-    
+      
     def get_reward(self):
         
         with psycopg2.connect(**config.dbparams) as conn:

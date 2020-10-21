@@ -47,3 +47,6 @@ sql_basename = "Stable"
 
 # Experiment id
 experiment_id = "0001"
+
+# Optional arguments for molecule builder
+build_kwargs = {}

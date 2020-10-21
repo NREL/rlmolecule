@@ -142,6 +142,8 @@ def build_radicals(starting_mol):
         if get_free_valence(atom) > 0:
             rw_mol = rdkit.Chem.RWMol(starting_mol)
             rw_mol.GetAtomWithIdx(i).SetNumRadicalElectrons(1)
+            
+            Chem.SanitizeMol(rw_mol)            
             smiles = Chem.MolToSmiles(rw_mol)
             if smiles not in generated_smiles:
                 yield rw_mol
