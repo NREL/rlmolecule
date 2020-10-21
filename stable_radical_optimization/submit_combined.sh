@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --account=rlmolecule
-#SBATCH --time=12:00:00
+#SBATCH --time=4:00:00
 #SBATCH --job-name az_stability
 # --- Policy Trainer ---
 #SBATCH --nodes=1

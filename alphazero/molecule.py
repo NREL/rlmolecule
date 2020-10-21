@@ -146,6 +146,7 @@ def build_radicals(starting_mol):
             Chem.SanitizeMol(rw_mol)            
             smiles = Chem.MolToSmiles(rw_mol)
             if smiles not in generated_smiles:
-                yield rw_mol
+                 # This makes sure the atom ordering is standardized
+                yield Chem.MolFromSmiles(smiles) 
                 generated_smiles += [smiles]
                 
