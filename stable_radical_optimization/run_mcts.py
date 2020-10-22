@@ -26,6 +26,9 @@ model = tf.keras.models.load_model(
     '/projects/rlmolecule/pstjohn/models/20201020_radical_stability_model',
     compile=False)
 
+@tf.function(experimental_relax_shapes=True)                
+def predict(inputs):
+    return model.predict_step(inputs)
 
 def get_ranked_rewards(reward):
 
@@ -89,7 +92,7 @@ class StabilityNode(Node):
         
         else:           
             
-            spins, buried_vol = model.predict_step(
+            spins, buried_vol = predict(
                 {key: tf.constant(np.expand_dims(val, 0))
                  for key, val in self.policy_inputs.items()})
         

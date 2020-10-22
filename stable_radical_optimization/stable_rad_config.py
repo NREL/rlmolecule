@@ -5,7 +5,7 @@ import alphazero.config as config
 config.sql_basename = "StablePSJ"
 
 # Experiment id
-config.experiment_id = "01_noh_with_s"
+config.experiment_id = "03_15_atom_max"
 
 config.dbparams = {
     'dbname': 'bde',
@@ -21,4 +21,7 @@ config.checkpoint_filepath = os.path.expandvars(
 
 config.dirichlet_x = 0.5  # percentage to favor dirichlet noise vs. prior estimation. Smaller means less noise
 
-config.build_kwargs.update({'atom_additions':  ('C', 'N', 'O', 'S')})
+config.build_kwargs.update({'atom_additions':  ('C', 'N', 'O', 'S'),
+                            'sa_score_threshold': 4.})
+
+config.max_atoms = 15

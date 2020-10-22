@@ -124,9 +124,11 @@ def build_molecules(starting_mol,
                                 
                         if tryEmbedding:
                             ntm = Chem.AddHs(isomer)
-                            cid = EmbedMolecule(ntm)
-                            if cid < 0:
-                                # Failed a 3D embedding
+                            
+                            try:
+                                assert EmbedMolecule(ntm) >= 0
+                            except (AssertionError, RuntimeError):
+                                # Failed a 3D embedding                                
                                 continue
                                 
                         yield isomer
