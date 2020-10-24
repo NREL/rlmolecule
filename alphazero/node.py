@@ -60,7 +60,7 @@ class Node(rdkit.Chem.Mol):
             raise RuntimeError("Attemping to get children of terminal node")
         
         if self.GetNumAtoms() < config.max_atoms:
-            for mol in build_molecules(self, stereoisomers=False):
+            for mol in build_molecules(self, **config.build_kwargs):
                 if self.G.has_node(mol):
                     # Check if the graph already has the current mol
                     yield self.G.nodes[mol]

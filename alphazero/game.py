@@ -34,6 +34,8 @@ class Game(nx.DiGraph):
         else:
             logger.info(f'{self.id}: no checkpoint found')
         
+        self.policy_predictions = tf.function(experimental_relax_shapes=True)(
+            self.policy_model.predict_step)
 
         
     def reset(self):
@@ -93,6 +95,7 @@ class Game(nx.DiGraph):
         # Create the children nodes and add them to the graph
         children = list(parent.build_children())
         
+        # Handle the case where a node doesn't have any valid children
         if not children:
             parent.terminal = True
             parent._reward = config.min_reward
@@ -101,8 +104,8 @@ class Game(nx.DiGraph):
         self.add_edges_from(((parent, child) for child in children))
         
         # Run the policy network to get value and prior_logit predictions
-        values, prior_logits = self.policy_model.predict(parent.policy_inputs_with_children())
-        prior_logits = prior_logits[1:].flatten()
+        values, prior_logits = self.policy_predictions(parent.policy_inputs_with_children())
+        prior_logits = prior_logits[1:].numpy().flatten()
         
         # Update child nodes with predicted prior_logits
         for child, prior_logit in zip(parent.successors, prior_logits):

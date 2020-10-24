@@ -1,0 +1,3 @@
+[submodule "molcomplex"]
+	path = molcomplex
+	url = git@github.nrel.gov:pstjohn/molcomplex.git

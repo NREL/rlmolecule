@@ -4,7 +4,7 @@ import uuid
 import logging
 
 sys.path.append('..')
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import numpy as np
 import pandas as pd
@@ -23,9 +23,12 @@ import tensorflow as tf
 import nfp
 
 model = tf.keras.models.load_model(
-    '/projects/rlmolecule/pstjohn/models/20200923_radical_stability_model',
+    '/projects/rlmolecule/pstjohn/models/20201020_radical_stability_model',
     compile=False)
 
+@tf.function(experimental_relax_shapes=True)                
+def predict(inputs):
+    return model.predict_step(inputs)
 
 def get_ranked_rewards(reward):
 
@@ -65,7 +68,7 @@ def get_ranked_rewards(reward):
     
 
 class StabilityNode(Node):
-    
+      
     def get_reward(self):
         
         with psycopg2.connect(**config.dbparams) as conn:
@@ -89,20 +92,16 @@ class StabilityNode(Node):
         
         else:           
             
-            spins, buried_vol = model.predict(
+            spins, buried_vol = predict(
                 {key: tf.constant(np.expand_dims(val, 0))
                  for key, val in self.policy_inputs.items()})
         
-            spins = spins.flatten()
-            buried_vol = buried_vol.flatten()
+            spins = spins.numpy().flatten()
+            buried_vol = buried_vol.numpy().flatten()
 
             atom_index = int(spins.argmax())
             max_spin = spins[atom_index]
             spin_buried_vol = buried_vol[atom_index]
-            
-            # Hacky solution until NN trained without H's finishes
-            if atom_index >= self.GetNumAtoms():
-                return 0.
             
             atom_type = self.GetAtomWithIdx(atom_index).GetSymbol()
 
