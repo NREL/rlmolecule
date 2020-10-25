@@ -1,4 +1,4 @@
-# rlmolecule
+![](https://cdn.rawgit.com/NREL/rlmolecule/master/docs/logo/logo.svg)
 
 A repository for sharing code related to End to End Optimization for Molecular and Atomistic Systems (19/CJ000/07/02)
 
