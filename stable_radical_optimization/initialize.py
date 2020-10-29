@@ -12,22 +12,11 @@ parser = argparse.ArgumentParser(description='Initialize the postgres tables.')
 parser.add_argument("--drop", action='store_true', help="whether to drop existing tables, if found")
 args = parser.parse_args()
 
-
-
-dbparams = {
-    'dbname': 'bde',
-    'port': 5432,
-    'host': 'yuma.hpc.nrel.gov',
-    'user': 'rlops',
-    'password': '***REMOVED***',
-    'options': f'-c search_path=rl',
-}
-
 ## This creates the table used to store the rewards
 ## But, we don't want this to run every time we run the script, 
 ## just keeping it here as a reference
 
-with psycopg2.connect(**dbparams) as conn:    
+with psycopg2.connect(**config.dbparams) as conn:    
     with conn.cursor() as cur:
         
         if args.drop:

@@ -7,12 +7,15 @@ config.sql_basename = "StablePSJ"
 # Experiment id
 config.experiment_id = "03_15_atom_max"
 
+with open('/projects/rlmolecule/rlops_pass', 'r') as f:
+    passwd = f.read().strip()
+
 config.dbparams = {
     'dbname': 'bde',
     'port': 5432,
     'host': 'yuma.hpc.nrel.gov',
     'user': 'rlops',
-    'password': '***REMOVED***',
+    'password': passwd,
     'options': f'-c search_path=rl',
 }
 

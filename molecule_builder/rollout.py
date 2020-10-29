@@ -38,7 +38,7 @@ dbparams = {
     'port': 5432,
     'host': 'yuma.hpc.nrel.gov',
     'user': 'rlops',
-    'password': '***REMOVED***',
+    'password': '********',
     'options': f'-c search_path=rl',
 }
 
