@@ -1,4 +1,6 @@
+import os
 import logging
+import sys
 
 import numpy as np
 import random
@@ -8,7 +10,9 @@ from rdkit import Chem
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
 from rdkit.Chem.rdDistGeom import EmbedMolecule
 
-from molcomplex import get_sa_score
+from rdkit.Chem import RDConfig
+sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
+import sascorer
 
 pt = Chem.GetPeriodicTable()
 
@@ -119,7 +123,7 @@ def build_molecules(starting_mol,
                         generated_smiles += [smiles]
                         
                         if sa_score_threshold is not None:                           
-                            if get_sa_score(isomer) >= sa_score_threshold:
+                            if sascorer.calculateScore(isomer) >= sa_score_threshold:
                                 continue                                
                                 
                         if tryEmbedding:
