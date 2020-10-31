@@ -37,7 +37,20 @@ def bond_featurizer(bond, flipped=False):
     return " ".join([atoms, btype, ring, bstereo]).strip()
 
 
+def filter_keys(attribute):
+    return {key: value for key, value in attribute.items()
+            if key in {'atom', 'bond', 'connectivity'}}
+
+
 class MolPreprocessor(nfp.preprocessing.SmilesPreprocessor):
+    
+    output_types = filter_keys(nfp.preprocessing.SmilesPreprocessor.output_types)
+    output_shapes = filter_keys(nfp.preprocessing.SmilesPreprocessor.output_shapes)
+    padding_values = filter_keys(nfp.preprocessing.SmilesPreprocessor.padding_values)
+    
+    def padded_shapes(self, *args, **kwargs):
+        return filter_keys(super().padded_shapes(*args, **kwargs))
+    
     def construct_feature_matrices(self, mol, train=False):
         """ Convert an rdkit Mol to a list of tensors
         'atom' : (n_atom,) length list of atom classes
@@ -98,7 +111,7 @@ class MolPreprocessor(nfp.preprocessing.SmilesPreprocessor):
             'bond': bond_feature_matrix,
             'connectivity': connectivity,
         }
-    
+        
 
 preprocessor = MolPreprocessor(atom_features=atom_featurizer,
                                bond_features=bond_featurizer,
