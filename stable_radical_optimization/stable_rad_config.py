@@ -5,7 +5,7 @@ import alphazero.config as config
 config.sql_basename = "StablePSJ"
 
 # Experiment id
-config.experiment_id = "03_15_atom_max"
+config.experiment_id = "fixing_node_visits_1"
 
 with open('/projects/rlmolecule/rlops_pass', 'r') as f:
     passwd = f.read().strip()
