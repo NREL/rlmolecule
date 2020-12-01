@@ -1,6 +1,5 @@
 import io
 import itertools
-from math import exp
 
 import networkx as nx
 import numpy as np
@@ -10,12 +9,14 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 import tensorflow as tf
 
 import alphazero.config as config
-from alphazero.molecule import build_molecules, build_radicals
+from molecule_graph.molecule_tools import build_molecules, build_radicals
 from alphazero.preprocessor import preprocessor
 
-class Node(rdkit.Chem.Mol):
+# TODO: can you remove rdkit from /alphazero/ ?
+
+class Node(rdkit.Chem.Mol): # TODO: integration point - factor into implemenation
     
-    def __init__(self, *args, graph: nx.DiGraph=None, terminal: bool=False, **kwargs):
+    def __init__(self, *args, game: nx.DiGraph=None, terminal: bool=False, **kwargs):
         """Base class that handles much of the mcts alphazero logic for
         organic radical construction. Actual usage of this class requires
         subclassing with a specific reward function, i.e.
@@ -38,46 +39,47 @@ class Node(rdkit.Chem.Mol):
         
         """
         
-        super(Node, self).__init__(*args, **kwargs)
-        self.G = graph
+        super(Node, self).__init__(*args, **kwargs) # TODO: integration point
+        self.game = game
         self.terminal = terminal
         
     def __hash__(self):
-        return hash(self.smiles)
+        return hash(self.smiles) # TODO: integration point
 
     def __eq__(self, other):
-        return self.__hash__() == other.__hash__()
+        return self.__hash__() == other.__hash__() # TODO: integration point (w/network x)
     
     @property
-    def smiles(self):
+    def smiles(self): # TODO: integration point - factor into implementation
         return rdkit.Chem.MolToSmiles(self)
     
     def __repr__(self):
         return '<{}>'.format(self.smiles)
     
+    # TODO: this calls the molecule builder -- factor into implementation
     def build_children(self):
         if self.terminal:
             raise RuntimeError("Attemping to get children of terminal node")
         
         if self.GetNumAtoms() < config.max_atoms:
             for mol in build_molecules(self, **config.build_kwargs):
-                if self.G.has_node(mol):
+                if self.game.has_node(mol):
                     # Check if the graph already has the current mol
-                    yield self.G.nodes[mol]
+                    yield self.game.nodes[mol]
                 else:
-                    yield self.__class__(mol, graph=self.G)
+                    yield self.__class__(mol, graph=self.game)
         
         if self.GetNumAtoms() >= config.min_atoms:
             for radical in build_radicals(self):
-                yield self.__class__(radical, graph=self.G, terminal=True)
+                yield self.__class__(radical, graph=self.game, terminal=True)
 
     @property        
     def successors(self):
-        return self.G.successors(self)
+        return self.game.successors(self)
                     
     def update(self, reward):
         """ Value and visit information is stored in the networkx graph, not individual nodes. """
-        node = self.G.nodes[self]
+        node = self.game.nodes[self]
         if 'visits' in node:
             node['visits'] += 1
         else:
@@ -91,7 +93,7 @@ class Node(rdkit.Chem.Mol):
             
     @property
     def visits(self):
-        node = self.G.nodes[self]
+        node = self.game.nodes[self]
         try:
             return node['visits']
         except KeyError:
@@ -100,7 +102,7 @@ class Node(rdkit.Chem.Mol):
         
     @property
     def value(self):
-        node = self.G.nodes[self]
+        node = self.game.nodes[self]
         
         try:
             total_value = node['total_value']
@@ -111,7 +113,7 @@ class Node(rdkit.Chem.Mol):
     
     
     def ucb_score(self, parent):
-        
+        # gets results for this node from the networkx digraph
         pb_c = np.log((parent.visits + config.pb_c_base + 1) /
                       config.pb_c_base) + config.pb_c_init
         
@@ -124,7 +126,7 @@ class Node(rdkit.Chem.Mol):
     
     @property
     def prior_logit(self):
-        node = self.G.nodes[self]
+        node = self.game.nodes[self]
         try:
             return node['prior_logit']
         except KeyError:
@@ -132,13 +134,13 @@ class Node(rdkit.Chem.Mol):
             
 
     def reset_priors(self):
-        node = self.G.nodes[self]
+        node = self.game.nodes[self]
         if 'prior_logit' in node:
             del node['prior_logit']
         
 
     def reset_updates(self):
-        node = self.G.nodes[self]
+        node = self.game.nodes[self]
         if 'visits' in node:
             del node['visits']
             
@@ -151,7 +153,7 @@ class Node(rdkit.Chem.Mol):
 
     @prior_logit.setter
     def prior_logit(self, value):
-        node = self.G.nodes[self]
+        node = self.game.nodes[self]
         
         if 'prior_logit' in node:
             pass
@@ -167,6 +169,7 @@ class Node(rdkit.Chem.Mol):
     def policy_inputs(self):
         """Constructs GNN inputs for the node, or returns them if they've
         been previously cached"""
+        # TODO: integration point - uses preprocessor script to build inputs to policy network
         try:
             return self._policy_inputs
         except AttributeError:
@@ -178,7 +181,7 @@ class Node(rdkit.Chem.Mol):
         """Return the given nodes policy inputs, concatenated together with the 
         inputs of its successor nodes. Used as the inputs for the policy neural
         network"""
-        
+        # TODO: integration point - stacks parent with current children as a batch
         policy_inputs = [node.policy_inputs for node in itertools.chain((self,), self.successors)]
         return {key: pad_sequences([elem[key] for elem in policy_inputs], padding='post')
                 for key in policy_inputs[0].keys()}
@@ -194,7 +197,7 @@ class Node(rdkit.Chem.Mol):
             data = dict(np.load(f, allow_pickle=True).items())        
         
         """
-        
+        # TODO: integration point - stores inputs so it can go into database
         data = self.policy_inputs_with_children()
         visit_counts = np.array([child.visits for child in self.successors])
         data['visit_probs'] = visit_counts / visit_counts.sum()
@@ -232,6 +235,7 @@ class Node(rdkit.Chem.Mol):
     
     @property        
     def reward(self):
+        # TODO: integration point -
         assert self.terminal, "Accessing reward of non-terminal state"
         try:
             return self._reward

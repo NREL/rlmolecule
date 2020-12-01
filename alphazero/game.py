@@ -20,11 +20,11 @@ class Game(nx.DiGraph):
         
         self.id = uuid.uuid4().hex[:8]      
 
-        start = node_cls(Chem.MolFromSmiles(start_smiles), graph=self)
+        start = node_cls(Chem.MolFromSmiles(start_smiles), graph=self) # TODO: integration point - games should be initialized with a node
         self.add_node(start)
         self.start = start
         
-        self.policy_trainer = build_policy_trainer()
+        self.policy_trainer = build_policy_trainer() # TODO: integration point - policy network must match node impl (node generates inputs to network)
         self.policy_model = self.policy_trainer.layers[-1].policy_model
 
         latest = tf.train.latest_checkpoint(config.checkpoint_filepath)
@@ -38,7 +38,7 @@ class Game(nx.DiGraph):
             self.policy_model.predict_step)
 
         
-    def reset(self):
+    def reset(self): # TODO: integration point - can delete
         """ CURRENTLY UNUSED -- second guessing whether we really want this...
         a random 10 atom game might expand to 22k nodes. I'm worried that we're going
         to be growing local memory a lot if we cache everything.
@@ -93,7 +93,7 @@ class Game(nx.DiGraph):
         """
 
         # Create the children nodes and add them to the graph
-        children = list(parent.build_children())
+        children = list(parent.build_children()) # TODO: integration point
         
         # Handle the case where a node doesn't have any valid children
         if not children:
@@ -101,10 +101,10 @@ class Game(nx.DiGraph):
             parent._reward = config.min_reward
             return parent._reward
         
-        self.add_edges_from(((parent, child) for child in children))
+        self.add_edges_from(((parent, child) for child in children)) # TODO: networkx call - uses hash function to figure out if a new node is needed
         
         # Run the policy network to get value and prior_logit predictions
-        values, prior_logits = self.policy_predictions(parent.policy_inputs_with_children())
+        values, prior_logits = self.policy_predictions(parent.policy_inputs_with_children()) # TODO: integration point - policy_inputs_with_children generates inputs to policy network
         prior_logits = prior_logits[1:].numpy().flatten()
         
         # Update child nodes with predicted prior_logits

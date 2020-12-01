@@ -11,7 +11,8 @@ min_atoms = 4  # max atoms in molecule
 # MCTS / rollout
 lru_cache_maxsize = 100000 
 num_rollouts = 1000   # should we limit, if so how much?
-num_simulations = 256  # number of simulations used by MCTS per game step
+# num_simulations = 256  # number of simulations used by MCTS per game step
+num_simulations = 20  # number of simulations used by MCTS per game step
 root_dirichlet_alpha = 0.0  # 0.3 chess, 0.03 Go, 0.15 shogi
 root_exploration_fraction = 0.25
 pb_c_base = 1   # 19652 in pseudocode

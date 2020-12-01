@@ -23,7 +23,7 @@ import tensorflow as tf
 import nfp
 
 model = tf.keras.models.load_model(
-    '/projects/rlmolecule/pstjohn/models/20201020_radical_stability_model',
+    config.reward_model_path,
     compile=False)
 
 @tf.function(experimental_relax_shapes=True)                
