@@ -16,31 +16,31 @@ from alphazero.preprocessor import preprocessor
 
 class Node(rdkit.Chem.Mol): # TODO: integration point - factor into implemenation
     
-    def __init__(self, *args, game: nx.DiGraph=None, terminal: bool=False, **kwargs):
+    def __init__(self, *args, graph: nx.DiGraph = None, terminal: bool = False, **kwargs):
         """Base class that handles much of the mcts alphazero logic for
         organic radical construction. Actual usage of this class requires
         subclassing with a specific reward function, i.e.
-        
+
         >>> from rdkit.Chem.Descriptors import qed
-        
+
         >>> class QedNode(Node):
                 def get_reward(self):
                     return qed(self)
-                
+
         >>> G = nx.DiGraph()
         >>> start = QedNode(rdkit.Chem.MolFromSmiles('CC'), graph=G)
         >>> G.add_node(start)
         >>> game = list(run_mcts(G, start))
-        
+
         Parameters:
         *args: standard initialization of rdkit.Chem.Mol using another Mol
         graph: A networkx.DiGraph definining the MCTS tree
         terminal: whether the given node is a terminal state
-        
+
         """
         
-        super(Node, self).__init__(*args, **kwargs) # TODO: integration point
-        self.game = game
+        super(Node, self).__init__(*args, **kwargs)
+        self.G = graph
         self.terminal = terminal
         
     def __hash__(self):
@@ -60,104 +60,97 @@ class Node(rdkit.Chem.Mol): # TODO: integration point - factor into implemenatio
     def build_children(self):
         if self.terminal:
             raise RuntimeError("Attemping to get children of terminal node")
-        
+    
         if self.GetNumAtoms() < config.max_atoms:
             for mol in build_molecules(self, **config.build_kwargs):
-                if self.game.has_node(mol):
+                if self.G.has_node(mol):
                     # Check if the graph already has the current mol
-                    yield self.game.nodes[mol]
+                    yield self.G.nodes[mol]
                 else:
-                    yield self.__class__(mol, graph=self.game)
-        
+                    yield self.__class__(mol, graph=self.G)
+    
         if self.GetNumAtoms() >= config.min_atoms:
             for radical in build_radicals(self):
-                yield self.__class__(radical, graph=self.game, terminal=True)
+                yield self.__class__(radical, graph=self.G, terminal=True)
 
-    @property        
+    @property
     def successors(self):
-        return self.game.successors(self)
-                    
+        return self.G.successors(self)
+
     def update(self, reward):
         """ Value and visit information is stored in the networkx graph, not individual nodes. """
-        node = self.game.nodes[self]
+        node = self.G.nodes[self]
         if 'visits' in node:
             node['visits'] += 1
         else:
             node['visits'] = 1
-            
+    
         if 'total_value' in node:
             node['total_value'] += reward
         else:
             node['total_value'] = reward
 
-            
     @property
     def visits(self):
-        node = self.game.nodes[self]
+        node = self.G.nodes[self]
         try:
             return node['visits']
         except KeyError:
             return 0
 
-        
     @property
     def value(self):
-        node = self.game.nodes[self]
-        
+        node = self.G.nodes[self]
+    
         try:
             total_value = node['total_value']
         except KeyError:
             total_value = 0
-        
+    
         return total_value / self.visits if self.visits > 0 else 0
-    
-    
+
     def ucb_score(self, parent):
-        # gets results for this node from the networkx digraph
+    
         pb_c = np.log((parent.visits + config.pb_c_base + 1) /
                       config.pb_c_base) + config.pb_c_init
-        
+    
         pb_c *= np.sqrt(parent.visits) / (self.visits + 1)
-        
+    
         prior_score = pb_c * self.prior(parent)
-               
+    
         return prior_score + self.value
 
-    
     @property
     def prior_logit(self):
-        node = self.game.nodes[self]
+        node = self.G.nodes[self]
         try:
             return node['prior_logit']
         except KeyError:
             return np.nan
-            
 
     def reset_priors(self):
-        node = self.game.nodes[self]
+        node = self.G.nodes[self]
         if 'prior_logit' in node:
             del node['prior_logit']
-        
 
     def reset_updates(self):
-        node = self.game.nodes[self]
+        node = self.G.nodes[self]
         if 'visits' in node:
             del node['visits']
-            
+    
         if 'total_value' in node:
             del node['total_value']
-        
+    
         if hasattr(self, '_reward'):
             del self._reward
 
-
     @prior_logit.setter
     def prior_logit(self, value):
-        node = self.game.nodes[self]
-        
+        node = self.G.nodes[self]
+    
         if 'prior_logit' in node:
             pass
-        
+    
         else:
             node['prior_logit'] = value
 
@@ -165,84 +158,84 @@ class Node(rdkit.Chem.Mol): # TODO: integration point - factor into implemenatio
         """Prior probabilities (unlike logits) depend on the parent"""
         return parent.child_priors[self]
 
+    # TODO: integration point - uses preprocessor script to build inputs to policy network
     @property
     def policy_inputs(self):
         """Constructs GNN inputs for the node, or returns them if they've
         been previously cached"""
-        # TODO: integration point - uses preprocessor script to build inputs to policy network
         try:
             return self._policy_inputs
         except AttributeError:
             self._policy_inputs = preprocessor.construct_feature_matrices(self)
             return self._policy_inputs
 
-        
+    # TODO: integration point - stacks parent with current children as a batch
     def policy_inputs_with_children(self):
         """Return the given nodes policy inputs, concatenated together with the 
         inputs of its successor nodes. Used as the inputs for the policy neural
         network"""
-        # TODO: integration point - stacks parent with current children as a batch
+    
         policy_inputs = [node.policy_inputs for node in itertools.chain((self,), self.successors)]
         return {key: pad_sequences([elem[key] for elem in policy_inputs], padding='post')
                 for key in policy_inputs[0].keys()}
 
-    
+    # TODO: integration point - stores inputs so it can go into database
     def get_action_inputs_as_binary(self):
-        """Returns the output of `self.policy_inputs_with_children` and child visit probabilities 
+        """Returns the output of `self.policy_inputs_with_children` and child visit probabilities
         as a numpy compressed binary data string.
-        
+
         save and load using the following:
         >>> binary_data = self.get_action_inputs_as_binary()
         >>> with io.BytesIO(binary_data) as f:
-            data = dict(np.load(f, allow_pickle=True).items())        
-        
+            data = dict(np.load(f, allow_pickle=True).items())
+
         """
-        # TODO: integration point - stores inputs so it can go into database
+    
         data = self.policy_inputs_with_children()
         visit_counts = np.array([child.visits for child in self.successors])
         data['visit_probs'] = visit_counts / visit_counts.sum()
-        
+    
         with io.BytesIO() as f:
             np.savez_compressed(f, **data)
             binary_data = f.getvalue()
         return binary_data
 
-    @property        
+    @property
     def child_priors(self):
         """Get a list of priors for the node's children, with optionally added dirichlet noise.
         Caches the result, so the noise is consistent.
         """
         try:
             return self._child_priors
-        
+    
         except AttributeError:
         
             # Perform the softmax over the children node's prior logits
             children = list(self.successors)
             priors = tf.nn.softmax([child.prior_logit for child in children]).numpy()
-                    
+        
             # Add the optional exploration noise
             if config.dirichlet_noise:
                 random_state = np.random.RandomState()
                 noise = random_state.dirichlet(
                     np.ones_like(priors) * config.dirichlet_alpha)
-                
-                priors = priors * (1 - config.dirichlet_x) + (noise * config.dirichlet_x)
             
-            assert np.isclose(priors.sum(), 1.)  # Just a sanity check            
-            self._child_priors = {child: prior for child, prior in zip(children, priors)}          
+                priors = priors * (1 - config.dirichlet_x) + (noise * config.dirichlet_x)
+        
+            assert np.isclose(priors.sum(), 1.)  # Just a sanity check
+            self._child_priors = {child: prior for child, prior in zip(children, priors)}
             return self._child_priors
-    
-    @property        
+
+    # TODO: integration point -
+    @property
     def reward(self):
-        # TODO: integration point -
         assert self.terminal, "Accessing reward of non-terminal state"
         try:
             return self._reward
         except AttributeError:
             self._reward = self.get_reward()
             return self._reward
-    
+
     def get_reward(self):
         """This should get overwritten by a subclass's reward function.
         (Should this be using ranked rewards?)

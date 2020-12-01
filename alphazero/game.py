@@ -1,5 +1,6 @@
 import logging
 import uuid
+from pprint import pprint
 
 import networkx as nx
 import numpy as np
@@ -18,8 +19,9 @@ class Game(nx.DiGraph):
     def __init__(self, node_cls=None, start_smiles=None):
         super(Game, self).__init__()
         
-        self.id = uuid.uuid4().hex[:8]      
+        self.id = uuid.uuid4().hex[:8]
 
+        pprint(Chem.MolFromSmiles(start_smiles))
         start = node_cls(Chem.MolFromSmiles(start_smiles), graph=self) # TODO: integration point - games should be initialized with a node
         self.add_node(start)
         self.start = start
@@ -85,7 +87,7 @@ class Game(nx.DiGraph):
 
 
     def expand(self, parent: Node):
-        """For a given node, build the chidren, add them to the graph, and run the 
+        """For a given node, build the chidren, add them to the graph, and run the
         policy network to get prior_logits and a value.
         
         Returns:
@@ -116,7 +118,7 @@ class Game(nx.DiGraph):
 
 
     def mcts_step(self, start: Node):
-        """Perform a single MCTS step from the given starting node, including a 
+        """Perform a single MCTS step from the given starting node, including a
         tree search, expansion, and backpropagation.
         """
         
@@ -124,7 +126,7 @@ class Game(nx.DiGraph):
         history = list(self.tree_policy(start))
         leaf = history[-1]
         
-        # Looks like in alphazero, we always expand, even if this is the 
+        # Looks like in alphazero, we always expand, even if this is the
         # first time we've visited the node
         if not leaf.terminal:
             value = self.expand(leaf)
@@ -175,7 +177,7 @@ class Game(nx.DiGraph):
                 choice = self.softmax_sample(node)
                 
             else:
-                choice = sorted((node for node in start.successors), 
+                choice = sorted((node for node in start.successors),
                                 key=lambda x: x.visits, reverse=True)[0]
                 
             yield from self.run_mcts(choice, explore=explore)

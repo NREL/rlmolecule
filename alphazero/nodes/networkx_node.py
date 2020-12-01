@@ -6,7 +6,7 @@ from typing import (
 
 from networkx import DiGraph
 
-from alphazero.node.abstract_node import AbstractNode
+from alphazero.nodes.abstract_node import AbstractNode
 
 
 class NetworkXNode(AbstractNode):

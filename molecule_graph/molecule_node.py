@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from typing import Iterator
 
 from networkx import DiGraph
@@ -8,7 +9,7 @@ from molecule_graph.molecule_tools import (
     build_molecules,
     build_radicals,
     )
-from alphazero.node.networkx_node import NetworkXNode
+from alphazero.nodes.networkx_node import NetworkXNode
 
 
 class MoleculeNode(NetworkXNode):
@@ -45,7 +46,7 @@ class MoleculeNode(NetworkXNode):
         if num_atoms >= self._config.min_atoms:
             yield from build_radicals(self)
     
-    # @abstractmethod
-    # @property
-    # def reward(self) -> float:
-    #     pass
+    @abstractmethod
+    @property
+    def reward(self) -> float:
+        pass
