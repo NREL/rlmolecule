@@ -161,6 +161,7 @@ class Game(nx.DiGraph):
         >>> game = list(run_mcts(G, start, explore=True))
         """
 
+        # The starting node of the current MCTS iteration.
         node = node if node else self.start
         
         logger.info(f"{self.id}: selecting node {node} with value={node.value:.3f} and visits={node.visits}")
@@ -169,6 +170,9 @@ class Game(nx.DiGraph):
         if not node.terminal:
             for _ in range(config.num_simulations):
                 self.mcts_step(node)
+            
+            # Store the search statistics and policy inputs for network training
+            node.store_policy_inputs_and_targets()
             
             # select action -- either softmax sample or by visit count
             if explore:

@@ -184,13 +184,13 @@ class Node(rdkit.Chem.Mol):
                 for key in policy_inputs[0].keys()}
 
     
-    def get_action_inputs_as_binary(self):
-        """Returns the output of `self.policy_inputs_with_children` and child visit probabilities 
+    def store_policy_inputs_and_targets(self):
+        """Stores the output of `self.policy_inputs_with_children` and child visit probabilities 
         as a numpy compressed binary data string.
         
         save and load using the following:
-        >>> binary_data = self.get_action_inputs_as_binary()
-        >>> with io.BytesIO(binary_data) as f:
+        >>> self.store_policy_inputs_and_targets()
+        >>> with io.BytesIO(self._policy_data) as f:
             data = dict(np.load(f, allow_pickle=True).items())        
         
         """
@@ -202,7 +202,8 @@ class Node(rdkit.Chem.Mol):
         with io.BytesIO() as f:
             np.savez_compressed(f, **data)
             binary_data = f.getvalue()
-        return binary_data
+        
+        self._policy_data = binary_data
 
     @property        
     def child_priors(self):
