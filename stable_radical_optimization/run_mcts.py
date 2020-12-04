@@ -163,7 +163,7 @@ def run_game():
                     values (%s, %s, %s, %s, %s, %s, %s);
                     """.format(table=config.sql_basename), (
                         config.experiment_id, G.id, node.smiles, game[-1].smiles, reward, i,
-                        node.get_action_inputs_as_binary()))
+                        node._policy_data))
                             
 
 if __name__ == "__main__":    
