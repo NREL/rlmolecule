@@ -12,8 +12,9 @@ from alphazero.nodes.abstract_node import AbstractNode
 class NetworkXNode(AbstractNode):
     
     def __init__(self, networkx_graph: DiGraph) -> None:
-        self.__networkx_graph: DiGraph = networkx_graph
+        self.__graph: DiGraph = networkx_graph
         self.__open: bool = True  # true if node has not yet been expanded
+        self.__graph.add_node(self)
         # self.__visits: int = 0
         # self.__total_value: float = 0.0
     
@@ -26,8 +27,8 @@ class NetworkXNode(AbstractNode):
         if self.open:
             self.__open = False
             successors = self._expand()
-            self.__networkx_graph.add_edges_from(((self, successor) for successor in successors))
-        return self.__networkx_graph.successors(self)
+            self.__graph.add_edges_from(((self, successor) for successor in successors))
+        return self.__graph.successors(self)
     
     # def update(self, reward:float) -> None:
     #     self.__visits += 1
@@ -48,6 +49,24 @@ class NetworkXNode(AbstractNode):
         """
         return self.__open
     
+    @property
+    def graph(self) -> DiGraph:
+        return self.__graph
+    
+    @abstractmethod
+    def _hash(self) -> int:
+        """
+        This exists to ensure implementers of this class define a custom hash function
+        """
+        pass
+    
+    @abstractmethod
+    def _eq(self, other: any) -> bool:
+        """
+        This exists to ensure implementers of this class define a custom eq function
+        """
+        pass
+    
     @abstractmethod
     def _expand(self) -> Iterator['MoleculeNode']:
         """
@@ -55,3 +74,15 @@ class NetworkXNode(AbstractNode):
         :return: list of successor nodes. These do not need to be interned nodes.
         """
         pass
+    
+    def __hash__(self) -> int:
+        """
+        Delegates to protected abstract method to encourage implementers use a correct implementation
+        """
+        return self._hash()
+    
+    def __eq__(self, other: any) -> bool:
+        """
+        Delegates to protected abstract method to encourage implementers use a correct implementation
+        """
+        return self._eq(other)

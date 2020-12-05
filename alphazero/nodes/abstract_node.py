@@ -9,17 +9,9 @@ import numpy as np
 
 class AbstractNode(ABC):
     
-    @abstractmethod
-    def __hash__(self) -> int:
-        pass
-    
-    @abstractmethod
-    def __eq__(self, other: any) -> bool:
-        pass
-    
-    @abstractmethod
-    def __repr__(self) -> str:
-        pass
+    @property
+    def terminal(self) -> bool:
+        return not any(True for _ in self.successors)
     
     @abstractmethod
     @property
