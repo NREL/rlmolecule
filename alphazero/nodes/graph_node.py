@@ -7,7 +7,7 @@ from typing import Iterable
 import numpy as np
 
 
-class AbstractNode(ABC):
+class GraphNode(ABC):
     
     @property
     def terminal(self) -> bool:
@@ -15,12 +15,7 @@ class AbstractNode(ABC):
     
     @abstractmethod
     @property
-    def successors(self) -> Iterable['AbstractNode']:
-        pass
-    
-    @abstractmethod
-    @property
-    def reward(self) -> float:
+    def successors(self) -> Iterable['GraphNode']:
         pass
     
     # @abstractmethod

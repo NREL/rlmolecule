@@ -37,7 +37,10 @@ class MoleculeNode(NetworkXNode):
         super().__init__(networkx_graph)
     
     def _eq(self, other: any) -> bool:
-        return self.smiles == other.smiles
+        return self._smiles == other._smiles
+    
+    def _hash(self) -> int:
+        return hash(self._smiles)
     
     def _repr(self) -> str:
         return self.smiles
@@ -73,6 +76,3 @@ class MoleculeNode(NetworkXNode):
                 self.parent,
                 self.graph,
                 build_radicals(self))
-    
-    def __hash__(self) -> int:
-        return hash(self.smiles)

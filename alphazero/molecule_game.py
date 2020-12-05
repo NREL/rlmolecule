@@ -23,10 +23,11 @@ class MoleculeGame:
         self._config: any = config
         self.id = uuid.uuid4().hex[:8]
         self.start = MoleculeNode.make_from_SMILES(self, start_smiles)
-        
         pprint(self.start)
         
-        self.start = start
+        # TODO: integration point - policy network must match node impl (node generates inputs to network)
+        self.policy_trainer = build_policy_trainer()
+        self.policy_model = self.policy_trainer.layers[-1].policy_model
         
         self.policy_trainer = build_policy_trainer()  # TODO: integration point - policy network must match node impl
         # (node generates inputs to network)
@@ -39,14 +40,14 @@ class MoleculeGame:
         else:
             logger.info(f'{self.id}: no checkpoint found')
         
-        self.policy_predictions = tf.function(experimental_relax_shapes=True)(
-            self.policy_model.predict_step)
+        self.policy_predictions = \
+            tf.function(experimental_relax_shapes=True)(self.policy_model.predict_step)
     
     @property
     def config(self) -> any:
         return self._config
     
-    def tree_policy(self, parent: Node):
+    def tree_policy(self, parent: MoleculeNode):
         """Implements the tree search part of an MCTS search. Recursive function which
         returns a generator over the optimal path.
     
@@ -62,7 +63,7 @@ class MoleculeGame:
             if sorted_successors:
                 yield from self.tree_policy(sorted_successors[0])
     
-    def expand(self, parent: Node):
+    def expand(self, parent: MoleculeNode):
         """For a given node, build the chidren, add them to the graph, and run the
         policy network to get prior_logits and a value.
         
@@ -71,17 +72,13 @@ class MoleculeGame:
         """
         
         # Create the children nodes and add them to the graph
-        children = list(parent.build_children())  # TODO: integration point
+        children = list(parent.successors)  # TODO: integration point
         
         # Handle the case where a node doesn't have any valid children
         if not children:
             parent.terminal = True
             parent._reward = config.min_reward
             return parent._reward
-        
-        self.add_edges_from(((parent, child) for child in
-                             children))  # TODO: networkx call - uses hash function to figure out if a new node is
-        # needed
         
         # Run the policy network to get value and prior_logit predictions
         values, prior_logits = self.policy_predictions(
@@ -96,7 +93,7 @@ class MoleculeGame:
         # Return the parent's predicted value
         return float(tf.nn.sigmoid(values[0]))
     
-    def mcts_step(self, start: Node):
+    def mcts_step(self, start: MoleculeNode):
         """Perform a single MCTS step from the given starting node, including a
         tree search, expansion, and backpropagation.
         """
@@ -119,7 +116,7 @@ class MoleculeGame:
         return leaf
     
     @staticmethod
-    def softmax_sample(node: Node) -> Node:
+    def softmax_sample(node: MoleculeNode) -> MoleculeNode:
         """Sample from node.successors according to their visit counts.
         
         Returns:

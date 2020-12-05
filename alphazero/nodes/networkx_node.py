@@ -6,10 +6,10 @@ from typing import (
 
 from networkx import DiGraph
 
-from alphazero.nodes.abstract_node import AbstractNode
+from alphazero.nodes.graph_node import GraphNode
 
 
-class NetworkXNode(AbstractNode):
+class NetworkXNode(GraphNode):
     
     def __init__(self, networkx_graph: DiGraph) -> None:
         self.__graph: DiGraph = networkx_graph
