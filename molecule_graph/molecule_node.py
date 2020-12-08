@@ -1,5 +1,6 @@
 from abc import abstractmethod
 from typing import (
+    Iterable,
     Iterator,
     Optional,
     )
@@ -11,39 +12,39 @@ from rdkit.Chem.rdmolfiles import (
     MolToSmiles,
     )
 
+from alphazero.nodes.graph_node import GraphNode
 from molecule_graph.molecule_tools import (
     build_molecules,
     build_radicals,
     )
-from alphazero.nodes.networkx_node import NetworkXNode
 
 
-class MoleculeNode(NetworkXNode):
+class MoleculeNode(GraphNode):
     
-    @staticmethod
-    def make_from_SMILES(parent: any, smiles: str, networkx_graph: Optional[DiGraph] = None) -> 'MoleculeNode':
-        """
-        Factory method for making a MoleculeNode from a SMILES string. If networkx_graph is None, a new one will be
-        created
-        """
-        if networkx_graph is None:
-            networkx_graph = DiGraph()
-        return MoleculeNode(parent, networkx_graph, MolFromSmiles(smiles))
-    
-    def __init__(self, parent: any, networkx_graph: DiGraph, molecule: Mol) -> None:
+    def __init__(self, parent: any, molecule: Mol) -> None:
         self._parent: any = parent
         self._molecule: Mol = molecule
         self._smiles = MolToSmiles(self._molecule)
-        super().__init__(networkx_graph)
     
-    def _eq(self, other: any) -> bool:
+    def __eq__(self, other: any) -> bool:
         return self._smiles == other._smiles
     
-    def _hash(self) -> int:
+    def __hash__(self) -> int:
         return hash(self._smiles)
     
-    def _repr(self) -> str:
-        return self.smiles
+    def __repr__(self) -> str:
+        return self._smiles
+    
+    def get_successors(self) -> Iterable['MoleculeNode']:
+        # TODO: should these functions be brought into this class?
+        num_atoms = self.molecule.GetNumAtoms()
+        if num_atoms < self._parent.config.max_atoms:
+            yield from (MoleculeNode(self.parent, molecule)
+                        for molecule in build_molecules(self._molecule, **self._parent.config.build_kwargs))
+        
+        if num_atoms >= self._parent.config.min_atoms:
+            yield from (MoleculeNode(self.parent, molecule)
+                        for molecule in build_radicals(self._molecule))
     
     @property
     def smiles(self) -> str:
@@ -56,23 +57,3 @@ class MoleculeNode(NetworkXNode):
     @property
     def parent(self) -> any:
         return self._parent
-    
-    @abstractmethod
-    @property
-    def reward(self) -> float:
-        pass
-    
-    def _expand(self) -> Iterator['MoleculeNode']:
-        # TODO: should these functions be brought into this class?
-        num_atoms = self.molecule.GetNumAtoms()
-        if num_atoms < self._parent.config.max_atoms:
-            yield from MoleculeNode(
-                self.parent,
-                self.graph,
-                build_molecules(self, **self._parent.build_kwargs))
-        
-        if num_atoms >= self._parent.config.min_atoms:
-            yield from MoleculeNode(
-                self.parent,
-                self.graph,
-                build_radicals(self))

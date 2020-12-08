@@ -82,7 +82,7 @@ class Game(nx.DiGraph):
         
         # Update child nodes with predicted prior_logits
         for child, prior_logit in zip(parent.successors, prior_logits):
-            child.prior_logit = float(prior_logit)
+            child._prior_logit = float(prior_logit)
             
         # Return the parent's predicted value
         return float(tf.nn.sigmoid(values[0]))
@@ -119,7 +119,7 @@ class Game(nx.DiGraph):
             choice: Node, the chosen successor node.
         """
         successors = list(node.successors)
-        visit_counts = np.array([n.visits for n in successors])
+        visit_counts = np.array([n._visits for n in successors])
         visit_softmax = tf.nn.softmax(tf.constant(visit_counts, dtype=tf.float32)).numpy()
         return successors[np.random.choice(
             range(len(successors)), size=1, p=visit_softmax)[0]]
@@ -153,6 +153,6 @@ class Game(nx.DiGraph):
                 
             else:
                 choice = sorted((node for node in start.successors),
-                                key=lambda x: x.visits, reverse=True)[0]
+                                key=lambda x: x._visits, reverse=True)[0]
                 
             yield from self.run_mcts(choice, explore=explore)

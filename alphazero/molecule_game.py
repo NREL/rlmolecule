@@ -1,4 +1,5 @@
 import logging
+import os
 import uuid
 from pprint import pprint
 from typing import Optional
@@ -8,60 +9,37 @@ import numpy as np
 import tensorflow as tf
 
 from rdkit import Chem
+from rdkit.Chem.rdmolfiles import MolFromSmiles
 
 import alphazero.config as config
 from alphazero.node import Node
+from alphazero.nodes.alpha_zero_game import AlphaZeroGame
 from alphazero.policy import build_policy_trainer
+from alphazero.preprocessor import MolPreprocessor
 from molecule_graph.molecule_node import MoleculeNode
 
 logger = logging.getLogger(__name__)
 
+default_preprocessor = MolPreprocessor(atom_features=atom_featurizer,
+                                       bond_features=bond_featurizer,
+                                       explicit_hs=False)
 
-class MoleculeGame:
+default_preprocessor.from_json(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'preprocessor.json'))
+
+
+class MoleculeGame(AlphaZeroGame):
     
-    def __init__(self, config: any, start_smiles: str):
-        self._config: any = config
-        self.id = uuid.uuid4().hex[:8]
-        self.start = MoleculeNode.make_from_SMILES(self, start_smiles)
+    def __init__(self, config: any, start_smiles: str, preprocessor: MolPreprocessor = default_preprocessor) -> None:
+        super().__init__(config)
+        self.preprocessor: MolPreprocessor = preprocessor
+        self.start: MoleculeNode = MoleculeNode.make_from_SMILES(self, MolFromSmiles(start_smiles))
         pprint(self.start)
         
-        # TODO: integration point - policy network must match node impl (node generates inputs to network)
-        self.policy_trainer = build_policy_trainer()
-        self.policy_model = self.policy_trainer.layers[-1].policy_model
-        
-        self.policy_trainer = build_policy_trainer()  # TODO: integration point - policy network must match node impl
-        # (node generates inputs to network)
-        self.policy_model = self.policy_trainer.layers[-1].policy_model
-        
-        latest = tf.train.latest_checkpoint(config.checkpoint_filepath)
-        if latest:
-            self.policy_trainer.load_weights(latest)
-            logger.info(f'{self.id}: loaded checkpoint {latest}')
-        else:
-            logger.info(f'{self.id}: no checkpoint found')
-        
-        self.policy_predictions = \
-            tf.function(experimental_relax_shapes=True)(self.policy_model.predict_step)
-    
-    @property
-    def config(self) -> any:
-        return self._config
-    
-    def tree_policy(self, parent: MoleculeNode):
-        """Implements the tree search part of an MCTS search. Recursive function which
-        returns a generator over the optimal path.
-    
-        >>> history = list(tree_policy(G, start))"""
-        
-        yield parent
-        
-        if not parent.terminal:
-            
-            sorted_successors = sorted(
-                parent.successors, key=lambda x: x.ucb_score(parent), reverse=True)
-            
-            if sorted_successors:
-                yield from self.tree_policy(sorted_successors[0])
+        policy_trainer = build_policy_trainer()
+        policy_model = policy_trainer.layers[-1].policy_model
+        policy_predictions = tf.function(experimental_relax_shapes=True)(policy_model.predict_step)
+        self._setup(policy_trainer, policy_model, policy_predictions)
     
     def expand(self, parent: MoleculeNode):
         """For a given node, build the chidren, add them to the graph, and run the
@@ -71,7 +49,7 @@ class MoleculeGame:
         value (float): the estimated value of `parent`.
         """
         
-        # Create the children nodes and add them to the graph
+        # Create the children nodes and add them to policy_predictionsthe graph
         children = list(parent.successors)  # TODO: integration point
         
         # Handle the case where a node doesn't have any valid children
@@ -88,7 +66,7 @@ class MoleculeGame:
         
         # Update child nodes with predicted prior_logits
         for child, prior_logit in zip(parent.successors, prior_logits):
-            child.prior_logit = float(prior_logit)
+            child._prior_logit = float(prior_logit)
         
         # Return the parent's predicted value
         return float(tf.nn.sigmoid(values[0]))
@@ -123,7 +101,7 @@ class MoleculeGame:
             choice: Node, the chosen successor node.
         """
         successors = list(node.successors)
-        visit_counts = np.array([n.visits for n in successors])
+        visit_counts = np.array([n._visits for n in successors])
         visit_softmax = tf.nn.softmax(tf.constant(visit_counts, dtype=tf.float32)).numpy()
         return successors[np.random.choice(
             range(len(successors)), size=1, p=visit_softmax)[0]]
@@ -156,6 +134,6 @@ class MoleculeGame:
             
             else:
                 choice = sorted((node for node in start.successors),
-                                key=lambda x: x.visits, reverse=True)[0]
+                                key=lambda x: x._visits, reverse=True)[0]
             
             yield from self.run_mcts(choice, explore=explore)

@@ -3,6 +3,7 @@ import itertools
 from abc import abstractmethod
 from typing import (
     Iterable,
+    Iterator,
     List,
     Optional,
     )
@@ -16,64 +17,113 @@ import tensorflow as tf
 
 class AlphaZeroNode(GraphNode):
     
-    def __init__(self) -> None:
-        self.visits: int = 0
-        self.total_value: float = 0.0
-        self.prior_logit: float = np.nan
+    def __init__(self, graph_node: GraphNode, game: 'AlphaZeroGame') -> None:
+        self._graph_node: GraphNode = graph_node
+        self._game: 'AlphaZeroGame' = game
+        self._visits: int = 0
+        self._total_value: float = 0.0
+        self._prior_logit: float = np.nan
         self._reward: Optional[float] = None
         self._child_priors: Optional[List['AlphaZeroNode']] = None
         self._policy_inputs: Optional[{}] = None
     
-    @abstractmethod
-    @property
-    def successors(self) -> Iterable['AlphaZeroNode']:
+    def get_successors(self) -> Iterable['AlphaZeroNode']:
+        game = self._game
+        return (AlphaZeroNode(graph_successor, game) for graph_successor in self._graph_node.get_successors())
+    
+    def compute_reward(self) -> float:
+        # if self.terminal:
+        #     return config.min_reward
+        # TODO: more here
         pass
     
-    @abstractmethod
-    def compute_reward(self) -> float:
-        pass
+    def compute_value_estimate(self) -> float:
+        """
+        For a given node, build the chidren, add them to the graph, and run the
+        policy network to get prior_logits and a value.
+
+        Returns:
+        value (float): the estimated value of `parent`.
+        """
+        
+        children = list(self.get_successors())
+        
+        # Handle the case where a node doesn't have any valid children
+        if len(children) == 0:
+            return self.config.min_reward
+        
+        # Run the policy network to get value and prior_logit predictions
+        # TODO: integration point - policy_predictions
+        values, prior_logits = self.policy_predictions(self.policy_inputs_with_children())
+        
+        # inputs to policy network
+        prior_logits = prior_logits[1:].numpy().flatten()
+        
+        # Update child nodes with predicted prior_logits
+        for child, prior_logit in zip(children, prior_logits):
+            child._prior_logit = float(prior_logit)
+        
+        # Return the parent's predicted value
+        return float(tf.nn.sigmoid(values[0]))
     
     def update(self, reward: float) -> None:
-        self.visits += 1
-        self.total_value += reward
+        self._visits += 1
+        self._total_value += reward
+    
+    @property
+    def visits(self) -> int:
+        return self._visits
+    
+    @property
+    def config(self) -> any:
+        return self._game.config
     
     @property
     def value(self) -> float:
-        return self.total_value / self.visits if self.visits != 0 else 0
-    
-    def ucb_score(self, parent):
-        pb_c = np.log((parent.visits + config.pb_c_base + 1) /
-                      config.pb_c_base) + config.pb_c_init
-        
-        pb_c *= np.sqrt(parent.visits) / (self.visits + 1)
-        
-        prior_score = pb_c * self.prior(parent)
-        
-        return prior_score + self.value
+        return self._total_value / self._visits if self._visits != 0 else 0
     
     def reset_priors(self) -> None:
-        self.prior_logit = np.nan
+        self._prior_logit = np.nan
     
     def reset_updates(self) -> None:
-        self.visits = 0
-        self.total_value = 0
+        self._visits = 0
+        self._total_value = 0
         self._reward = None
     
-    def prior(self, parent) -> float:
-        """Prior probabilities (unlike logits) depend on the parent"""
-        return parent.child_priors[self]
+    def tree_policy(self) -> Iterator['AlphaZeroNode']:
+        """
+        Implements the tree search part of an MCTS search. Recursive function which
+        returns a generator over the optimal path.
+        """
+        yield self
+        yield from sorted(self.get_successors(), key=lambda successor: -self.ucb_score(successor))
+    
+    def ucb_score(self, child: 'AlphaZeroNode') -> float:
+        config = self.config
+        pb_c = np.log((self.visits + config.pb_c_base + 1) / config.pb_c_base) + config.pb_c_init
+        pb_c *= np.sqrt(self.visits) / (child.visits + 1)
+        prior_score = pb_c * self.child_prior(child)
+        return prior_score + child.value
+    
+    def child_prior(self, child: 'AlphaZeroNode') -> float:
+        """
+        Prior probabilities (unlike logits) depend on the parent
+        """
+        return self.child_priors[child]
     
     @property
     def child_priors(self) -> {'AlphaZeroNode': float}:
-        """Get a list of priors for the node's children, with optionally added dirichlet noise.
+        """
+        Get a list of priors for the node's children, with optionally added dirichlet noise.
         Caches the result, so the noise is consistent.
         """
         if self._child_priors is None:
             # Perform the softmax over the children node's prior logits
-            children = list(self.successors)
-            priors = tf.nn.softmax([child.prior_logit for child in children]).numpy()
+            children = list(self.get_successors())
+            priors = tf.nn.softmax([child._prior_logit for child in children]).numpy()
             
             # Add the optional exploration noise
+            config = self.config
             if config.dirichlet_noise:
                 random_state = np.random.RandomState()
                 noise = random_state.dirichlet(
@@ -89,8 +139,9 @@ class AlphaZeroNode(GraphNode):
     # TODO: integration point - uses preprocessor script to build inputs to policy network
     @property
     def policy_inputs(self):
-        """Constructs GNN inputs for the node, or returns them if they've
-        been previously cached"""
+        """
+        Constructs GNN inputs for the node, or returns them if they've been previously cached
+        """
         if self._policy_inputs is None:
             self._policy_inputs = preprocessor.construct_feature_matrices(self)
         return self._policy_inputs
@@ -118,7 +169,7 @@ class AlphaZeroNode(GraphNode):
         """
         
         data = self.policy_inputs_with_children()
-        visit_counts = np.array([child.visits for child in self.successors])
+        visit_counts = np.array([child._visits for child in self.successors])
         data['visit_probs'] = visit_counts / visit_counts.sum()
         
         with io.BytesIO() as f:
