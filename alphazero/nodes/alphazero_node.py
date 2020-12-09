@@ -36,6 +36,9 @@ class AlphaZeroNode(GraphNode):
     def __hash__(self) -> int:
         return hash(self._graph_node)
     
+    def __repr__(self) -> str:
+        return self._graph_node.__repr__()
+    
     def get_successors(self) -> Iterable['AlphaZeroNode']:
         game = self._game
         return (AlphaZeroNode(graph_successor, game) for graph_successor in self._graph_node.get_successors())
@@ -44,11 +47,12 @@ class AlphaZeroNode(GraphNode):
     def graph_node(self) -> GraphNode:
         return self._graph_node
     
-    def compute_reward(self) -> float:
-        # if self.terminal:
-        #     return config.min_reward
-        # TODO: more here
-        pass
+    # TODO: investigate reward API
+    # def compute_reward(self) -> float:
+    #     # if self.terminal:
+    #     #     return config.min_reward
+    #     # TODO: more here
+    #     pass
     
     def compute_value_estimate(self) -> float:
         """
@@ -60,6 +64,7 @@ class AlphaZeroNode(GraphNode):
         Returns:
         value (float): the estimated value of `parent`.
         """
+        print('{}: compute_value_estimate'.format(self))
         
         children = self.get_successors_list()
         
@@ -105,15 +110,18 @@ class AlphaZeroNode(GraphNode):
         Implements the tree search part of an MCTS search. Recursive function which
         returns a generator over the optimal path.
         """
+        print('{} tree_policy'.format(self))
         yield self
-        sorted_successors = sorted(self.get_successors(), key=lambda successor: -self.ucb_score(successor))
-        yield from (successor.tree_policy() for successor in sorted_successors)
+        successor = max(self.get_successors(), key=lambda successor: self.ucb_score(successor))
+        yield from successor.tree_policy()
     
     def mcts_step(self) -> 'AlphaZeroNode':
         """
         Perform a single MCTS step from the given starting node, including a
         tree search, expansion, and backpropagation.
         """
+        
+        print('{}: mcts_step'.format(self))
         
         # Perform the tree policy search
         history = list(self.tree_policy())

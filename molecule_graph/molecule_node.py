@@ -21,8 +21,8 @@ from molecule_graph.molecule_tools import (
 
 class MoleculeNode(GraphNode):
     
-    def __init__(self, parent: any, molecule: Mol) -> None:
-        self._parent: any = parent
+    def __init__(self, parent: 'MoleculeGame', molecule: Mol) -> None:
+        self._parent: 'MoleculeGame' = parent
         self._molecule: Mol = molecule
         self._smiles = MolToSmiles(self._molecule)
     

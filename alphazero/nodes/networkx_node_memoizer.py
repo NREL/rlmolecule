@@ -33,15 +33,15 @@ class NetworkXNodeMemoizer:
         delegate_successors_getter = node.get_successors
         
         def memoized_successors_getter(parent: GraphNode) -> Iterable['NetworkNode']:
-            return self.__graph.successors(self)
+            return self.__graph.successors(parent)
         
         def memoizing_successors_getter(parent: GraphNode) -> Iterable['NetworkNode']:
             self.__graph.add_edges_from(
-                ((parent, self.memoize(successor)) for successor in delegate_successors_getter(parent)))
-            parent.get_successors = memoized_successors_getter
+                ((parent, self.memoize(successor)) for successor in delegate_successors_getter()))
+            parent.get_successors = memoized_successors_getter.__get__(parent, GraphNode)
             return parent.get_successors()
         
-        node.get_successors = memoizing_successors_getter
+        node.get_successors = memoizing_successors_getter.__get__(node, GraphNode)
         return node
     
     @property

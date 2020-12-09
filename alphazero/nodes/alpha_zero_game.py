@@ -52,7 +52,7 @@ class AlphaZeroGame:
     
     @property
     def dirichlet_noise(self) -> bool:
-        return self.dirichlet_noise
+        return self._dirichlet_noise
     
     @property
     def dirichlet_alpha(self) -> float:
@@ -69,3 +69,6 @@ class AlphaZeroGame:
     @abstractmethod
     def construct_feature_matrices(self, node: AlphaZeroNode):
         pass
+
+    
+    

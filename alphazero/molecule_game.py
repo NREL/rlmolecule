@@ -1,6 +1,10 @@
 import logging
 import os
 from pprint import pprint
+from typing import (
+    Iterator,
+    Optional,
+    )
 
 import tensorflow as tf
 from rdkit.Chem.rdmolfiles import MolFromSmiles
@@ -28,7 +32,12 @@ default_preprocessor.from_json(os.path.join(
 
 class MoleculeGame(AlphaZeroGame):
     
-    def __init__(self, config: any, start_smiles: str, preprocessor: MolPreprocessor = default_preprocessor) -> None:
+    def __init__(
+            self,
+            config: any,
+            start_smiles: str,
+            preprocessor: MolPreprocessor = default_preprocessor,
+            ) -> None:
         super().__init__(
             config.min_reward,
             config.pb_c_base,
@@ -55,6 +64,10 @@ class MoleculeGame(AlphaZeroGame):
         self._policy_predictions = tf.function(experimental_relax_shapes=True)(self._policy_model.predict_step)
         self.load_from_checkpoint()  # TODO: does this ever do anything?
     
+    @property
+    def config(self) -> any:
+        return self._config
+    
     def construct_feature_matrices(self, node: AlphaZeroNode):
         return self._preprocessor.construct_feature_matrices(node.graph_node)
     
@@ -68,3 +81,7 @@ class MoleculeGame(AlphaZeroGame):
             logger.info(f'{self.id}: loaded checkpoint {latest}')
         else:
             logger.info(f'{self.id}: no checkpoint found')
+    
+    def run_mcts(self, num_simulations: Optional[int] = None, explore: bool = True) -> Iterator['AlphaZeroNode']:
+        num_simulations = self._config.num_simulations if num_simulations is None else num_simulations
+        return self._start.run_mcts(num_simulations, explore)

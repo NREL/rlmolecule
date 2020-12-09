@@ -111,10 +111,10 @@ class Node(rdkit.Chem.Mol): # TODO: integration point - factor into implemenatio
 
     def ucb_score(self, parent):
     
-        pb_c = np.log((parent._visits + config.pb_c_base + 1) /
+        pb_c = np.log((parent.visits + config.pb_c_base + 1) /
                       config.pb_c_base) + config.pb_c_init
     
-        pb_c *= np.sqrt(parent._visits) / (self.visits + 1)
+        pb_c *= np.sqrt(parent.visits) / (self.visits + 1)
     
         prior_score = pb_c * self.prior(parent)
     
@@ -192,7 +192,7 @@ class Node(rdkit.Chem.Mol): # TODO: integration point - factor into implemenatio
         """
     
         data = self.policy_inputs_with_children()
-        visit_counts = np.array([child._visits for child in self.successors])
+        visit_counts = np.array([child.visits for child in self.successors])
         data['visit_probs'] = visit_counts / visit_counts.sum()
     
         with io.BytesIO() as f:
@@ -214,7 +214,7 @@ class Node(rdkit.Chem.Mol): # TODO: integration point - factor into implemenatio
         
             # Perform the softmax over the children node's prior logits
             children = list(self.successors)
-            priors = tf.nn.softmax([child._prior_logit for child in children]).numpy()
+            priors = tf.nn.softmax([child.prior_logit for child in children]).numpy()
         
             # Add the optional exploration noise
             if config.dirichlet_noise:
