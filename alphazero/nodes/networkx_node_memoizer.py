@@ -1,9 +1,5 @@
-from abc import abstractmethod
 from typing import (
     Iterable,
-    Iterator,
-    TypeVar,
-    final,
     )
 
 from networkx import DiGraph

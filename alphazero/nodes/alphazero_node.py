@@ -1,6 +1,6 @@
 import io
 import itertools
-from abc import abstractmethod
+import logging
 from typing import (
     Iterable,
     Iterator,
@@ -8,11 +8,13 @@ from typing import (
     Optional,
     )
 
+import numpy as np
+import tensorflow as tf
 from keras_preprocessing.sequence import pad_sequences
 
 from alphazero.nodes.graph_node import GraphNode
-import numpy as np
-import tensorflow as tf
+
+logger = logging.getLogger(__name__)
 
 
 class AlphaZeroNode(GraphNode):
@@ -26,10 +28,15 @@ class AlphaZeroNode(GraphNode):
         self._reward: Optional[float] = None
         self._child_priors: Optional[List['AlphaZeroNode']] = None
         self._policy_inputs: Optional[{}] = None
+        self._policy_data = None
     
     def get_successors(self) -> Iterable['AlphaZeroNode']:
         game = self._game
         return (AlphaZeroNode(graph_successor, game) for graph_successor in self._graph_node.get_successors())
+    
+    @property
+    def graph_node(self) -> GraphNode:
+        return self._graph_node
     
     def compute_reward(self) -> float:
         # if self.terminal:
@@ -39,6 +46,8 @@ class AlphaZeroNode(GraphNode):
     
     def compute_value_estimate(self) -> float:
         """
+        Used to be called "expand()".
+        
         For a given node, build the chidren, add them to the graph, and run the
         policy network to get prior_logits and a value.
 
@@ -46,15 +55,14 @@ class AlphaZeroNode(GraphNode):
         value (float): the estimated value of `parent`.
         """
         
-        children = list(self.get_successors())
+        children = self.get_successors_list()
         
         # Handle the case where a node doesn't have any valid children
         if len(children) == 0:
-            return self.config.min_reward
+            return self._game.min_reward  # TODO: what? This doesn't make sense to me.
         
         # Run the policy network to get value and prior_logit predictions
-        # TODO: integration point - policy_predictions
-        values, prior_logits = self.policy_predictions(self.policy_inputs_with_children())
+        values, prior_logits = self._game.policy_predictions(self.policy_inputs_with_children())
         
         # inputs to policy network
         prior_logits = prior_logits[1:].numpy().flatten()
@@ -75,10 +83,6 @@ class AlphaZeroNode(GraphNode):
         return self._visits
     
     @property
-    def config(self) -> any:
-        return self._game.config
-    
-    @property
     def value(self) -> float:
         return self._total_value / self._visits if self._visits != 0 else 0
     
@@ -96,11 +100,35 @@ class AlphaZeroNode(GraphNode):
         returns a generator over the optimal path.
         """
         yield self
-        yield from sorted(self.get_successors(), key=lambda successor: -self.ucb_score(successor))
+        sorted_successors = sorted(self.get_successors(), key=lambda successor: -self.ucb_score(successor))
+        yield from (successor.tree_policy() for successor in sorted_successors)
+    
+    def mcts_step(self) -> 'AlphaZeroNode':
+        """
+        Perform a single MCTS step from the given starting node, including a
+        tree search, expansion, and backpropagation.
+        """
+        
+        # Perform the tree policy search
+        history = list(self.tree_policy())
+        leaf = history[-1]
+        
+        # Looks like in alphazero, we always expand, even if this is the
+        # first time we've visited the node
+        if not leaf.terminal:
+            value = leaf.compute_value_estimate()
+        else:
+            value = leaf.reward
+        
+        # perform backprop
+        for node in history:
+            node.update(value)
+        
+        return leaf
     
     def ucb_score(self, child: 'AlphaZeroNode') -> float:
-        config = self.config
-        pb_c = np.log((self.visits + config.pb_c_base + 1) / config.pb_c_base) + config.pb_c_init
+        game = self._game
+        pb_c = np.log((self.visits + game.pb_c_base + 1) / game.pb_c_base) + game.pb_c_init
         pb_c *= np.sqrt(self.visits) / (child.visits + 1)
         prior_score = pb_c * self.child_prior(child)
         return prior_score + child.value
@@ -119,64 +147,57 @@ class AlphaZeroNode(GraphNode):
         """
         if self._child_priors is None:
             # Perform the softmax over the children node's prior logits
-            children = list(self.get_successors())
+            children = self.get_successors_list()
             priors = tf.nn.softmax([child._prior_logit for child in children]).numpy()
             
             # Add the optional exploration noise
-            config = self.config
-            if config.dirichlet_noise:
+            game = self._game
+            if game.dirichlet_noise:
                 random_state = np.random.RandomState()
                 noise = random_state.dirichlet(
-                    np.ones_like(priors) * config.dirichlet_alpha)
+                    np.ones_like(priors) * game.dirichlet_alpha)
                 
-                priors = priors * (1 - config.dirichlet_x) + (noise * config.dirichlet_x)
+                priors = priors * (1 - game.dirichlet_x) + (noise * game.dirichlet_x)
             
             assert np.isclose(priors.sum(), 1.)  # Just a sanity check
             self._child_priors = {child: prior for child, prior in zip(children, priors)}
         
         return self._child_priors
     
-    # TODO: integration point - uses preprocessor script to build inputs to policy network
     @property
     def policy_inputs(self):
         """
-        Constructs GNN inputs for the node, or returns them if they've been previously cached
+        :return GNN inputs for the node
         """
         if self._policy_inputs is None:
-            self._policy_inputs = preprocessor.construct_feature_matrices(self)
+            self._policy_inputs = self._game.construct_feature_matrices(self)
         return self._policy_inputs
     
-    # TODO: integration point - stacks parent with current children as a batch
     def policy_inputs_with_children(self) -> {}:
-        """Return the given nodes policy inputs, concatenated together with the
+        """
+        :return the given nodes policy inputs, concatenated together with the
         inputs of its successor nodes. Used as the inputs for the policy neural
-        network"""
+        network
+        """
         
-        policy_inputs = [node.policy_inputs for node in itertools.chain((self,), self.successors)]
+        policy_inputs = [node.policy_inputs for node in itertools.chain((self,), self.get_successors())]
         return {key: pad_sequences([elem[key] for elem in policy_inputs], padding='post')
                 for key in policy_inputs[0].keys()}
     
-    # TODO: integration point - stores inputs so it can go into database
-    def store_policy_inputs_and_targets(self) -> None:
-        """Stores the output of `self.policy_inputs_with_children` and child visit probabilities
-        as a numpy compressed binary data string.
-
-        save and load using the following:
-        >>> self.store_policy_inputs_and_targets()
-        >>> with io.BytesIO(self._policy_data) as f:
-            data = dict(np.load(f, allow_pickle=True).items())
-
-        """
-        
+    def store_policy_data(self):
         data = self.policy_inputs_with_children()
-        visit_counts = np.array([child._visits for child in self.successors])
+        visit_counts = np.array([child.visits for child in self.get_successors()])
         data['visit_probs'] = visit_counts / visit_counts.sum()
         
         with io.BytesIO() as f:
             np.savez_compressed(f, **data)
-            binary_data = f.getvalue()
-        
-        self._policy_data = binary_data
+            self._policy_data = f.getvalue()
+    
+    @property
+    def policy_data(self):
+        if self._policy_data is None:
+            self.store_policy_data()
+        return self._policy_data
     
     @property
     def reward(self) -> float:
@@ -184,3 +205,47 @@ class AlphaZeroNode(GraphNode):
         if self._reward is None:
             self._reward = self.compute_reward()
         return self._reward
+    
+    def softmax_sample(self) -> 'AlphaZeroNode':
+        """
+        Sample from successors according to their visit counts.
+
+        Returns:
+            choice: Node, the chosen successor node.
+        """
+        successors = self.get_successors_list()
+        visit_counts = np.array([n._visits for n in successors])
+        visit_softmax = tf.nn.softmax(tf.constant(visit_counts, dtype=tf.float32)).numpy()
+        return successors[np.random.choice(range(len(successors)), size=1, p=visit_softmax)[0]]
+    
+    def run_mcts(self, num_simulations: int, explore: bool = True) -> Iterator['AlphaZeroNode']:
+        """
+        Performs a full game simulation, running config.num_simulations per iteration,
+        choosing nodes either deterministically (explore=False) or via softmax sampling
+        (explore=True) for subsequent iterations.
+
+        Called recursively, returning a generator of game positions:
+        >>> game = list(start.run_mcts(explore=True))
+        """
+        
+        logger.info(
+            f"{self._game.id}: selecting node {self.graph_node} with value={self.value:.3f} and visits={self.visits}")
+        
+        yield self
+        
+        if not self.terminal:
+            for _ in range(num_simulations):
+                self.mcts_step()
+            
+            # Store the search statistics and policy inputs for network training
+            self.store_policy_data()
+            
+            # select action -- either softmax sample or by visit count
+            if explore:
+                choice = self.softmax_sample()
+            
+            else:
+                choice = sorted((node for node in self.get_successors()),
+                                key=lambda x: -x.visits)[0]
+            
+            yield from choice.run_mcts(num_simulations, explore=explore)

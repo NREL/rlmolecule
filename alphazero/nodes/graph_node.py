@@ -4,8 +4,6 @@ from abc import (
     )
 from typing import Iterable
 
-import numpy as np
-
 
 class GraphNode(ABC):
     
@@ -25,3 +23,10 @@ class GraphNode(ABC):
         :return: the nodes successors as an iterable.
         """
         pass
+    
+    def get_successors_list(self) -> ['GraphNode']:
+        """
+        Syntatic sugar for list(node.get_successors())
+        :return: list of successor nodes
+        """
+        return list(self.get_successors())
