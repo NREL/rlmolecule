@@ -10,7 +10,7 @@ import tensorflow as tf
 
 import alphazero.config as config
 from molecule_graph.molecule_tools import build_molecules, build_radicals
-from alphazero.preprocessor import preprocessor
+from alphazero.mol_preprocessor import preprocessor
 
 # TODO: can you remove rdkit from /alphazero/ ?
 

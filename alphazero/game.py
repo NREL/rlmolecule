@@ -9,7 +9,7 @@ from rdkit import Chem
 
 import alphazero.config as config
 from alphazero.node import Node
-from alphazero.policy import build_policy_trainer
+from alphazero.molecule_policy import build_policy_trainer
 
 logger = logging.getLogger(__name__)
 

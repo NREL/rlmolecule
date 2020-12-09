@@ -8,8 +8,8 @@ from rdkit.Chem.rdmolfiles import MolFromSmiles
 from alphazero.nodes.alpha_zero_game import AlphaZeroGame
 from alphazero.nodes.alphazero_node import AlphaZeroNode
 from alphazero.nodes.networkx_node_memoizer import NetworkXNodeMemoizer
-from alphazero.policy import build_policy_trainer
-from alphazero.preprocessor import (
+from alphazero.molecule_policy import build_policy_trainer
+from alphazero.mol_preprocessor import (
     MolPreprocessor,
     atom_featurizer,
     bond_featurizer,
@@ -68,4 +68,3 @@ class MoleculeGame(AlphaZeroGame):
             logger.info(f'{self.id}: loaded checkpoint {latest}')
         else:
             logger.info(f'{self.id}: no checkpoint found')
-    

@@ -12,7 +12,7 @@ import pandas as pd
 import tensorflow as tf
 
 import alphazero.config as config
-from alphazero.policy import build_policy_trainer
+from alphazero.molecule_policy import build_policy_trainer
 from alphazero.policy_data import create_dataset
 
 import stable_rad_config

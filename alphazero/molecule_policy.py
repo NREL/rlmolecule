@@ -4,7 +4,7 @@ from tensorflow.python.keras.losses import LossFunctionWrapper, losses_utils
 import nfp
 
 import alphazero.config as config
-from alphazero.preprocessor import preprocessor
+from alphazero.mol_preprocessor import preprocessor
 
 # two models: 
 # first, a policy model that predicts value, pi_logits from a batch of molecule inputs
