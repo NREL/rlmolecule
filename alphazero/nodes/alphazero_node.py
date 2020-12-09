@@ -30,6 +30,12 @@ class AlphaZeroNode(GraphNode):
         self._policy_inputs: Optional[{}] = None
         self._policy_data = None
     
+    def __eq__(self, other: any) -> bool:
+        return isinstance(other, AlphaZeroNode) and self._graph_node == other._graph_node
+    
+    def __hash__(self) -> int:
+        return hash(self._graph_node)
+    
     def get_successors(self) -> Iterable['AlphaZeroNode']:
         game = self._game
         return (AlphaZeroNode(graph_successor, game) for graph_successor in self._graph_node.get_successors())
