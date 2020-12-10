@@ -4,7 +4,7 @@ from typing import (
 
 from networkx import DiGraph
 
-from alphazero.nodes.graph_node import GraphNode
+from alphazero.graph_node import GraphNode
 
 """
 + Override successors() to use graph memoization

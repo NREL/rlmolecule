@@ -12,7 +12,7 @@ import numpy as np
 import tensorflow as tf
 from keras_preprocessing.sequence import pad_sequences
 
-from alphazero.nodes.graph_node import GraphNode
+from alphazero.graph_node import GraphNode
 
 logger = logging.getLogger(__name__)
 

@@ -1,21 +1,15 @@
-from abc import abstractmethod
 from typing import (
     Iterable,
-    Iterator,
-    Optional,
     )
 
-from networkx import DiGraph
 from rdkit.Chem.rdchem import Mol
 from rdkit.Chem.rdmolfiles import (
-    MolFromSmiles,
     MolToSmiles,
     )
 
-from alphazero.nodes.graph_node import GraphNode
+from alphazero.graph_node import GraphNode
 from molecule_game.molecule_tools import (
     build_molecules,
-    build_radicals,
     )
 
 

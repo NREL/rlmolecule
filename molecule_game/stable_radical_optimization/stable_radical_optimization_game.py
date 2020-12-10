@@ -10,16 +10,15 @@ import psycopg2
 import tensorflow as tf
 from rdkit.Chem.rdmolfiles import MolFromSmiles
 
-from alphazero.nodes.alpha_zero_game import AlphaZeroGame
-from alphazero.nodes.alphazero_node import AlphaZeroNode
-from alphazero.nodes.networkx_node_memoizer import NetworkXNodeMemoizer
+from alphazero.alpha_zero_game import AlphaZeroGame
+from alphazero.alphazero_node import AlphaZeroNode
+from alphazero.networkx_node_memoizer import NetworkXNodeMemoizer
 from molecule_game.molecule_policy import build_policy_trainer
 from molecule_game.mol_preprocessor import (
     MolPreprocessor,
     atom_featurizer,
     bond_featurizer,
     )
-from molecule_game.molecule_node import MoleculeNode
 from molecule_game.stable_radical_optimization.stable_radical_optimization_node import StableRadicalOptimizationNode
 from run_mcts import predict
 import numpy as np
@@ -30,7 +29,7 @@ default_preprocessor = MolPreprocessor(atom_features=atom_featurizer,
                                        explicit_hs=False)
 
 default_preprocessor.from_json(os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), '../../alphazero/preprocessor.json'))
+    os.path.dirname(os.path.abspath(__file__)), '../../molecule_game/preprocessor.json'))
 
 
 class StableRadicalOptimizationGame(AlphaZeroGame):

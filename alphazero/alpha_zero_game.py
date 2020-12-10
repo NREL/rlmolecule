@@ -2,8 +2,7 @@ import logging
 import uuid
 from abc import abstractmethod
 
-from alphazero.nodes.alphazero_node import AlphaZeroNode
-from alphazero.nodes.graph_node import GraphNode
+from alphazero.alphazero_node import AlphaZeroNode
 
 logger = logging.getLogger(__name__)
 
