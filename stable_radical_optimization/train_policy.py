@@ -13,7 +13,7 @@ import tensorflow as tf
 
 import molecule_game.config as config
 from molecule_game.molecule_policy import build_policy_trainer
-from alphazero.policy_data import create_dataset
+from molecule_game.policy_data import create_dataset
 
 
 def psql_generator():

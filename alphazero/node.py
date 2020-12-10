@@ -14,6 +14,8 @@ from molecule_game.mol_preprocessor import preprocessor
 
 # TODO: can you remove rdkit from /alphazero/ ?
 
+# Charles: Target to remove with refactor
+
 class Node(rdkit.Chem.Mol): # TODO: integration point - factor into implemenation
     
     def __init__(self, *args, graph: nx.DiGraph = None, terminal: bool = False, **kwargs):

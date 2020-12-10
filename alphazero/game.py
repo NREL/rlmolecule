@@ -13,6 +13,7 @@ from molecule_game.molecule_policy import build_policy_trainer
 
 logger = logging.getLogger(__name__)
 
+# Charles: Target to remove with refactor
 
 class Game(nx.DiGraph):
     
@@ -179,7 +180,7 @@ class Game(nx.DiGraph):
                 choice = self.softmax_sample(node)
             
             else:
-                choice = sorted((node for node in start.successors),
+                choice = sorted((node for node in node.successors),
                                 key=lambda x: x.visits, reverse=True)[0]
             
             yield from self.run_mcts(choice, explore=explore)
