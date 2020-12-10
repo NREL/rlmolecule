@@ -13,7 +13,7 @@ from rdkit.Chem.rdmolfiles import (
     )
 
 from alphazero.nodes.graph_node import GraphNode
-from molecule_graph.molecule_tools import (
+from molecule_game.molecule_tools import (
     build_molecules,
     build_radicals,
     )
@@ -38,13 +38,12 @@ class MoleculeNode(GraphNode):
     def get_successors(self) -> Iterable['MoleculeNode']:
         # TODO: should these functions be brought into this class?
         num_atoms = self.molecule.GetNumAtoms()
-        if num_atoms < self._parent.config.max_atoms:
-            yield from (MoleculeNode(self.parent, molecule)
-                        for molecule in build_molecules(self._molecule, **self._parent.config.build_kwargs))
+        parent = self._parent
+        molecule = self._molecule
         
-        if num_atoms >= self._parent.config.min_atoms:
-            yield from (MoleculeNode(self.parent, molecule)
-                        for molecule in build_radicals(self._molecule))
+        if num_atoms < self._parent.config.max_atoms:
+            yield from (MoleculeNode(parent, molecule)
+                        for molecule in build_molecules(molecule, **parent.config.build_kwargs))
     
     @property
     def smiles(self) -> str:

@@ -1,26 +1,18 @@
 import os
 import sys
-import uuid
 import logging
 
 sys.path.append('..')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import numpy as np
-import pandas as pd
 import psycopg2
-import rdkit
-from rdkit import Chem
-from rdkit import DataStructs
-import networkx as nx
 
-import alphazero.config as config
-import stable_rad_config
+import molecule_game.config as config
 from alphazero.node import Node
 from alphazero.game import Game
 
 import tensorflow as tf
-import nfp
 
 model = tf.keras.models.load_model(
     config.reward_model_path,

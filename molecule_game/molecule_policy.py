@@ -3,8 +3,8 @@ from tensorflow.keras import layers
 from tensorflow.python.keras.losses import LossFunctionWrapper, losses_utils
 import nfp
 
-import alphazero.config as config
-from alphazero.mol_preprocessor import preprocessor
+import molecule_game.config as config
+from molecule_game.mol_preprocessor import preprocessor
 
 # two models: 
 # first, a policy model that predicts value, pi_logits from a batch of molecule inputs
@@ -27,7 +27,7 @@ def policy_model():
     bond_state = layers.Embedding(preprocessor.bond_classes, config.features,
                                   name='bond_embedding', mask_zero=True)(bond_class)
     
-    units = config.features//config.num_heads
+    units = config.features // config.num_heads
     global_state = nfp.GlobalUpdate(units=units, num_heads=config.num_heads)(
         [atom_state, bond_state, connectivity])
 

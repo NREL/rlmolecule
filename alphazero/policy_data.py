@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 import nfp
 
-import alphazero.config as config
+import molecule_game.config as config
 
 def parse_binary_data(binary_data, reward):
     """ Use io and numpy to parse the binary data from postgresQL
@@ -48,8 +48,8 @@ def create_dataset(sql_generator):
         .repeat()\
         .shuffle(config.policy_buffer_max_size)\
         .map(parse_data_tf, num_parallel_calls=tf.data.experimental.AUTOTUNE)\
-        .padded_batch(config.batch_size, 
-        padding_values=({'atom': nfp.zero, 'bond': nfp.zero, 'connectivity': nfp.zero}, (nfp.zero, 0.)))\
+        .padded_batch(config.batch_size,
+                      padding_values=({'atom': nfp.zero, 'bond': nfp.zero, 'connectivity': nfp.zero}, (nfp.zero, 0.)))\
         .prefetch(tf.data.experimental.AUTOTUNE)
     
     return dataset

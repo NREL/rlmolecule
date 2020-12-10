@@ -7,9 +7,9 @@ import tensorflow as tf
 
 from rdkit import Chem
 
-import alphazero.config as config
+import molecule_game.config as config
 from alphazero.node import Node
-from alphazero.molecule_policy import build_policy_trainer
+from molecule_game.molecule_policy import build_policy_trainer
 
 logger = logging.getLogger(__name__)
 

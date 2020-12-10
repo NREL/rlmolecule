@@ -1,9 +1,9 @@
-from alphazero import config
-from alphazero.molecule_game import MoleculeGame
-from run_mcts import Game, StabilityNode
+import stable_rad_config
+from molecule_game.stable_radical_optimization.stable_radical_optimization_game import StableRadicalOptimizationGame
 
-G = Game(StabilityNode, 'C')
-game = list(G.run_mcts())
+# G = Game(StabilityNode, 'C')
+# game = list(G.run_mcts())
 
-game = MoleculeGame(config, 'C')
+
+game = StableRadicalOptimizationGame(stable_rad_config.config, 'C')
 game_history = list(game.run_mcts())

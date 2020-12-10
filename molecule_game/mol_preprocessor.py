@@ -118,4 +118,4 @@ preprocessor = MolPreprocessor(atom_features=atom_featurizer,
                                explicit_hs=False)
 
 preprocessor.from_json(os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), 'preprocessor.json'))
+    os.path.dirname(os.path.abspath(__file__)), '../alphazero/preprocessor.json'))

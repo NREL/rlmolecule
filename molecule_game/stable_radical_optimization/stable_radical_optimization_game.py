@@ -13,14 +13,16 @@ from rdkit.Chem.rdmolfiles import MolFromSmiles
 from alphazero.nodes.alpha_zero_game import AlphaZeroGame
 from alphazero.nodes.alphazero_node import AlphaZeroNode
 from alphazero.nodes.networkx_node_memoizer import NetworkXNodeMemoizer
-from alphazero.molecule_policy import build_policy_trainer
-from alphazero.mol_preprocessor import (
+from molecule_game.molecule_policy import build_policy_trainer
+from molecule_game.mol_preprocessor import (
     MolPreprocessor,
     atom_featurizer,
     bond_featurizer,
     )
-from molecule_graph.molecule_node import MoleculeNode
-
+from molecule_game.molecule_node import MoleculeNode
+from molecule_game.stable_radical_optimization.stable_radical_optimization_node import StableRadicalOptimizationNode
+from run_mcts import predict
+import numpy as np
 logger = logging.getLogger(__name__)
 
 default_preprocessor = MolPreprocessor(atom_features=atom_featurizer,
@@ -28,10 +30,10 @@ default_preprocessor = MolPreprocessor(atom_features=atom_featurizer,
                                        explicit_hs=False)
 
 default_preprocessor.from_json(os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), 'preprocessor.json'))
+    os.path.dirname(os.path.abspath(__file__)), '../../alphazero/preprocessor.json'))
 
 
-class MoleculeGame(AlphaZeroGame):
+class StableRadicalOptimizationGame(AlphaZeroGame):
     
     def __init__(
             self,
@@ -55,7 +57,7 @@ class MoleculeGame(AlphaZeroGame):
         self._start: AlphaZeroNode = \
             self._graph_memoizer.memoize(
                 AlphaZeroNode(
-                    MoleculeNode(self, MolFromSmiles(start_smiles)),
+                    StableRadicalOptimizationNode(self, MolFromSmiles(start_smiles), False),
                     self))
         
         pprint(self._start.graph_node)
@@ -112,7 +114,7 @@ class MoleculeGame(AlphaZeroGame):
             
             spins, buried_vol = predict(
                 {key: tf.constant(np.expand_dims(val, 0))
-                 for key, val in self.policy_inputs.items()})
+                 for key, val in node.policy_inputs.items()})
             
             spins = spins.numpy().flatten()
             buried_vol = buried_vol.numpy().flatten()
@@ -121,7 +123,7 @@ class MoleculeGame(AlphaZeroGame):
             max_spin = spins[atom_index]
             spin_buried_vol = buried_vol[atom_index]
             
-            atom_type = self.GetAtomWithIdx(atom_index).GetSymbol()
+            atom_type = node.graph_node.molecule.GetAtomWithIdx(atom_index).GetSymbol()
             
             # This is a bit of a placeholder; but the range for spin is about 1/50th that
             # of buried volume.
@@ -134,15 +136,17 @@ class MoleculeGame(AlphaZeroGame):
                         (smiles, real_reward, atom_type, buried_vol, max_spin, atom_index)
                         values (%s, %s, %s, %s, %s, %s)
                         ON CONFLICT DO NOTHING;""".format(table=config.sql_basename), (
-                        self.smiles, float(reward), atom_type,  # This should be the real reward
+                        node.graph_node.smiles, float(reward), atom_type,  # This should be the real reward
                         float(spin_buried_vol), float(max_spin), atom_index))
             
             rr = self.get_ranked_rewards(reward)
-            self._true_reward = reward
+            
+            # TODO: do we want to store this here?
+            # node._true_reward = reward
             return rr
     
     def get_ranked_rewards(self, reward: float) -> float:
-        
+        config = self.config
         with psycopg2.connect(**config.dbparams) as conn:
             with conn.cursor() as cur:
                 cur.execute("select count(*) from {table}_game where experiment_id = %s;".format(

@@ -4,8 +4,8 @@ sys.path.append("..")
 
 import psycopg2
 
-import alphazero.config as config
-import stable_rad_config
+import molecule_game.config as config
+
 # Initialize PostgreSQL tables
 
 parser = argparse.ArgumentParser(description='Initialize the postgres tables.')

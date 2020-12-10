@@ -8,9 +8,9 @@ import rdkit.Chem
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import tensorflow as tf
 
-import alphazero.config as config
-from molecule_graph.molecule_tools import build_molecules, build_radicals
-from alphazero.mol_preprocessor import preprocessor
+import molecule_game.config as config
+from molecule_game.molecule_tools import build_molecules, build_radicals
+from molecule_game.mol_preprocessor import preprocessor
 
 # TODO: can you remove rdkit from /alphazero/ ?
 
