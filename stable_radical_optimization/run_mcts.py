@@ -19,109 +19,13 @@ import stable_rad_config
 from alphazero.node import Node
 from alphazero.game import Game
 
-import tensorflow as tf
-import nfp
 
-model = tf.keras.models.load_model(
-    '/projects/rlmolecule/pstjohn/models/20201020_radical_stability_model',
-    compile=False)
-
-@tf.function(experimental_relax_shapes=True)                
-def predict(inputs):
-    return model.predict_step(inputs)
-
-def get_ranked_rewards(reward):
-
-    with psycopg2.connect(**config.dbparams) as conn:
-        with conn.cursor() as cur:
-            cur.execute("select count(*) from {table}_game where experiment_id = %s;".format(
-                table=config.sql_basename), (config.experiment_id,))
-            n_games = cur.fetchone()[0]
-        
-        if n_games < config.reward_buffer_min_size:
-            # Here, we don't have enough of a game buffer
-            # to decide if the move is good or not
-            logging.debug(f"ranked_reward: not enough games ({n_games})")
-            return np.random.choice([0., 1.])
-        
-        else:
-            with conn.cursor() as cur:
-                cur.execute("""
-                        select percentile_disc(%s) within group (order by real_reward) 
-                        from (select real_reward from {table}_game where experiment_id = %s
-                              order by id desc limit %s) as finals
-                        """.format(table=config.sql_basename),
-                            (config.ranked_reward_alpha, config.experiment_id, config.reward_buffer_max_size))
-                
-                r_alpha = cur.fetchone()[0]
-
-            logging.debug(f"ranked_reward: r_alpha={r_alpha}, reward={reward}")
-            
-            if np.isclose(reward, r_alpha):
-                return np.random.choice([0., 1.])
-            
-            elif reward > r_alpha:
-                return 1.
-            
-            elif reward < r_alpha:
-                return 0.
-    
+from reward import calc_reward
+  
 
 class StabilityNode(Node):
-      
     def get_reward(self):
-        
-        with psycopg2.connect(**config.dbparams) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "select real_reward from {table}_reward where smiles = %s".format(
-                        table=config.sql_basename), (self.smiles,))
-                result = cur.fetchone()
-        
-        if result:
-            # Probably would put RR code here?
-            rr = get_ranked_rewards(result[0])
-            self._true_reward = result[0]
-            return rr
-        
-        # Node is outside the domain of validity
-        elif ((self.policy_inputs['atom'] == 1).any() | 
-              (self.policy_inputs['bond'] == 1).any()):
-            self._true_reward = 0.
-            return config.min_reward
-        
-        else:           
-            
-            spins, buried_vol = predict(
-                {key: tf.constant(np.expand_dims(val, 0))
-                 for key, val in self.policy_inputs.items()})
-        
-            spins = spins.numpy().flatten()
-            buried_vol = buried_vol.numpy().flatten()
-
-            atom_index = int(spins.argmax())
-            max_spin = spins[atom_index]
-            spin_buried_vol = buried_vol[atom_index]
-            
-            atom_type = self.GetAtomWithIdx(atom_index).GetSymbol()
-
-            # This is a bit of a placeholder; but the range for spin is about 1/50th that
-            # of buried volume.
-            reward = (1 - max_spin) * 50 + spin_buried_vol
-            
-            with psycopg2.connect(**config.dbparams) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        INSERT INTO {table}_reward
-                        (smiles, real_reward, atom_type, buried_vol, max_spin, atom_index) 
-                        values (%s, %s, %s, %s, %s, %s)
-                        ON CONFLICT DO NOTHING;""".format(table=config.sql_basename), (
-                            self.smiles, float(reward), atom_type, # This should be the real reward
-                            float(spin_buried_vol), float(max_spin), atom_index))
-            
-            rr = get_ranked_rewards(reward)
-            self._true_reward = reward
-            return rr
+        return calc_reward(self)
 
         
 def run_game():

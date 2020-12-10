@@ -2,10 +2,10 @@ import os
 import alphazero.config as config
 
 # DB table names modified by the user according to their wish
-config.sql_basename = "StablePSJ"
+config.sql_basename = "StablePSJ_newreward"
 
 # Experiment id
-config.experiment_id = "fixing_node_visits_1"
+config.experiment_id = "debug"
 
 with open('/projects/rlmolecule/rlops_pass', 'r') as f:
     passwd = f.read().strip()
@@ -25,6 +25,7 @@ config.checkpoint_filepath = os.path.expandvars(
 config.dirichlet_x = 0.5  # percentage to favor dirichlet noise vs. prior estimation. Smaller means less noise
 
 config.build_kwargs.update({'atom_additions':  ('C', 'N', 'O', 'S'),
-                            'sa_score_threshold': 4.})
+                            'sa_score_threshold': 3.5})
 
 config.max_atoms = 15
+config.min_reward = 0
