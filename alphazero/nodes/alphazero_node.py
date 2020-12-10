@@ -29,6 +29,7 @@ class AlphaZeroNode(GraphNode):
         self._child_priors: Optional[List['AlphaZeroNode']] = None
         self._policy_inputs: Optional[{}] = None
         self._policy_data = None
+        self._expanded: bool = False
     
     def __eq__(self, other: any) -> bool:
         return isinstance(other, AlphaZeroNode) and self._graph_node == other._graph_node
@@ -44,46 +45,12 @@ class AlphaZeroNode(GraphNode):
         return (AlphaZeroNode(graph_successor, game) for graph_successor in self._graph_node.get_successors())
     
     @property
+    def expanded(self) -> bool:
+        return self._expanded
+    
+    @property
     def graph_node(self) -> GraphNode:
         return self._graph_node
-    
-    # TODO: investigate reward API
-    # def compute_reward(self) -> float:
-    #     # if self.terminal:
-    #     #     return config.min_reward
-    #     # TODO: more here
-    #     pass
-    
-    def compute_value_estimate(self) -> float:
-        """
-        Used to be called "expand()".
-        
-        For a given node, build the chidren, add them to the graph, and run the
-        policy network to get prior_logits and a value.
-
-        Returns:
-        value (float): the estimated value of `parent`.
-        """
-        print('{}: compute_value_estimate'.format(self))
-        
-        children = self.get_successors_list()
-        
-        # Handle the case where a node doesn't have any valid children
-        if len(children) == 0:
-            return self._game.min_reward  # TODO: what? This doesn't make sense to me.
-        
-        # Run the policy network to get value and prior_logit predictions
-        values, prior_logits = self._game.policy_predictions(self.policy_inputs_with_children())
-        
-        # inputs to policy network
-        prior_logits = prior_logits[1:].numpy().flatten()
-        
-        # Update child nodes with predicted prior_logits
-        for child, prior_logit in zip(children, prior_logits):
-            child._prior_logit = float(prior_logit)
-        
-        # Return the parent's predicted value
-        return float(tf.nn.sigmoid(values[0]))
     
     def update(self, reward: float) -> None:
         self._visits += 1
@@ -112,8 +79,10 @@ class AlphaZeroNode(GraphNode):
         """
         print('{} tree_policy'.format(self))
         yield self
-        successor = max(self.get_successors(), key=lambda successor: self.ucb_score(successor))
-        yield from successor.tree_policy()
+        if self.expanded:
+            print(self.get_successors_list())
+            successor = max(self.get_successors(), key=lambda successor: self.ucb_score(successor))
+            yield from successor.tree_policy()
     
     def mcts_step(self) -> 'AlphaZeroNode':
         """
@@ -126,19 +95,51 @@ class AlphaZeroNode(GraphNode):
         # Perform the tree policy search
         history = list(self.tree_policy())
         leaf = history[-1]
-        
-        # Looks like in alphazero, we always expand, even if this is the
-        # first time we've visited the node
-        if not leaf.terminal:
-            value = leaf.compute_value_estimate()
-        else:
-            value = leaf.reward
+        value = leaf.evaluate()
         
         # perform backprop
         for node in history:
             node.update(value)
         
         return leaf
+    
+    def evaluate(self):
+        """
+        For a given node, build the children, add them to the graph, and run the
+        policy network to get prior_logits and a value.
+
+        Returns:
+        value (float): the estimated value of `parent`.
+        """
+        print('{}: evaluate'.format(self))
+        
+        # Looks like in alphazero, we always expand, even if this is the
+        # first time we've visited the node
+        if self.terminal:
+            return self.reward
+        
+        print('{}: compute_value_estimate'.format(self))
+        
+        self._expanded = True
+        
+        children = self.get_successors_list()
+        
+        # Handle the case where a node doesn't have any valid children
+        if len(children) == 0:
+            return self._game.min_reward  # TODO: what? This doesn't make sense to me.
+        
+        # Run the policy network to get value and prior_logit predictions
+        values, prior_logits = self._game.policy_predictions(self.policy_inputs_with_children())
+        
+        # inputs to policy network
+        prior_logits = prior_logits[1:].numpy().flatten()
+        
+        # Update child nodes with predicted prior_logits
+        for child, prior_logit in zip(children, prior_logits):
+            child._prior_logit = float(prior_logit)
+        
+        # Return the parent's predicted value
+        return float(tf.nn.sigmoid(values[0]))
     
     def ucb_score(self, child: 'AlphaZeroNode') -> float:
         game = self._game
@@ -217,7 +218,7 @@ class AlphaZeroNode(GraphNode):
     def reward(self) -> float:
         assert self.terminal, "Accessing reward of non-terminal state"
         if self._reward is None:
-            self._reward = self.compute_reward()
+            self._reward = self._game.compute_reward(self)
         return self._reward
     
     def softmax_sample(self) -> 'AlphaZeroNode':

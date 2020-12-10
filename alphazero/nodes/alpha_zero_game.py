@@ -3,6 +3,7 @@ import uuid
 from abc import abstractmethod
 
 from alphazero.nodes.alphazero_node import AlphaZeroNode
+from alphazero.nodes.graph_node import GraphNode
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,7 @@ class AlphaZeroGame:
     @abstractmethod
     def construct_feature_matrices(self, node: AlphaZeroNode):
         pass
-
     
-    
+    @abstractmethod
+    def compute_reward(self, node: AlphaZeroNode) -> float:
+        pass
