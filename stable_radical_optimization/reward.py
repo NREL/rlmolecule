@@ -148,18 +148,23 @@ def calc_reward_inner(node):
         redox_model, {key: tf.constant(np.expand_dims(val, 0))
                       for key, val in node.policy_inputs.items()}).numpy().tolist()[0]
 
+    v_diff = ionization_energy - electron_affinity
     bde = calc_bde(node)
 
     ea_range = (-.5, 0.2)
     ie_range = (.5, 1.2)
+    v_range = (1, 1.7)   
     bde_range = (60, 80)
+    
 
     # This is a bit of a placeholder; but the range for spin is about 1/50th that
     # of buried volume.
     reward = ((1 - max_spin) * 50 + spin_buried_vol + 100 * (
         windowed_loss(electron_affinity, ea_range) +     
         windowed_loss(ionization_energy, ie_range) + 
-        windowed_loss(bde, bde_range)) / 3)
+        windowed_loss(v_diff, v_range) +         
+        windowed_loss(bde, bde_range)) / 4)
+
        
     with psycopg2.connect(**config.dbparams) as conn:
         with conn.cursor() as cur:
