@@ -16,7 +16,7 @@ class GraphNode(ABC):
     # @final
     def __eq__(self, other: any) -> bool:
         return isinstance(other, GraphNode) and self.equals(other)
-
+    
     # @final
     def __hash__(self) -> int:
         return self.hash()

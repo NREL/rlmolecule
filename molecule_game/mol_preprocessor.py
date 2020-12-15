@@ -8,7 +8,7 @@ import rdkit
 def atom_featurizer(atom):
     """ Return an integer hash representing the atom type
     """
-
+    
     return str((
         atom.GetSymbol(),
         atom.GetNumRadicalElectrons(),
@@ -18,11 +18,10 @@ def atom_featurizer(atom):
         nfp.get_ring_size(atom, max_size=6),
         atom.GetDegree(),
         atom.GetTotalNumHs(includeNeighbors=True)
-    ))
+        ))
 
 
 def bond_featurizer(bond, flipped=False):
-    
     if not flipped:
         atoms = "{}-{}".format(
             *tuple((bond.GetBeginAtom().GetSymbol(),
@@ -31,7 +30,7 @@ def bond_featurizer(bond, flipped=False):
         atoms = "{}-{}".format(
             *tuple((bond.GetEndAtom().GetSymbol(),
                     bond.GetBeginAtom().GetSymbol())))
-
+    
     bstereo = bond.GetStereo().name
     btype = str(bond.GetBondType())
     ring = 'R{}'.format(nfp.get_ring_size(bond, max_size=6)) if bond.IsInRing() else ''
@@ -45,7 +44,6 @@ def filter_keys(attribute):
 
 
 class MolPreprocessor(nfp.preprocessing.SmilesPreprocessor):
-    
     output_types = filter_keys(nfp.preprocessing.SmilesPreprocessor.output_types)
     output_shapes = filter_keys(nfp.preprocessing.SmilesPreprocessor.output_shapes)
     padding_values = filter_keys(nfp.preprocessing.SmilesPreprocessor.padding_values)
@@ -65,13 +63,13 @@ class MolPreprocessor(nfp.preprocessing.SmilesPreprocessor):
         
         if self.explicit_hs:
             mol = rdkit.Chem.AddHs(mol)
-
+        
         n_atom = mol.GetNumAtoms()
         n_bond = 2 * mol.GetNumBonds()
-
+        
         # If its an isolated atom, add a self-link
         if n_bond == 0:
-            n_bond = 1            
+            n_bond = 1
         
         atom_feature_matrix = np.zeros(n_atom, dtype='int')
         bond_feature_matrix = np.zeros(n_bond, dtype='int')
@@ -79,41 +77,41 @@ class MolPreprocessor(nfp.preprocessing.SmilesPreprocessor):
         
         if n_bond == 1:
             bond_feature_matrix[0] = self.bond_tokenizer('self-link')
-
+        
         bond_index = 0
         for n, atom in enumerate(mol.GetAtoms()):
-
+            
             # Atom Classes
             atom_feature_matrix[n] = self.atom_tokenizer(
                 self.atom_features(atom))
-
+            
             start_index = atom.GetIdx()
-
+            
             for bond in atom.GetBonds():
                 # Is the bond pointing at the target atom
                 rev = bond.GetBeginAtomIdx() != start_index
-
+                
                 # Bond Classes
                 bond_feature_matrix[bond_index] = self.bond_tokenizer(
-                    self.bond_features(bond, flipped=rev))         
-
+                    self.bond_features(bond, flipped=rev))
+                
                 # Connectivity
                 if not rev:  # Original direction
                     connectivity[bond_index, 0] = bond.GetBeginAtomIdx()
                     connectivity[bond_index, 1] = bond.GetEndAtomIdx()
-
+                
                 else:  # Reversed
                     connectivity[bond_index, 0] = bond.GetEndAtomIdx()
                     connectivity[bond_index, 1] = bond.GetBeginAtomIdx()
-
+                
                 bond_index += 1
-
-        return {
-            'atom': atom_feature_matrix,
-            'bond': bond_feature_matrix,
-            'connectivity': connectivity,
-        }
         
+        return {
+            'atom':         atom_feature_matrix,
+            'bond':         bond_feature_matrix,
+            'connectivity': connectivity,
+            }
+
 
 preprocessor = MolPreprocessor(atom_features=atom_featurizer,
                                bond_features=bond_featurizer,

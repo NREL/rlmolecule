@@ -66,7 +66,7 @@ class AlphaZeroNode:
     def get_successors(self) -> Iterable['AlphaZeroNode']:
         game = self._game
         return (AlphaZeroNode(graph_successor, game) for graph_successor in self._graph_node.get_successors())
-
+    
     @property
     def terminal(self) -> bool:
         """

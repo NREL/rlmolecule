@@ -12,6 +12,7 @@ from molecule_game.molecule_policy import build_policy_trainer
 
 logger = logging.getLogger(__name__)
 
+
 # Charles: Target to remove with refactor
 
 class Game(nx.DiGraph):
@@ -70,7 +71,7 @@ class Game(nx.DiGraph):
         returns a generator over the optimal path.
 
         >>> history = list(tree_policy(G, start))"""
-
+        
         print('{} tree_policy'.format(parent))
         
         yield parent
@@ -119,7 +120,7 @@ class Game(nx.DiGraph):
         """Perform a single MCTS step from the given starting node, including a
         tree search, expansion, and backpropagation.
         """
-
+        
         print('{} mcts_step'.format(start))
         
         # Perform the tree policy search
