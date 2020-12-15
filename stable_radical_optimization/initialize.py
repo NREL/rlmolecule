@@ -34,7 +34,10 @@ with psycopg2.connect(**config.dbparams) as conn:
             atom_type varchar(2),
             buried_vol real,
             max_spin real,
-            atom_index int
+            atom_index int,
+            ie real,
+            ea real,
+            bde real
             );
             
         CREATE TABLE IF NOT EXISTS {table}_replay (

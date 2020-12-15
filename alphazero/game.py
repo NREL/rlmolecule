@@ -97,6 +97,7 @@ class Game(nx.DiGraph):
         
         # Handle the case where a node doesn't have any valid children
         if not children:
+            logger.debug(f"Node {parent} doesn't have children, setting min_reward")
             parent.terminal = True
             parent._reward = config.min_reward
             return parent._reward

@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --account=rlmolecule
 #SBATCH --time=4:00:00
-#SBATCH --job-name az_stability
+#SBATCH --job-name az_stability_newreward_short
 # --- Policy Trainer ---
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:2
