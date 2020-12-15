@@ -10,10 +10,15 @@ from molecule_game.molecule_tools import (
 
 
 class StableRadicalOptimizationNode(MoleculeNode):
+    """
+    A MoleculeNode implemenation which uses simple transformations (such as adding a bond) to define
+    a graph over molecular structures.
+    """
     
-    def __init__(self, parent: 'MoleculeGame', molecule: Mol, is_radical: bool) -> None:
+    def __init__(self, parent: 'StableRadicalOptimizationGame', molecule: Mol, is_radical: bool) -> None:
+        self._parent: 'StableRadicalOptimizationGame' = parent
         self._is_radical: bool = is_radical
-        super().__init__(parent, molecule)
+        super().__init__(molecule)
     
     @property
     def is_radical(self) -> bool:
@@ -43,3 +48,7 @@ class StableRadicalOptimizationNode(MoleculeNode):
             yield from br
             # yield from (MoleculeNode(parent, molecule)
             #             for molecule in build_radicals(molecule))
+    
+    @property
+    def parent(self) -> any:
+        return self._parent

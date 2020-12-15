@@ -8,6 +8,12 @@ logger = logging.getLogger(__name__)
 
 
 class AlphaZeroGame:
+    """
+    This class defines the interface for implementing AlphaZero-based games within this framework.
+    Such a game overrides the abstract methods below with application-specific implementations.
+    
+    AlphaZeroGame interacts with AlphaZeroNode. See AlphaZeroNode for more details.
+    """
     
     def __init__(self,
                  min_reward: float = 0.0,
@@ -64,10 +70,19 @@ class AlphaZeroGame:
     
     @abstractmethod
     def policy_predictions(self, policy_inputs_with_children):
+        """
+         un the policy network to get value and prior_logit predictions
+        :param policy_inputs_with_children:
+        :return: (values, prior_logits) as a tuple
+        """
         pass
     
     @abstractmethod
     def construct_feature_matrices(self, node: AlphaZeroNode):
+        """
+        :param node:
+        :return:  _policy_inputs
+        """
         pass
     
     @abstractmethod

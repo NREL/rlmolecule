@@ -6,14 +6,9 @@ from typing import Iterable
 
 
 class GraphNode(ABC):
-    
-    @property
-    def terminal(self) -> bool:
-        """
-        Should be overridden if get_successors() is not performant
-        :return: True iff this node has no successors
-        """
-        return not any(True for _ in self.get_successors())
+    """
+    Simply defines a directed graph structure which is incrementally navigated via the get_successors() method.
+    """
     
     @abstractmethod
     def get_successors(self) -> Iterable['GraphNode']:
@@ -30,3 +25,11 @@ class GraphNode(ABC):
         :return: list of successor nodes
         """
         return list(self.get_successors())
+    
+    @property
+    def terminal(self) -> bool:
+        """
+        Should be overridden if get_successors() is not performant
+        :return: True iff this node has no successors
+        """
+        return not any(True for _ in self.get_successors())

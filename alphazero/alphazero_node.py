@@ -18,26 +18,40 @@ logger = logging.getLogger(__name__)
 
 
 class AlphaZeroNode(GraphNode):
+    """
+    A graph node type which implements the AlphaZero search methodology, with the assistance of a supplied
+    AlphaZeroGame implementation ("game").
+    """
     
     def __init__(self, graph_node: GraphNode, game: 'AlphaZeroGame') -> None:
-        self._graph_node: GraphNode = graph_node
-        self._game: 'AlphaZeroGame' = game
-        self._visits: int = 0
+        
+        self._graph_node: GraphNode = graph_node  # delegate which defines the graph structure being explored
+        self._game: 'AlphaZeroGame' = game  # the parent game class which supplies application-specific methods
+        self._visits: int = 0  # visit count
         self._total_value: float = 0.0
         self._prior_logit: float = np.nan
-        self._reward: Optional[float] = None
-        self._child_priors: Optional[List['AlphaZeroNode']] = None
-        self._policy_inputs: Optional[{}] = None
-        self._policy_data = None
-        self._expanded: bool = False
+        self._reward: Optional[float] = None  # lazily initialized
+        self._child_priors: Optional[List['AlphaZeroNode']] = None  # lazily initialized
+        self._policy_inputs: Optional[{}] = None  # lazily initialized
+        self._policy_data = None  # lazily initialized
+        self._expanded: bool = False  # True iff node has been evaluated
     
     def __eq__(self, other: any) -> bool:
+        """
+        equals method delegates to self._graph_node for easy hashing based on graph structure
+        """
         return isinstance(other, AlphaZeroNode) and self._graph_node == other._graph_node
     
     def __hash__(self) -> int:
+        """
+        hash method delegates to self._graph_node for easy hashing based on graph structure
+        """
         return hash(self._graph_node)
     
     def __repr__(self) -> str:
+        """
+        repr method delegates to self._graph_node
+        """
         return self._graph_node.__repr__()
     
     def get_successors(self) -> Iterable['AlphaZeroNode']:
@@ -46,13 +60,22 @@ class AlphaZeroNode(GraphNode):
     
     @property
     def expanded(self) -> bool:
+        """
+        :return: True iff node has been evaluated
+        """
         return self._expanded
     
     @property
     def graph_node(self) -> GraphNode:
+        """
+        :return: delegate which defines the graph structure being explored
+        """
         return self._graph_node
     
     def update(self, reward: float) -> None:
+        """
+        Updates this node with a visit and a reward
+        """
         self._visits += 1
         self._total_value += reward
     
@@ -65,9 +88,15 @@ class AlphaZeroNode(GraphNode):
         return self._total_value / self._visits if self._visits != 0 else 0
     
     def reset_priors(self) -> None:
+        """
+        NB: not sure if this is a good idea
+        """
         self._prior_logit = np.nan
     
     def reset_updates(self) -> None:
+        """
+        NB: not sure if this is a good idea
+        """
         self._visits = 0
         self._total_value = 0
         self._reward = None

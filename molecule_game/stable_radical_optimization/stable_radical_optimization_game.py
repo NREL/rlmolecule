@@ -33,6 +33,9 @@ default_preprocessor.from_json(os.path.join(
 
 
 class StableRadicalOptimizationGame(AlphaZeroGame):
+    """
+    An AlphaZeroGame that implements a stable radical optimization search.
+    """
     
     def __init__(
             self,
