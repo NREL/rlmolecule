@@ -36,7 +36,6 @@ class StableRadicalOptimizationNode(MoleculeNode):
         if num_atoms < self._parent.config.max_atoms:
             bml = list((StableRadicalOptimizationNode(parent, molecule, False)
                         for molecule in build_molecules(molecule, **parent.config.build_kwargs)))
-            print("{} bml: {}".format(self, bml))
             yield from bml
             # yield from (MoleculeNode(parent, molecule)
             #             for molecule in build_molecules(molecule, **parent.config.build_kwargs))
@@ -44,7 +43,6 @@ class StableRadicalOptimizationNode(MoleculeNode):
         if num_atoms >= self._parent.config.min_atoms:
             br = list((StableRadicalOptimizationNode(parent, molecule, True)
                        for molecule in build_radicals(molecule)))
-            print("{} br: {}".format(self, br))
             yield from br
             # yield from (MoleculeNode(parent, molecule)
             #             for molecule in build_radicals(molecule))
