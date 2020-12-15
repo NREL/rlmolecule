@@ -18,9 +18,9 @@ from alphazero.networkx_node_memoizer import NetworkXNodeMemoizer
 logger = logging.getLogger(__name__)
 
 
-class AlphaZeroNode(GraphNode):
+class AlphaZeroNode:
     """
-    A graph node type which implements the AlphaZero search methodology, with the assistance of a supplied
+    A class which implements the AlphaZero search methodology, with the assistance of a supplied
     AlphaZeroGame implementation ("game").
     """
     
@@ -66,6 +66,20 @@ class AlphaZeroNode(GraphNode):
     def get_successors(self) -> Iterable['AlphaZeroNode']:
         game = self._game
         return (AlphaZeroNode(graph_successor, game) for graph_successor in self._graph_node.get_successors())
+
+    @property
+    def terminal(self) -> bool:
+        """
+        :return: True iff this node has no successors
+        """
+        return not any(True for _ in self.get_successors())
+    
+    def get_successors_list(self) -> ['AlphaZeroNode']:
+        """
+        Syntatic sugar for list(node.get_successors())
+        :return: list of successor nodes
+        """
+        return list(self.get_successors())
     
     @property
     def expanded(self) -> bool:

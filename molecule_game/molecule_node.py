@@ -27,23 +27,23 @@ class MoleculeNode(GraphNode):
         self._molecule: Mol = molecule
         self._smiles = MolToSmiles(self._molecule)
     
-    def __eq__(self, other: any) -> bool:
-        """
-        delegates to the SMILES string
-        """
-        return self._smiles == other._smiles
-    
-    def __hash__(self) -> int:
-        """
-        delegates to the SMILES string
-        """
-        return hash(self._smiles)
-    
     def __repr__(self) -> str:
         """
         delegates to the SMILES string
         """
         return self._smiles
+    
+    def equals(self, other: 'MoleculeNode') -> bool:
+        """
+        delegates to the SMILES string
+        """
+        return isinstance(other, 'MoleculeNode') and self._smiles == other._smiles
+    
+    def hash(self) -> int:
+        """
+        delegates to the SMILES string
+        """
+        return hash(self._smiles)
     
     @property
     def smiles(self) -> str:
