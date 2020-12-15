@@ -7,8 +7,6 @@ from networkx import DiGraph
 from alphazero.graph_node import GraphNode
 
 
-
-
 class NetworkXNodeMemoizer:
     """
     This class injects a networkx-based memoizer into a target GraphNode instance's get_successors() method.

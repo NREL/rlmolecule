@@ -13,6 +13,7 @@ import tensorflow as tf
 from keras_preprocessing.sequence import pad_sequences
 
 from alphazero.graph_node import GraphNode
+from alphazero.networkx_node_memoizer import NetworkXNodeMemoizer
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,14 @@ class AlphaZeroNode(GraphNode):
         self._policy_inputs: Optional[{}] = None  # lazily initialized
         self._policy_data = None  # lazily initialized
         self._expanded: bool = False  # True iff node has been evaluated
+    
+    @staticmethod
+    def make_memoized_root_node(
+            graph_node: GraphNode,
+            game: 'AlphaZeroGame',
+            ) -> (NetworkXNodeMemoizer, 'AlphaZeroNode'):
+        memoizer = NetworkXNodeMemoizer()
+        return memoizer, memoizer.memoize(AlphaZeroNode(graph_node, game))
     
     def __eq__(self, other: any) -> bool:
         """
@@ -109,7 +118,6 @@ class AlphaZeroNode(GraphNode):
         print('{} tree_policy'.format(self))
         yield self
         if self.expanded:
-            print(self.get_successors_list())
             successor = max(self.get_successors(), key=lambda successor: self.ucb_score(successor))
             yield from successor.tree_policy()
     
@@ -118,8 +126,6 @@ class AlphaZeroNode(GraphNode):
         Perform a single MCTS step from the given starting node, including a
         tree search, expansion, and backpropagation.
         """
-        
-        print('{}: mcts_step'.format(self))
         
         # Perform the tree policy search
         history = list(self.tree_policy())
@@ -140,14 +146,10 @@ class AlphaZeroNode(GraphNode):
         Returns:
         value (float): the estimated value of `parent`.
         """
-        print('{}: evaluate'.format(self))
-        
         # Looks like in alphazero, we always expand, even if this is the
         # first time we've visited the node
         if self.terminal:
             return self.reward
-        
-        print('{}: compute_value_estimate'.format(self))
         
         self._expanded = True
         

@@ -22,6 +22,7 @@ from molecule_game.mol_preprocessor import (
 from molecule_game.stable_radical_optimization.stable_radical_optimization_node import StableRadicalOptimizationNode
 from run_mcts import predict
 import numpy as np
+
 logger = logging.getLogger(__name__)
 
 default_preprocessor = MolPreprocessor(atom_features=atom_featurizer,
@@ -53,17 +54,13 @@ class StableRadicalOptimizationGame(AlphaZeroGame):
             )
         self._config = config
         self._preprocessor: MolPreprocessor = preprocessor
-        self._graph_memoizer: NetworkXNodeMemoizer = NetworkXNodeMemoizer()
         
-        # noinspection PyTypeChecker
-        self._start: AlphaZeroNode = \
-            self._graph_memoizer.memoize(
-                AlphaZeroNode(
-                    StableRadicalOptimizationNode(self, MolFromSmiles(start_smiles), False),
-                    self))
+        memoizer, start = \
+            AlphaZeroNode.make_memoized_root_node(
+                StableRadicalOptimizationNode(self, MolFromSmiles(start_smiles), False), self)
         
-        pprint(self._start.graph_node)
-        
+        self._graph_memoizer: NetworkXNodeMemoizer = memoizer
+        self._start: AlphaZeroNode = start
         self._policy_trainer = build_policy_trainer()
         self._policy_model = self._policy_trainer.layers[-1].policy_model
         self._policy_predictions = tf.function(experimental_relax_shapes=True)(self._policy_model.predict_step)
