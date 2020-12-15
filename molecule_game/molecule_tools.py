@@ -1,19 +1,16 @@
 import os
-import logging
+import random
 import sys
 
 import numpy as np
-import random
-
 import rdkit
 from rdkit import Chem
+from rdkit.Chem import RDConfig
 from rdkit.Chem.EnumerateStereoisomers import (
     EnumerateStereoisomers,
     StereoEnumerationOptions,
     )
 from rdkit.Chem.rdDistGeom import EmbedMolecule
-
-from rdkit.Chem import RDConfig
 
 sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
 import sascorer

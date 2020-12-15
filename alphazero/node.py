@@ -5,12 +5,16 @@ import networkx as nx
 import numpy as np
 import rdkit
 import rdkit.Chem
-from tensorflow.keras.preprocessing.sequence import pad_sequences
 import tensorflow as tf
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 import molecule_game.config as config
-from molecule_game.molecule_tools import build_molecules, build_radicals
 from molecule_game.mol_preprocessor import preprocessor
+from molecule_game.molecule_tools import (
+    build_molecules,
+    build_radicals,
+    )
+
 
 # TODO: can you remove rdkit from /alphazero/ ?
 

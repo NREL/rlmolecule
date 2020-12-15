@@ -1,7 +1,9 @@
 import os
+
+import nfp
 import numpy as np
 import rdkit
-import nfp
+
 
 def atom_featurizer(atom):
     """ Return an integer hash representing the atom type

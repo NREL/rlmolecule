@@ -1,12 +1,16 @@
+import nfp
 import tensorflow as tf
 from tensorflow.keras import layers
-from tensorflow.python.keras.losses import LossFunctionWrapper, losses_utils
-import nfp
+from tensorflow.python.keras.losses import (
+    LossFunctionWrapper,
+    losses_utils,
+    )
 
 import molecule_game.config as config
 from molecule_game.mol_preprocessor import preprocessor
 
-# two models: 
+
+# two models:
 # first, a policy model that predicts value, pi_logits from a batch of molecule inputs
 # Then, a wrapper model that expects batches of games and normalizes logit values
 

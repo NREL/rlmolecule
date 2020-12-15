@@ -1,4 +1,5 @@
 import os
+
 import molecule_game.config as config
 
 # DB table names modified by the user according to their wish

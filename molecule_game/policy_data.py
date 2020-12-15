@@ -1,9 +1,11 @@
 import io
+
+import nfp
 import numpy as np
 import tensorflow as tf
-import nfp
 
 import molecule_game.config as config
+
 
 def parse_binary_data(binary_data, reward):
     """ Use io and numpy to parse the binary data from postgresQL

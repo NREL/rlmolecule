@@ -4,7 +4,6 @@ import uuid
 import networkx as nx
 import numpy as np
 import tensorflow as tf
-
 from rdkit import Chem
 
 import molecule_game.config as config

@@ -1,11 +1,11 @@
 import logging
 import os
-from pprint import pprint
 from typing import (
     Iterator,
     Optional,
     )
 
+import numpy as np
 import psycopg2
 import tensorflow as tf
 from rdkit.Chem.rdmolfiles import MolFromSmiles
@@ -13,15 +13,14 @@ from rdkit.Chem.rdmolfiles import MolFromSmiles
 from alphazero.alpha_zero_game import AlphaZeroGame
 from alphazero.alphazero_node import AlphaZeroNode
 from alphazero.networkx_node_memoizer import NetworkXNodeMemoizer
-from molecule_game.molecule_policy import build_policy_trainer
 from molecule_game.mol_preprocessor import (
     MolPreprocessor,
     atom_featurizer,
     bond_featurizer,
     )
+from molecule_game.molecule_policy import build_policy_trainer
 from molecule_game.stable_radical_optimization.stable_radical_optimization_node import StableRadicalOptimizationNode
 from run_mcts import predict
-import numpy as np
 
 logger = logging.getLogger(__name__)
 

@@ -1,17 +1,9 @@
-from abc import abstractmethod
-from typing import (
-    Iterable,
-    )
-
 from rdkit.Chem.rdchem import Mol
 from rdkit.Chem.rdmolfiles import (
     MolToSmiles,
     )
 
 from alphazero.graph_node import GraphNode
-from molecule_game.molecule_tools import (
-    build_molecules,
-    )
 
 
 class MoleculeNode(GraphNode):
