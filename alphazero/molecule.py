@@ -18,6 +18,12 @@ pt = Chem.GetPeriodicTable()
 
 bond_orders = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE, Chem.BondType.TRIPLE]
 
+def shuffle(item):
+    """ For a given iterable, return a shuffled list """
+    item_list = list(item)
+    random.shuffle(item_list)
+    return item_list
+
 def get_free_valence(atom):
     """ For a given atom, calculate the free valence remaining """
     return pt.GetDefaultValence(atom.GetSymbol()) - atom.GetExplicitValence()
@@ -118,7 +124,7 @@ def build_molecules(starting_mol,
                         
                         if sa_score_threshold is not None:                           
                             if sascorer.calculateScore(isomer) >= sa_score_threshold:
-                                continue
+                                continue                                
                                 
                         if tryEmbedding:
                             ntm = Chem.AddHs(isomer)
@@ -129,7 +135,7 @@ def build_molecules(starting_mol,
                                 # Failed a 3D embedding                                
                                 continue
                                 
-                        yield Chem.MolFromSmiles(smiles)
+                        yield isomer
 
                         
 def build_radicals(starting_mol):
