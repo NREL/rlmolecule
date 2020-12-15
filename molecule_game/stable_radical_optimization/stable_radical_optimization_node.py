@@ -15,7 +15,7 @@ class StableRadicalOptimizationNode(MoleculeNode):
     a graph over molecular structures.
     """
     
-    def __init__(self, parent: 'StableRadicalOptimizationGame', molecule: Mol, is_radical: bool) -> None:
+    def __init__(self, parent: 'StableRadicalOptimizationGame', molecule: Mol, is_radical: bool = False) -> None:
         self._parent: 'StableRadicalOptimizationGame' = parent
         self._is_radical: bool = is_radical
         super().__init__(molecule)

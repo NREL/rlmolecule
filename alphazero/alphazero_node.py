@@ -43,7 +43,7 @@ class AlphaZeroNode(GraphNode):
             game: 'AlphaZeroGame',
             ) -> (NetworkXNodeMemoizer, 'AlphaZeroNode'):
         memoizer = NetworkXNodeMemoizer()
-        return memoizer, memoizer.memoize(AlphaZeroNode(graph_node, game))
+        return memoizer, memoizer.memoize(graph_node.__class__(graph_node, game))
     
     def __eq__(self, other: any) -> bool:
         """
@@ -65,7 +65,7 @@ class AlphaZeroNode(GraphNode):
     
     def get_successors(self) -> Iterable['AlphaZeroNode']:
         game = self._game
-        return (AlphaZeroNode(graph_successor, game) for graph_successor in self._graph_node.get_successors())
+        return (self.__class__(graph_successor, game) for graph_successor in self._graph_node.get_successors())
     
     @property
     def expanded(self) -> bool:
@@ -115,7 +115,7 @@ class AlphaZeroNode(GraphNode):
         Implements the tree search part of an MCTS search. Recursive function which
         returns a generator over the optimal path.
         """
-        print('{} tree_policy'.format(self))
+        logger.debug('{} tree_policy'.format(self))
         yield self
         if self.expanded:
             successor = max(self.get_successors(), key=lambda successor: self.ucb_score(successor))

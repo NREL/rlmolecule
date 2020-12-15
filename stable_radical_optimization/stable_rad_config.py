@@ -3,15 +3,15 @@ import molecule_game.config as config
 
 # DB table names modified by the user according to their wish
 #config.sql_basename = "StablePSJ"
-config.sql_basename = "CharlesNodeRefactor"
+config.sql_basename = "CharlesNodeRefactor_PSJ"
 
 # Experiment id
 config.experiment_id = "01"
 
-# with open('/projects/rlmolecule/rlops_pass', 'r') as f:
-#     passwd = f.read().strip()
-with open('rlops_pass', 'r') as f:
+with open('/projects/rlmolecule/rlops_pass', 'r') as f:
     passwd = f.read().strip()
+# with open('rlops_pass', 'r') as f:
+#     passwd = f.read().strip()
 
 config.dbparams = {
     'dbname': 'bde',
@@ -33,5 +33,5 @@ config.build_kwargs.update({'atom_additions':     ('C', 'N', 'O', 'S'),
 # config.max_atoms = 15
 config.max_atoms = 5
 
-# config.reward_model_path = '/projects/rlmolecule/pstjohn/models/20201020_radical_stability_model'
-config.reward_model_path = '/home/ctripp/project/rlmol/data/model/20201020_radical_stability_mod'
+config.reward_model_path = '/projects/rlmolecule/pstjohn/models/20201020_radical_stability_model'
+# config.reward_model_path = '/home/ctripp/project/rlmol/data/model/20201020_radical_stability_mod'

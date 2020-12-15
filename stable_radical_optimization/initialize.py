@@ -5,6 +5,7 @@ sys.path.append("..")
 import psycopg2
 
 import molecule_game.config as config
+import stable_rad_config
 
 # Initialize PostgreSQL tables
 

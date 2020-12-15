@@ -11,16 +11,16 @@ import tensorflow as tf
 from rdkit.Chem.rdmolfiles import MolFromSmiles
 
 from alphazero.alpha_zero_game import AlphaZeroGame
-from alphazero.alphazero_node import AlphaZeroNode
 from alphazero.networkx_node_memoizer import NetworkXNodeMemoizer
+from molecule_game import config
 from molecule_game.molecule_policy import build_policy_trainer
+from molecule_game.molecule_node import MoleculeNode
 from molecule_game.mol_preprocessor import (
     MolPreprocessor,
     atom_featurizer,
     bond_featurizer,
     )
 from molecule_game.stable_radical_optimization.stable_radical_optimization_node import StableRadicalOptimizationNode
-from run_mcts import predict
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -31,6 +31,13 @@ default_preprocessor = MolPreprocessor(atom_features=atom_featurizer,
 
 default_preprocessor.from_json(os.path.join(
     os.path.dirname(os.path.abspath(__file__)), '../../molecule_game/preprocessor.json'))
+
+# this is messy, and we're not always gaurenteed to have a reward model, or we might have multiple
+model = tf.keras.models.load_model(config.reward_model_path, compile=False)
+
+@tf.function(experimental_relax_shapes=True)                
+def predict(inputs):
+    return model.predict_step(inputs)
 
 
 class StableRadicalOptimizationGame(AlphaZeroGame):
@@ -56,11 +63,11 @@ class StableRadicalOptimizationGame(AlphaZeroGame):
         self._preprocessor: MolPreprocessor = preprocessor
         
         memoizer, start = \
-            AlphaZeroNode.make_memoized_root_node(
+            StableRadicalOptimizationNode.make_memoized_root_node(
                 StableRadicalOptimizationNode(self, MolFromSmiles(start_smiles), False), self)
         
         self._graph_memoizer: NetworkXNodeMemoizer = memoizer
-        self._start: AlphaZeroNode = start
+        self._start: MoleculeNode = start
         self._policy_trainer = build_policy_trainer()
         self._policy_model = self._policy_trainer.layers[-1].policy_model
         self._policy_predictions = tf.function(experimental_relax_shapes=True)(self._policy_model.predict_step)
@@ -70,7 +77,7 @@ class StableRadicalOptimizationGame(AlphaZeroGame):
     def config(self) -> any:
         return self._config
     
-    def construct_feature_matrices(self, node: AlphaZeroNode):
+    def construct_feature_matrices(self, node: MoleculeNode):
         return self._preprocessor.construct_feature_matrices(node.graph_node.molecule)
     
     def policy_predictions(self, policy_inputs_with_children):
@@ -84,11 +91,11 @@ class StableRadicalOptimizationGame(AlphaZeroGame):
         else:
             logger.info(f'{self.id}: no checkpoint found')
     
-    def run_mcts(self, num_simulations: Optional[int] = None, explore: bool = True) -> Iterator['AlphaZeroNode']:
+    def run_mcts(self, num_simulations: Optional[int] = None, explore: bool = True) -> Iterator['MoleculeNode']:
         num_simulations = self._config.num_simulations if num_simulations is None else num_simulations
         return self._start.run_mcts(num_simulations, explore)
     
-    def compute_reward(self, node: AlphaZeroNode) -> float:
+    def compute_reward(self, node: MoleculeNode) -> float:
         config = self.config
         with psycopg2.connect(**config.dbparams) as conn:
             with conn.cursor() as cur:

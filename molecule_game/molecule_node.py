@@ -8,13 +8,13 @@ from rdkit.Chem.rdmolfiles import (
     MolToSmiles,
     )
 
-from alphazero.graph_node import GraphNode
+from alphazero.alphazero_node import AlphaZeroNode
 from molecule_game.molecule_tools import (
     build_molecules,
     )
 
 
-class MoleculeNode(GraphNode):
+class MoleculeNode(AlphaZeroNode):
     """
     An abstract GraphNode implementation which uses simple transformations (such as adding a bond) to define a
     graph of molecules that can be navigated.
@@ -24,6 +24,7 @@ class MoleculeNode(GraphNode):
     """
     
     def __init__(self, molecule: Mol) -> None:
+        super().__init__()
         self._molecule: Mol = molecule
         self._smiles = MolToSmiles(self._molecule)
     
