@@ -1,4 +1,5 @@
 import math
+import random
 
 import pytest
 
@@ -21,7 +22,7 @@ def qed_root():
     return QEDNode(start)
 
 
-def test_compute_reward(qed_root):
+def test_reward(qed_root):
     with pytest.raises(AssertionError):
         qed_root.reward
 
@@ -62,23 +63,36 @@ def test_get_successors(qed_root):
 
 
 def test_tree_policy(qed_root):
-
     assert len(list(qed_root.tree_policy())) == 1
 
-    child = qed_root.get_successors()[0]
+    qed_root.update(1.)
+    qed_root.expanded = True
+    assert len(list(qed_root.tree_policy())) == 2
+
+    for child in qed_root.get_successors():
+        child.update(1.)
+        child.expanded = True
+
+    assert len(list(qed_root.tree_policy())) == 3
 
 
-
-    assert False
-
-
-def test_reward():
-    assert False
+def test_evaluate(qed_root):
+    random.seed(42)
+    assert qed_root.evaluate() == pytest.approx(0.4521166661434767)
 
 
-def test_evaluate():
-    assert False
+def test_mcts_step(qed_root):
+
+    random.seed(42)
+    for _ in range(10):
+        qed_root.mcts_step()
+
+    assert qed_root.visits == 10
+    assert qed_root.value == pytest.approx(0.37061839971331995)
 
 
-def test_mcts_step():
-    assert False
+def test_run_mcts(qed_root):
+
+    random.seed(42)
+    history = list(qed_root.run_mcts(50, explore=False))
+    assert history[-1].reward > 0.4

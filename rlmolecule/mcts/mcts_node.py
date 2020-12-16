@@ -1,10 +1,16 @@
+import logging
 import math
-from abc import abstractmethod
 import random
+from abc import abstractmethod
 from typing import Iterable, Iterator, List, Optional
+
+import numpy as np
 
 from rlmolecule.mcts.mcts_game import MCTSGame
 from rlmolecule.state import State
+
+logger = logging.getLogger(__name__)
+
 
 class MCTSNode:
     def __init__(self, state: State, game: Optional[MCTSGame] = None) -> None:
@@ -113,7 +119,8 @@ class MCTSNode:
         return self._reward
 
     def evaluate(self):
-        if self.terminal or (random.random() < self.game.early_stop_frac):
+        if self.terminal:
+            logger.debug(f"{self} reward: {self.reward:.3f}")
             return self.reward
         else:
             return random.choice(self.get_successors()).evaluate()
@@ -137,3 +144,43 @@ class MCTSNode:
             node.update(value)
 
         return leaf
+
+
+    def softmax_sample(self) -> 'MCTSNode':
+        """
+        Sample from successors according to their visit counts.
+        Returns:
+            choice: Node, the chosen successor node.
+        """
+        successors = list(self.get_successors())
+        visit_counts = np.array([n._visits for n in successors])
+        visit_softmax = np.exp(visit_counts) / sum(np.exp(visit_counts))
+        return successors[np.random.choice(range(len(successors)), size=1, p=visit_softmax)[0]]
+
+
+    def run_mcts(self, num_simulations: int, explore: bool = True) -> Iterator['MCTSNode']:
+        """
+        Performs a full game simulation, running num_simulations per iteration,
+        choosing nodes either deterministically (explore=False) or via softmax sampling
+        (explore=True) for subsequent iterations.
+        Called recursively, returning a generator of game positions:
+        >>> game = list(start.run_mcts(explore=True))
+        """
+
+        logger.info(
+            f"{self._game.id}: selecting node {self.state} with value={self.value:.3f} and visits={self.visits}")
+
+        yield self
+
+        if not self.terminal:
+            for _ in range(num_simulations):
+                self.mcts_step()
+
+            if explore:
+                choice = self.softmax_sample()
+
+            else:
+                choice = sorted((node for node in self.get_successors()),
+                                key=lambda x: -x.visits)[0]
+
+            yield from choice.run_mcts(num_simulations, explore=explore)

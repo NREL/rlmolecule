@@ -2,7 +2,7 @@ import logging
 import uuid
 from abc import abstractmethod
 
-from rlmolecule.alphazero.alphazero_node import AlphaZeroNode
+from rlmolecule.alphazero.alphazero_state.py import AlphaZeroNode
 
 logger = logging.getLogger(__name__)
 
