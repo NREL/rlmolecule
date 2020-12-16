@@ -140,3 +140,4 @@ Untitled*.ipynb
 .*.sh
 
 /stable_radical_optimization/rlops_pass
+.idea/
