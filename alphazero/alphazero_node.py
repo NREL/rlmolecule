@@ -129,7 +129,6 @@ class AlphaZeroNode:
         Implements the tree search part of an MCTS search. Recursive function which
         returns a generator over the optimal path.
         """
-        print('{} tree_policy'.format(self))
         yield self
         if self.expanded:
             successor = max(self.get_successors(), key=lambda successor: self.ucb_score(successor))

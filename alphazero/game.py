@@ -72,8 +72,6 @@ class Game(nx.DiGraph):
 
         >>> history = list(tree_policy(G, start))"""
         
-        print('{} tree_policy'.format(parent))
-        
         yield parent
         
         if not parent.terminal:
@@ -91,8 +89,6 @@ class Game(nx.DiGraph):
         Returns:
         value (float): the estimated value of `parent`.
         """
-        
-        print('{} expand'.format(parent))
         
         # Create the children nodes and add them to the graph
         children = list(parent.build_children())
@@ -120,8 +116,6 @@ class Game(nx.DiGraph):
         """Perform a single MCTS step from the given starting node, including a
         tree search, expansion, and backpropagation.
         """
-        
-        print('{} mcts_step'.format(start))
         
         # Perform the tree policy search
         history = list(self.tree_policy(start))
