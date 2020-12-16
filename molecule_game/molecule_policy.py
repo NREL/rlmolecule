@@ -4,7 +4,7 @@ from tensorflow.keras import layers
 from tensorflow.python.keras.losses import (
     LossFunctionWrapper,
     losses_utils,
-    )
+)
 
 import molecule_game.config as config
 from molecule_game.mol_preprocessor import preprocessor

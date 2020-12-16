@@ -9,8 +9,8 @@ import numpy as np
 import psycopg2
 
 import molecule_game.config as config
-from alphazero.node import Node
-from alphazero.game import Game
+from rlmolecule.node import Node
+from rlmolecule.game import Game
 
 import tensorflow as tf
 

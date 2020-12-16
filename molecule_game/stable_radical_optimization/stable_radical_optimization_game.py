@@ -10,9 +10,9 @@ import psycopg2
 import tensorflow as tf
 from rdkit.Chem.rdmolfiles import MolFromSmiles
 
-from alphazero.alpha_zero_game import AlphaZeroGame
-from alphazero.alphazero_node import AlphaZeroNode
-from alphazero.networkx_node_memoizer import NetworkXNodeMemoizer
+from rlmolecule.alphazero.alphazero_game import AlphaZeroGame
+from rlmolecule.alphazero.alphazero_node import AlphaZeroNode
+from rlmolecule.networkx_node_memoizer import NetworkXNodeMemoizer
 from molecule_game.mol_preprocessor import (
     MolPreprocessor,
     atom_featurizer,
@@ -70,7 +70,7 @@ class StableRadicalOptimizationGame(AlphaZeroGame):
         return self._config
     
     def construct_feature_matrices(self, node: AlphaZeroNode):
-        return self._preprocessor.construct_feature_matrices(node.graph_node.molecule)
+        return self._preprocessor.construct_feature_matrices(node.state.molecule)
     
     def policy_predictions(self, policy_inputs_with_children):
         return self._policy_predictions(policy_inputs_with_children)
@@ -93,7 +93,7 @@ class StableRadicalOptimizationGame(AlphaZeroGame):
             with conn.cursor() as cur:
                 cur.execute(
                     "select real_reward from {table}_reward where smiles = %s".format(
-                        table=config.sql_basename), (node.graph_node.smiles,))
+                        table=config.sql_basename), (node.state.smiles,))
                 result = cur.fetchone()
         
         if result:
@@ -121,7 +121,7 @@ class StableRadicalOptimizationGame(AlphaZeroGame):
             max_spin = spins[atom_index]
             spin_buried_vol = buried_vol[atom_index]
             
-            atom_type = node.graph_node.molecule.GetAtomWithIdx(atom_index).GetSymbol()
+            atom_type = node.state.molecule.GetAtomWithIdx(atom_index).GetSymbol()
             
             # This is a bit of a placeholder; but the range for spin is about 1/50th that
             # of buried volume.
@@ -134,7 +134,7 @@ class StableRadicalOptimizationGame(AlphaZeroGame):
                         (smiles, real_reward, atom_type, buried_vol, max_spin, atom_index)
                         values (%s, %s, %s, %s, %s, %s)
                         ON CONFLICT DO NOTHING;""".format(table=config.sql_basename), (
-                        node.graph_node.smiles, float(reward), atom_type,  # This should be the real reward
+                        node.state.smiles, float(reward), atom_type,  # This should be the real reward
                         float(spin_buried_vol), float(max_spin), atom_index))
             
             rr = self.get_ranked_rewards(reward)

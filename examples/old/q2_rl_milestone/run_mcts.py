@@ -9,8 +9,8 @@ from rdkit import Chem
 from rdkit import DataStructs
 import networkx as nx
 
-from alphazero.node import Node
-from alphazero.mcts import run_mcts
+from rlmolecule.node import Node
+from rlmolecule.mcts import run_mcts
 
 radical_fps = pd.read_pickle('/projects/rlmolecule/pstjohn/q2_milestone/binary_fps.p.gz').apply(
     DataStructs.CreateFromBinaryText)

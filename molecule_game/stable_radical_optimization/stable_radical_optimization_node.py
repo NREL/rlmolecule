@@ -2,14 +2,14 @@ from typing import Iterable
 
 from rdkit.Chem.rdchem import Mol
 
-from molecule_game.molecule_node import MoleculeNode
-from molecule_game.molecule_tools import (
+from rlmolecule.molecule.molecule_state import MoleculeState
+from rlmolecule.molecule.molecule_tools import (
     build_molecules,
     build_radicals,
     )
 
 
-class StableRadicalOptimizationNode(MoleculeNode):
+class StableRadicalOptimizationNode(MoleculeState):
     """
     A MoleculeNode implemenation which uses simple transformations (such as adding a bond) to define
     a graph over molecular structures.
@@ -24,7 +24,7 @@ class StableRadicalOptimizationNode(MoleculeNode):
     def is_radical(self) -> bool:
         return self._is_radical
     
-    def get_successors(self) -> Iterable['StableRadicalOptimizationNode']:
+    def get_next_actions(self) -> Iterable['StableRadicalOptimizationNode']:
         if self.is_radical:
             return []  # radicals are leaf nodes for this problem
         

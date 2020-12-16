@@ -1,3 +1,7 @@
+from abc import (
+    ABC,
+    abstractmethod,
+    )
 import io
 import itertools
 import logging
@@ -12,63 +16,41 @@ import numpy as np
 import tensorflow as tf
 from keras_preprocessing.sequence import pad_sequences
 
-from alphazero.graph_node import GraphNode
-from alphazero.networkx_node_memoizer import NetworkXNodeMemoizer
+from rlmolecule.state import State
+from rlmolecule.networkx_node_memoizer import NetworkXNodeMemoizer
 
 logger = logging.getLogger(__name__)
 
+class BaseNode(ABC):
+    """
+    Base class that handles the MCTS-specific functionality of AZ tree search
+    """
+    def __init__(self, state: State):
+        self._visits: int = 0  # visit count
+        self._total_value: float = 0.0
+        self._state: State = state  # delegate which defines the graph structure being explored
 
-class AlphaZeroNode:
+
+
+
+class AlphaZeroNode(BaseNode):
     """
     A class which implements the AlphaZero search methodology, with the assistance of a supplied
     AlphaZeroGame implementation ("game").
     """
-    
-    def __init__(self, graph_node: GraphNode, game: 'AlphaZeroGame') -> None:
-        
-        self._graph_node: GraphNode = graph_node  # delegate which defines the graph structure being explored
+    def __init__(self, state: State, game: 'AlphaZeroGame') -> None:
+        super(AlphaZeroNode, self).__init__(state)
         self._game: 'AlphaZeroGame' = game  # the parent game class which supplies application-specific methods
-        self._visits: int = 0  # visit count
-        self._total_value: float = 0.0
         self._prior_logit: float = np.nan
         self._reward: Optional[float] = None  # lazily initialized
         self._child_priors: Optional[List['AlphaZeroNode']] = None  # lazily initialized
         self._policy_inputs: Optional[{}] = None  # lazily initialized
         self._policy_data = None  # lazily initialized
         self._expanded: bool = False  # True iff node has been evaluated
-    
-    @staticmethod
-    def make_memoized_root_node(
-            graph_node: GraphNode,
-            game: 'AlphaZeroGame',
-            ) -> (NetworkXNodeMemoizer, 'AlphaZeroNode'):
-        memoizer = NetworkXNodeMemoizer()
-        return memoizer, memoizer.memoize(AlphaZeroNode(graph_node, game))
-    
-    def __eq__(self, other: any) -> bool:
-        """
-        equals method delegates to self._graph_node for easy hashing based on graph structure
-        """
-        return isinstance(other, AlphaZeroNode) and self._graph_node == other._graph_node
-    
-    def __hash__(self) -> int:
-        """
-        hash method delegates to self._graph_node for easy hashing based on graph structure
-        """
-        return hash(self._graph_node)
-    
-    def __repr__(self) -> str:
-        """
-        repr method delegates to self._graph_node
-        """
-        return self._graph_node.__repr__()
-    
-    def get_successors(self) -> Iterable['AlphaZeroNode']:
-        game = self._game
-        return (AlphaZeroNode(graph_successor, game) for graph_successor in self._graph_node.get_successors())
+
     
     @property
-    def terminal(self) -> bool:
+    def terminal(self) -> bool:  # todo: not sure this is what we want
         """
         :return: True iff this node has no successors
         """
@@ -88,42 +70,7 @@ class AlphaZeroNode:
         """
         return self._expanded
     
-    @property
-    def graph_node(self) -> GraphNode:
-        """
-        :return: delegate which defines the graph structure being explored
-        """
-        return self._graph_node
-    
-    def update(self, reward: float) -> None:
-        """
-        Updates this node with a visit and a reward
-        """
-        self._visits += 1
-        self._total_value += reward
-    
-    @property
-    def visits(self) -> int:
-        return self._visits
-    
-    @property
-    def value(self) -> float:
-        return self._total_value / self._visits if self._visits != 0 else 0
-    
-    def reset_priors(self) -> None:
-        """
-        NB: not sure if this is a good idea
-        """
-        self._prior_logit = np.nan
-    
-    def reset_updates(self) -> None:
-        """
-        NB: not sure if this is a good idea
-        """
-        self._visits = 0
-        self._total_value = 0
-        self._reward = None
-    
+
     def tree_policy(self) -> Iterator['AlphaZeroNode']:
         """
         Implements the tree search part of an MCTS search. Recursive function which
@@ -160,7 +107,7 @@ class AlphaZeroNode:
         Returns:
         value (float): the estimated value of `parent`.
         """
-        # Looks like in alphazero, we always expand, even if this is the
+        # Looks like in rlmolecule, we always expand, even if this is the
         # first time we've visited the node
         if self.terminal:
             return self.reward
@@ -185,13 +132,7 @@ class AlphaZeroNode:
         
         # Return the parent's predicted value
         return float(tf.nn.sigmoid(values[0]))
-    
-    def ucb_score(self, child: 'AlphaZeroNode') -> float:
-        game = self._game
-        pb_c = np.log((self.visits + game.pb_c_base + 1) / game.pb_c_base) + game.pb_c_init
-        pb_c *= np.sqrt(self.visits) / (child.visits + 1)
-        prior_score = pb_c * self.child_prior(child)
-        return prior_score + child.value
+
     
     def child_prior(self, child: 'AlphaZeroNode') -> float:
         """
@@ -265,7 +206,7 @@ class AlphaZeroNode:
         if self._reward is None:
             self._reward = self._game.compute_reward(self)
         return self._reward
-    
+
     def softmax_sample(self) -> 'AlphaZeroNode':
         """
         Sample from successors according to their visit counts.
@@ -289,7 +230,7 @@ class AlphaZeroNode:
         """
         
         logger.info(
-            f"{self._game.id}: selecting node {self.graph_node} with value={self.value:.3f} and visits={self.visits}")
+            f"{self._game.id}: selecting node {self.state} with value={self.value:.3f} and visits={self.visits}")
         
         yield self
         

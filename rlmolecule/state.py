@@ -8,21 +8,21 @@ from typing import (
     )
 
 
-class GraphNode(ABC):
+class State(ABC):
     """
     Simply defines a directed graph structure which is incrementally navigated via the get_successors() method.
     """
     
     # @final
     def __eq__(self, other: any) -> bool:
-        return isinstance(other, GraphNode) and self.equals(other)
+        return isinstance(other, State) and self.equals(other)
     
     # @final
     def __hash__(self) -> int:
         return self.hash()
     
     @abstractmethod
-    def equals(self, other: 'GraphNode') -> bool:
+    def equals(self, other: 'State') -> bool:
         """
         Equality method which must be implemented by subclasses.
         Used when memoizing and traversing the graph structure to ensure that only one instance of the same node exists.
@@ -40,25 +40,18 @@ class GraphNode(ABC):
         pass
     
     @abstractmethod
-    def get_successors(self) -> Iterable['GraphNode']:
+    def get_next_actions(self) -> Iterable['State']:
         """
         This is a getter instead of a property because it is dynamically overridden in some cases,
         and it is cleaner and simpler to dynamically override a function rather than a property.
         :return: the nodes successors as an iterable.
         """
         pass
-    
-    def get_successors_list(self) -> ['GraphNode']:
-        """
-        Syntatic sugar for list(node.get_successors())
-        :return: list of successor nodes
-        """
-        return list(self.get_successors())
-    
+
     @property
     def terminal(self) -> bool:
         """
         Should be overridden if get_successors() is not performant
         :return: True iff this node has no successors
         """
-        return not any(True for _ in self.get_successors())
+        return not any(True for _ in self.get_next_actions())

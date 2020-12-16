@@ -4,7 +4,7 @@ from typing import (
 
 from networkx import DiGraph
 
-from alphazero.graph_node import GraphNode
+from rlmolecule.state import State
 
 
 class NetworkXNodeMemoizer:
@@ -32,7 +32,7 @@ class NetworkXNodeMemoizer:
     def __init__(self):
         self.__graph: DiGraph = DiGraph()
     
-    def memoize(self, node: GraphNode) -> GraphNode:
+    def memoize(self, node: State) -> State:
         """
         Injects the memoizer into the given node.
         After injection, this node and all successors will be memoized in a networkx DiGraph.
@@ -40,18 +40,18 @@ class NetworkXNodeMemoizer:
         :return: target node
         """
         
-        delegate_successors_getter = node.get_successors
+        delegate_successors_getter = node.get_next_actions
         
-        def memoized_successors_getter(parent: GraphNode) -> Iterable['NetworkNode']:
+        def memoized_successors_getter(parent: State) -> Iterable['NetworkNode']:
             return self.__graph.successors(parent)
         
-        def memoizing_successors_getter(parent: GraphNode) -> Iterable['NetworkNode']:
+        def memoizing_successors_getter(parent: State) -> Iterable['NetworkNode']:
             self.__graph.add_edges_from(
                 ((parent, self.memoize(successor)) for successor in delegate_successors_getter()))
-            parent.get_successors = memoized_successors_getter.__get__(parent, GraphNode)
-            return parent.get_successors()
+            parent.get_next_actions = memoized_successors_getter.__get__(parent, State)
+            return parent.get_next_actions()
         
-        node.get_successors = memoizing_successors_getter.__get__(node, GraphNode)
+        node.get_next_actions = memoizing_successors_getter.__get__(node, State)
         return node
     
     @property

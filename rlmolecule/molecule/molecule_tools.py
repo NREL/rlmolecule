@@ -9,7 +9,7 @@ from rdkit.Chem import RDConfig
 from rdkit.Chem.EnumerateStereoisomers import (
     EnumerateStereoisomers,
     StereoEnumerationOptions,
-    )
+)
 from rdkit.Chem.rdDistGeom import EmbedMolecule
 
 sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
@@ -140,7 +140,7 @@ def build_molecules(starting_mol,
                                 # Failed a 3D embedding                                
                                 continue
                         
-                        yield isomer
+                        yield rdkit.Chem.MolFromSmiles(smiles)
 
 
 def build_radicals(starting_mol):
