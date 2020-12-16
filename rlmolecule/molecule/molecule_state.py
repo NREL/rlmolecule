@@ -43,7 +43,7 @@ class MoleculeState(State):
     efficient hashing.
     """
 
-    def __init__(self, molecule: Mol, config: Optional[MoleculeConfig] = None, is_terminal:bool = False) -> None:
+    def __init__(self, molecule: Mol, config: Optional[MoleculeConfig] = None, is_terminal: bool = False) -> None:
         """
         :param molecule: an RDKit molecule specifying the current state
         :param config: A MoleculeConfig class
@@ -60,19 +60,21 @@ class MoleculeState(State):
         """
         delegates to the SMILES string
         """
-        return self._smiles
+        return f"{self._smiles}{' (t)' if self.terminal else ''}"
 
     def equals(self, other: 'MoleculeState') -> bool:
         """
         delegates to the SMILES string
         """
-        return isinstance(other, MoleculeState) and self._smiles == other._smiles
+        return (isinstance(other, self.__class__) and
+                self._smiles == other._smiles and
+                self.terminal == other.terminal)
 
     def hash(self) -> int:
         """
         delegates to the SMILES string
         """
-        return hash(self._smiles)
+        return hash(self.__repr__())
 
     @property
     def config(self) -> MoleculeConfig:

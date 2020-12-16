@@ -12,15 +12,25 @@ from rlmolecule.state import State
 logger = logging.getLogger(__name__)
 
 
-class MCTSNode:
+class MCTSNode(object):
     def __init__(self, state: State, game: Optional[MCTSGame] = None) -> None:
+        """A node that coordinates 'vanilla' MCTS optimization. This class must be subclassed with a `compute_reward`
+        function, and provided a State class that defines the allowable action space.
 
+       For instance, to optimize QED of a molecule:
+        >>> class QEDNode(MCTSNode):
+        ...     def compute_reward(self):
+        ...     return qed(self.state.molecule)
+
+        :param state: The starting State instance that is used to initialize the tree search
+        :param game: A MCTSGame instance that provides overall configuration parameters to all the nodes.
+        """
         if game is None:
             game = MCTSGame()
 
         self._state = state
         self._game = game
-        self.expanded: bool = False  # True iff node has been expanded
+        self._expanded: bool = False  # True iff node has been expanded
 
         self._visits: int = 0  # visit count
         self._total_value: float = 0.0
@@ -44,6 +54,15 @@ class MCTSNode:
         :return: delegate which contains game-level configuration
         """
         return self._game
+
+    @property
+    def expanded(self) -> bool:
+        return self._expanded
+
+    def expand(self) -> None:
+        """self.get_successors will always return successor nodes, but these will not be explored in self.tree_policy
+        unless self.expanded is True. """
+        self._expanded = True
 
     @property
     def visits(self) -> int:
@@ -73,7 +92,7 @@ class MCTSNode:
         """
         equals method delegates to self._graph_node for easy hashing based on graph structure
         """
-        return isinstance(other, 'MCTSNode') and self._state == other._state
+        return isinstance(other, self.__class__) and self._state == other._state
 
     def __hash__(self) -> int:
         """
@@ -118,12 +137,20 @@ class MCTSNode:
             self._reward = self.compute_reward()
         return self._reward
 
-    def evaluate(self):
-        if self.terminal:
-            logger.debug(f"{self} reward: {self.reward:.3f}")
-            return self.reward
-        else:
-            return random.choice(self.get_successors()).evaluate()
+    def evaluate(self) -> float:
+        """ In MCTS, we evaluate nodes through a random rollout of potential future actions.
+
+        :return: reward of a terminal state selected from the current node
+        """
+
+        def random_rollout(state: State) -> float:
+            """Recursively descend the action space until a final node is reached"""
+            if state.terminal:
+                return self.__class__(state).compute_reward()
+            else:
+                return random_rollout(random.choice(list(state.get_next_actions())))
+
+        return random_rollout(self.state)
 
     def mcts_step(self) -> 'MCTSNode':
         """
@@ -135,7 +162,7 @@ class MCTSNode:
         history = list(self.tree_policy())
         leaf = history[-1]
         if (leaf.visits > 0) and not leaf.terminal:
-            leaf.expanded = True
+            leaf.expand()
 
         value = leaf.evaluate()
 
@@ -144,7 +171,6 @@ class MCTSNode:
             node.update(value)
 
         return leaf
-
 
     def softmax_sample(self) -> 'MCTSNode':
         """
@@ -156,7 +182,6 @@ class MCTSNode:
         visit_counts = np.array([n._visits for n in successors])
         visit_softmax = np.exp(visit_counts) / sum(np.exp(visit_counts))
         return successors[np.random.choice(range(len(successors)), size=1, p=visit_softmax)[0]]
-
 
     def run_mcts(self, num_simulations: int, explore: bool = True) -> Iterator['MCTSNode']:
         """

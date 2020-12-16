@@ -94,5 +94,5 @@ def test_mcts_step(qed_root):
 def test_run_mcts(qed_root):
 
     random.seed(42)
-    history = list(qed_root.run_mcts(50, explore=False))
+    history = list(qed_root.run_mcts(10, explore=False))
     assert history[-1].reward > 0.4
