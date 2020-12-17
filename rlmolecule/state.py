@@ -1,26 +1,26 @@
 from abc import (
     ABC,
     abstractmethod,
-    )
+)
 from typing import (
     Iterable,
     # final
-    )
+)
 
 
 class State(ABC):
     """
     Simply defines a directed graph structure which is incrementally navigated via the get_successors() method.
     """
-    
+
     # @final
     def __eq__(self, other: any) -> bool:
         return isinstance(other, State) and self.equals(other)
-    
+
     # @final
     def __hash__(self) -> int:
         return self.hash()
-    
+
     @abstractmethod
     def equals(self, other: 'State') -> bool:
         """
@@ -29,7 +29,7 @@ class State(ABC):
         :return: true iff this state should be treated as the same state in the graph as the other state.
         """
         pass
-    
+
     @abstractmethod
     def hash(self) -> int:
         """
@@ -38,7 +38,7 @@ class State(ABC):
         :return: a valid hash value for this state
         """
         pass
-    
+
     @abstractmethod
     def get_next_actions(self) -> Iterable['State']:
         """

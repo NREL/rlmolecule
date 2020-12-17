@@ -26,11 +26,13 @@ def test_reward(qed_root):
     with pytest.raises(AssertionError):
         qed_root.reward
 
-    assert qed_root.get_successors()[-1].reward == 0.3597849378839701
+    qed_root.expand()
+    assert qed_root.successors[-1].reward == 0.3597849378839701
 
 
 def test_ucb_score(qed_root):
-    child = qed_root.get_successors()[0]
+    qed_root.expand()
+    child = qed_root.successors[0]
     qed_root._visits = 10
 
     child._visits = 0
@@ -51,27 +53,28 @@ def test_update(qed_root):
 
 
 def test_get_successors(qed_root):
-    successors = list(qed_root.get_successors())
+    qed_root.expand()
+    successors = qed_root.successors
     assert len(successors) == 4
     assert successors[-1].terminal
     assert not successors[0].terminal
 
     successors[0].update(4.)
 
-    assert list(qed_root.get_successors())[0].value == 4.
-    assert list(qed_root.get_successors())[0].visits == 1
+    assert qed_root.successors[0].value == 4.
+    assert qed_root.successors[0].visits == 1
 
 
 def test_tree_policy(qed_root):
     assert len(list(qed_root.tree_policy())) == 1
 
     qed_root.update(1.)
-    qed_root.expanded = True
+    qed_root.expand()
     assert len(list(qed_root.tree_policy())) == 2
 
-    for child in qed_root.get_successors():
+    for child in qed_root.successors:
         child.update(1.)
-        child.expanded = True
+        child.expand()
 
     assert len(list(qed_root.tree_policy())) == 3
 
@@ -82,7 +85,6 @@ def test_evaluate(qed_root):
 
 
 def test_mcts_step(qed_root):
-
     random.seed(42)
     for _ in range(10):
         qed_root.mcts_step()
@@ -92,7 +94,6 @@ def test_mcts_step(qed_root):
 
 
 def test_run_mcts(qed_root):
-
     random.seed(42)
     history = list(qed_root.run_mcts(10, explore=False))
     assert history[-1].reward > 0.4

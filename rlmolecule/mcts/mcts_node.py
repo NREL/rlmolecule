@@ -30,7 +30,6 @@ class MCTSNode(object):
 
         self._state = state
         self._game = game
-        self._expanded: bool = False  # True iff node has been expanded
 
         self._visits: int = 0  # visit count
         self._total_value: float = 0.0
@@ -57,12 +56,15 @@ class MCTSNode(object):
 
     @property
     def expanded(self) -> bool:
-        return self._expanded
+        return bool(self.successors)
 
-    def expand(self) -> None:
-        """self.get_successors will always return successor nodes, but these will not be explored in self.tree_policy
-        unless self.expanded is True. """
-        self._expanded = True
+    @property
+    def successors(self) -> List['MCTSNode']:
+        return self._successors
+
+    def expand(self) -> 'MCTSNode':
+        self._successors = [self.__class__(action, self.game) for action in self._state.get_next_actions()]
+        return self
 
     @property
     def visits(self) -> int:
@@ -81,12 +83,13 @@ class MCTSNode(object):
         return child.value + game.ucb_constant * math.sqrt(
             2 * math.log(self.visits) / child.visits)
 
-    def update(self, reward: float) -> None:
+    def update(self, reward: float) -> 'MCTSNode':
         """
         Updates this node with a visit and a reward
         """
         self._visits += 1
         self._total_value += reward
+        return self
 
     def __eq__(self, other: any) -> bool:
         """
@@ -106,16 +109,6 @@ class MCTSNode(object):
         """
         return self._state.__repr__()
 
-    def get_successors(self) -> Iterable['MCTSNode']:
-        """ Default implementation that caches successors locally. This routine can be overridden to provide more
-        advanced memoization or graph resolution. """
-
-        if self._successors is None:
-            self._successors = [self.__class__(action, self.game)
-                                for action in self._state.get_next_actions()]
-
-        return self._successors
-
     @property
     def terminal(self) -> bool:
         return self.state.terminal
@@ -127,7 +120,7 @@ class MCTSNode(object):
         """
         yield self
         if self.expanded:
-            successor = max(self.get_successors(), key=lambda successor: self.ucb_score(successor))
+            successor = max(self.successors, key=lambda successor: self.ucb_score(successor))
             yield from successor.tree_policy()
 
     @property
@@ -142,6 +135,10 @@ class MCTSNode(object):
 
         :return: reward of a terminal state selected from the current node
         """
+
+        # In MCTS, we only expand if the node has previously been visited
+        if (self.visits > 0) and not self.terminal:
+            self.expand()
 
         def random_rollout(state: State) -> float:
             """Recursively descend the action space until a final node is reached"""
@@ -161,8 +158,6 @@ class MCTSNode(object):
         # Perform the tree policy search
         history = list(self.tree_policy())
         leaf = history[-1]
-        if (leaf.visits > 0) and not leaf.terminal:
-            leaf.expand()
 
         value = leaf.evaluate()
 
@@ -178,7 +173,7 @@ class MCTSNode(object):
         Returns:
             choice: Node, the chosen successor node.
         """
-        successors = list(self.get_successors())
+        successors = self.successors
         visit_counts = np.array([n._visits for n in successors])
         visit_softmax = np.exp(visit_counts) / sum(np.exp(visit_counts))
         return successors[np.random.choice(range(len(successors)), size=1, p=visit_softmax)[0]]
@@ -205,7 +200,6 @@ class MCTSNode(object):
                 choice = self.softmax_sample()
 
             else:
-                choice = sorted((node for node in self.get_successors()),
-                                key=lambda x: -x.visits)[0]
+                choice = sorted((node for node in self.successors), key=lambda x: -x.visits)[0]
 
             yield from choice.run_mcts(num_simulations, explore=explore)

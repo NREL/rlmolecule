@@ -4,17 +4,19 @@ from abc import abstractmethod
 
 from rlmolecule.alphazero.alphazero_state.py import AlphaZeroNode
 
+from rlmolecule.mcts.mcts_game import MCTSGame
+
 logger = logging.getLogger(__name__)
 
 
-class AlphaZeroGame:
+class AlphaZeroGame(MCTSGame):
     """
     This class defines the interface for implementing AlphaZero-based games within this framework.
     Such a game overrides the abstract methods below with application-specific implementations.
     
     AlphaZeroGame interacts with AlphaZeroNode. See AlphaZeroNode for more details.
     """
-    
+
     def __init__(self,
                  min_reward: float = 0.0,
                  pb_c_base: float = 1.0,
@@ -32,42 +34,38 @@ class AlphaZeroGame:
         :param dirichlet_alpha: dirichlet 'shape' parameter. Larger values spread out probability over more moves.
         :param dirichlet_x: percentage to favor dirichlet noise vs. prior estimation. Smaller means less noise
         """
-        self.__id: uuid.UUID = uuid.uuid4()
+        super(AlphaZeroGame, self).__init__()
         self._min_reward: float = min_reward
         self._pb_c_base: float = pb_c_base
         self._pb_c_init: float = pb_c_init
         self._dirichlet_noise: bool = dirichlet_noise
         self._dirichlet_alpha: float = dirichlet_alpha
         self._dirichlet_x: float = dirichlet_x
-    
-    @property
-    def id(self) -> uuid.UUID:
-        return self.__id
-    
+
     @property
     def min_reward(self) -> float:
         return self._min_reward
-    
+
     @property
     def pb_c_base(self) -> float:
         return self._pb_c_base
-    
+
     @property
     def pb_c_init(self) -> float:
         return self._pb_c_init
-    
+
     @property
     def dirichlet_noise(self) -> bool:
         return self._dirichlet_noise
-    
+
     @property
     def dirichlet_alpha(self) -> float:
         return self._dirichlet_alpha
-    
+
     @property
     def dirichlet_x(self) -> float:
         return self._dirichlet_x
-    
+
     @abstractmethod
     def policy_predictions(self, policy_inputs_with_children):
         """
@@ -76,7 +74,7 @@ class AlphaZeroGame:
         :return: (values, prior_logits) as a tuple
         """
         pass
-    
+
     @abstractmethod
     def construct_feature_matrices(self, node: AlphaZeroNode):
         """
@@ -84,7 +82,7 @@ class AlphaZeroGame:
         :return:  _policy_inputs
         """
         pass
-    
+
     @abstractmethod
     def compute_reward(self, node: AlphaZeroNode) -> float:
         pass

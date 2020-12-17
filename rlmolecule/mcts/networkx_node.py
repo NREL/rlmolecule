@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import List
 
 from networkx import DiGraph
 
@@ -13,13 +13,24 @@ class NetworkxSuccessorMixin(object):
         super(NetworkxSuccessorMixin, self).__init__(*args, **kwargs)
 
         if not hasattr(self.game, '_graph'):
+            self.game._nodes_dict: dict = {self: self}
             self.game._graph: DiGraph = DiGraph()
+            self.game._graph.add_node(self)
 
-    def get_successors(self) -> Iterable['NetworkxSuccessorMixin']:
+    def _canconicalize_node(self, node: 'MCTSNode') -> 'MCTSNode':
+        """Fixes an odd issue in networkx where the nodes linked in an edge are not always the nodes stored in
+        G.nodes """
+        if node in self.game._nodes_dict:
+            return self.game._nodes_dict[node]
+        else:
+            self.game._nodes_dict[node] = node
+            return node
 
-        if self._successors is None:
-            children = [self.__class__(action, self.game) for action in self.state.get_next_actions()]
-            self.game._graph.add_edges_from([(self, child) for child in children])
-            self._successors = list(self.game._graph.successors(self))
+    @property
+    def successors(self) -> List['MCTSNode']:
+        return list(self.game._graph.successors(self))
 
-        return self._successors
+    def expand(self) -> 'NetworkxSuccessorMixin':
+        children = [self.__class__(action, self.game) for action in self._state.get_next_actions()]
+        self.game._graph.add_edges_from(((self, self._canconicalize_node(child)) for child in children))
+        return self
