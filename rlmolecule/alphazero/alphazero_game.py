@@ -1,5 +1,7 @@
 import logging
 
+import numpy as np
+
 from rlmolecule.alphazero.alphazero_node import AlphaZeroNode
 from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.tree_search.tree_search_game import TreeSearchGame
@@ -7,7 +9,7 @@ from rlmolecule.tree_search.tree_search_game import TreeSearchGame
 logger = logging.getLogger(__name__)
 
 
-class AlphaZeroGame(TreeSearchGame):
+class AlphaZeroGame(TreeSearchGame[AlphaZeroNode]):
     """
     This class defines the interface for implementing AlphaZero-based games within this framework.
     Such a game overrides the abstract methods below with application-specific implementations.
@@ -70,5 +72,16 @@ class AlphaZeroGame(TreeSearchGame):
     def dirichlet_x(self) -> float:
         return self._dirichlet_x
 
-    def compute_reward(self, node: AlphaZeroNode) -> float:
-        return self._problem.compute_reward(node.state, node.policy_inputs)
+    # def compute_reward(self, node: AlphaZeroNode) -> float:
+    #     return self._problem.compute_reward(node.state, node.policy_inputs)
+
+    def _ucb_score(self, parent: AlphaZeroNode, child: AlphaZeroNode) -> float:
+        """A modified upper confidence bound score for the nodes value, incorporating the prior prediction.
+
+        :param child: Node for which the UCB score is desired
+        :return: UCB score for the given child
+        """
+        pb_c = np.log((parent.visits + self.pb_c_base + 1) / self.pb_c_base) + self.pb_c_init
+        pb_c *= np.sqrt(parent.visits) / (child.visits + 1)
+        prior_score = pb_c * parent.child_priors[child]
+        return prior_score + child.value

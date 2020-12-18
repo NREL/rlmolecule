@@ -15,7 +15,7 @@ from rlmolecule.tree_search.tree_search_state import TreeSearchState
 logger = logging.getLogger(__name__)
 
 
-class AlphaZeroNode(TreeSearchNode):
+class AlphaZeroNode(TreeSearchNode['AlphaZeroNode']):
     """
     A class which implements the AlphaZero search methodology, with the assistance of a supplied
     AlphaZeroGame implementation ("game").
@@ -24,36 +24,36 @@ class AlphaZeroNode(TreeSearchNode):
     score for the current node and prior score for each child.
     """
 
-    def __init__(self, state: TreeSearchState, game: AlphaZeroGame) -> None:
-        super().__init__(state, game)
+    def __init__(self, state: TreeSearchState) -> None:
+        super().__init__(state)
 
-        self._child_priors: Optional[Dict['MCTSNode', float]] = None  # lazily initialized
-        self._policy_inputs: Optional[Dict[str, np.ndarray]] = None  # lazily initialized
-        self._policy_data = None  # lazily initialized
+        self.child_priors: Optional[Dict['AlphaZeroNode', float]] = None  # lazily initialized
+        self.policy_inputs: Optional[Dict[str, np.ndarray]] = None  # lazily initialized
+        self.policy_data = None  # lazily initialized
 
-    @abstractmethod
-    def policy(self, children: List['MCTSNode']) -> (float, Dict['MCTSNode', float]):
-        """
-        A user-provided function to get value and prior estimates for the given node. Accepts a list of child
-        nodes for the given state, and should return both the predicted value of the current node, as well as prior
-        scores for each child node.
+    # @abstractmethod
+    # def policy(self, children: List['MCTSNode']) -> (float, Dict['MCTSNode', float]):
+    #     """
+    #     A user-provided function to get value and prior estimates for the given node. Accepts a list of child
+    #     nodes for the given state, and should return both the predicted value of the current node, as well as prior
+    #     scores for each child node.
+    #
+    #     :param children: A list of AlphaZeroNodes corresponding to next potential actions
+    #     :return: (value_of_current_node, {child_node: child_prior for child_node in children})
+    #     """
+    #     pass
 
-        :param children: A list of AlphaZeroNodes corresponding to next potential actions
-        :return: (value_of_current_node, {child_node: child_prior for child_node in children})
-        """
-        pass
-
-    def ucb_score(self, child: 'AlphaZeroNode') -> float:
-        """A modified upper confidence bound score for the nodes value, incorporating the prior prediction.
-
-        :param child: Node for which the UCB score is desired
-        :return: UCB score for the given child
-        """
-        game: AlphaZeroGame = self._game
-        pb_c = np.log((self.visits + game.pb_c_base + 1) / game.pb_c_base) + game.pb_c_init
-        pb_c *= np.sqrt(self.visits) / (child.visits + 1)
-        prior_score = pb_c * self.child_prior(child)
-        return prior_score + child.value
+    # def ucb_score(self, child: 'AlphaZeroNode') -> float:
+    #     """A modified upper confidence bound score for the nodes value, incorporating the prior prediction.
+    #
+    #     :param child: Node for which the UCB score is desired
+    #     :return: UCB score for the given child
+    #     """
+    #     game: AlphaZeroGame = self._game
+    #     pb_c = np.log((self.visits + game.pb_c_base + 1) / game.pb_c_base) + game.pb_c_init
+    #     pb_c *= np.sqrt(self.visits) / (child.visits + 1)
+    #     prior_score = pb_c * self.child_prior(child)
+    #     return prior_score + child.value
 
     def evaluate_and_expand(self) -> float:
         """In alphazero, these steps must happen simultaneously. For a given node, expand and run the policy network to
@@ -76,14 +76,6 @@ class AlphaZeroNode(TreeSearchNode):
 
         return value
 
-    def evaluate(self) -> float:
-        return self.evaluate_and_expand()
-
-    def expand(self) -> List['AlphaZeroNode']:
-        self.evaluate_and_expand()
-        # noinspection PyTypeChecker
-        return self.children
-
     def store_child_priors_with_noise(self, child_priors: Dict['MCTSNode', float]) -> None:
         """Store prior values for child nodes predicted from the policy network, and add dirichlet noise as
         specified in the game configuration.
@@ -100,10 +92,4 @@ class AlphaZeroNode(TreeSearchNode):
             priors = priors * (1 - game.dirichlet_x) + (noise * game.dirichlet_x)
 
         assert np.isclose(priors.sum(), 1.), "child priors need to sum to one"
-        self._child_priors = {child: prior for child, prior in zip(children, priors)}
-
-    def child_prior(self, child: 'AlphaZeroNode') -> float:
-        """
-        Prior probabilities (unlike logits) depend on the parent
-        """
-        return self._child_priors[child]
+        self.child_priors = {child: prior for child, prior in zip(children, priors)}

@@ -24,9 +24,6 @@ class MCTSGame(TreeSearchGame[MCTSNode]):
     def problem(self) -> MCTSProblem:
         return self._problem
 
-    def compute_reward(self, node: MCTSNode) -> float:
-        return self._problem.compute_reward(node.state)
-
     def run(self, explore: bool = True):
         root: MCTSNode = self._make_root()
         selection_function = self.visit_selection

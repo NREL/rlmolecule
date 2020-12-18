@@ -25,11 +25,3 @@ class MCTSNode(TreeSearchNode['MCTSNode']):
         """
         super().__init__(state)
         self.reward: Optional[float] = None  # lazily initialized
-
-    def update(self, reward: float) -> 'MCTSNode':
-        """
-        Updates this node with a visit and a reward
-        """
-        self.visits += 1
-        self.total_value += reward
-        return self

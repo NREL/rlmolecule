@@ -8,26 +8,6 @@ from molecule_game.molecule_config import MoleculeConfig
 from rlmolecule.mcts.mcts_game import MCTSGame
 from tests.qed_optimization_problem import QEDOptimizationProblem
 
-
-# @pytest.fixture()
-# def qed_root():
-#     from rdkit.Chem.Descriptors import qed
-#     from rlmolecule.mcts.mcts_node import MCTSNode
-#     from rlmolecule.molecule.molecule_state import MoleculeState, MoleculeConfig
-#     import rdkit.Chem
-#
-#     class QEDNode(MCTSNode):
-#         def compute_reward(self):
-#             return qed(self.state.molecule)
-#
-#     mol = rdkit.Chem.MolFromSmiles('C')
-#     config = MoleculeConfig(max_atoms=5, min_atoms=1)
-#     start = MoleculeState(mol, config)
-#
-#     return QEDNode(start)
-#
-
-
 @pytest.fixture()
 def game() -> MCTSGame:
     config = MoleculeConfig(max_atoms=4,

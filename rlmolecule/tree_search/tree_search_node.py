@@ -40,3 +40,11 @@ class TreeSearchNode(Generic[Node], ABC):
     @property
     def expanded(self) -> bool:
         return self.children is not None
+
+    def update(self, reward: float) -> Node:
+        """
+        Updates this node with a visit and a reward
+        """
+        self.visits += 1
+        self.total_value += reward
+        return self

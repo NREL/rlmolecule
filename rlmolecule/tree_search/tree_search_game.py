@@ -26,9 +26,5 @@ class TreeSearchGame(Generic[Node], ABC):
         return node
 
     @abstractmethod
-    def compute_reward(self, node: Node) -> float:
-        pass
-
-    @abstractmethod
     def _make_new_node(self, state: TreeSearchState) -> Node:
         pass
