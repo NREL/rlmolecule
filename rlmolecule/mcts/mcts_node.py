@@ -29,21 +29,7 @@ class MCTSNode(TreeSearchNode):
         """
         super().__init__(state, game)
 
-        self._visits: int = 0  # visit count
-        self._total_value: float = 0.0
         self._reward: Optional[float] = None  # lazily initialized
-
-    @property
-    def expanded(self) -> bool:
-        return self.successors is not None
-
-    @property
-    def visits(self) -> int:
-        return self._visits
-
-    @property
-    def value(self) -> float:
-        return self._total_value / self._visits if self._visits != 0 else 0
 
     def ucb_score(self, child: 'MCTSNode') -> float:
         """Calculates the UCB1 score for the given child node. From Auer, P., Cesa-Bianchi, N., & Fischer, P. (2002).
@@ -55,8 +41,6 @@ class MCTSNode(TreeSearchNode):
 
         # noinspection PyTypeChecker
         game: 'MCTSGame' = self._game
-
-        game = self._game
         if self.visits == 0:
             raise RuntimeError("Child {} of parent {} with zero visits".format(child, self))
         if child.visits == 0:

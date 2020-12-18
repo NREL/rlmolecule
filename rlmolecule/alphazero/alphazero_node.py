@@ -1,20 +1,22 @@
 import logging
+from abc import abstractmethod
 
 from typing import (
     List,
-    Optional,
+    Optional, Dict,
 )
 
 import numpy as np
 
 from rlmolecule.alphazero.alphazero_game import AlphaZeroGame
 from rlmolecule.mcts.mcts_node import MCTSNode
+from rlmolecule.tree_search.tree_search_node import TreeSearchNode
 from rlmolecule.tree_search.tree_search_state import TreeSearchState
 
 logger = logging.getLogger(__name__)
 
 
-class AlphaZeroNode(MCTSNode):
+class AlphaZeroNode(TreeSearchNode):
     """
     A class which implements the AlphaZero search methodology, with the assistance of a supplied
     AlphaZeroGame implementation ("game").
@@ -62,13 +64,14 @@ class AlphaZeroNode(MCTSNode):
         :return: value (float), the estimated value of the current node
         """
         if self.terminal:
-            return self.reward
+            return self.game.compute_reward(self)
 
         MCTSNode.expand(self)
 
         # This will cause issues later, so we catch an incorrect state.terminal definition here
         assert self.expanded, f"{self} has no valid successors, but is not a terminal state"
 
+        # noinspection PyTypeChecker
         value, successor_priors = self.policy(self.successors)
         self.store_successor_priors_with_noise(successor_priors)
 
@@ -77,9 +80,10 @@ class AlphaZeroNode(MCTSNode):
     def evaluate(self) -> float:
         return self.evaluate_and_expand()
 
-    def expand(self) -> 'MCTSNode':
+    def expand(self) -> List['AlphaZeroNode']:
         self.evaluate_and_expand()
-        return self
+        # noinspection PyTypeChecker
+        return self.successors
 
     def store_successor_priors_with_noise(self, successor_priors: Dict['MCTSNode', float]) -> None:
         """Store prior values for successor nodes predicted from the policy network, and add dirichlet noise as

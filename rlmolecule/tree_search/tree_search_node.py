@@ -11,6 +11,8 @@ class TreeSearchNode(ABC):
         self._state: TreeSearchState = state
         self._game: 'TreeSearchGame' = game
         self._successors: Optional[List[TreeSearchNode]] = None
+        self._visits: int = 0  # visit count
+        self._total_value: float = 0.0
 
     def __eq__(self, other: any) -> bool:
         """
@@ -29,6 +31,18 @@ class TreeSearchNode(ABC):
         repr method delegates to self._graph_node
         """
         return self._state.__repr__()
+
+    @property
+    def value(self) -> float:
+        return self._total_value / self._visits if self._visits != 0 else 0
+
+    @property
+    def visits(self) -> int:
+        return self._visits
+
+    @property
+    def expanded(self) -> bool:
+        return self.successors is not None
 
     @property
     def state(self) -> TreeSearchState:
