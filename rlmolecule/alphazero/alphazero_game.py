@@ -1,15 +1,14 @@
 import logging
-import uuid
-from abc import abstractmethod
 
-from rlmolecule.alphazero.alphazero_state.py import AlphaZeroNode
-
+from rlmolecule.alphazero.alphazero_node import AlphaZeroNode
+from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.mcts.mcts_game import MCTSGame
+from rlmolecule.tree_search.tree_search_game import TreeSearchGame
 
 logger = logging.getLogger(__name__)
 
 
-class AlphaZeroGame(MCTSGame):
+class AlphaZeroGame(TreeSearchGame):
     """
     This class defines the interface for implementing AlphaZero-based games within this framework.
     Such a game overrides the abstract methods below with application-specific implementations.
@@ -18,6 +17,7 @@ class AlphaZeroGame(MCTSGame):
     """
 
     def __init__(self,
+                 problem: AlphaZeroProblem,
                  min_reward: float = 0.0,
                  pb_c_base: float = 1.0,
                  pb_c_init: float = 1.25,
@@ -34,13 +34,18 @@ class AlphaZeroGame(MCTSGame):
         :param dirichlet_alpha: dirichlet 'shape' parameter. Larger values spread out probability over more moves.
         :param dirichlet_x: percentage to favor dirichlet noise vs. prior estimation. Smaller means less noise
         """
-        super(AlphaZeroGame, self).__init__()
+        super().__init__()
+        self._problem = problem
         self._min_reward: float = min_reward
         self._pb_c_base: float = pb_c_base
         self._pb_c_init: float = pb_c_init
         self._dirichlet_noise: bool = dirichlet_noise
         self._dirichlet_alpha: float = dirichlet_alpha
         self._dirichlet_x: float = dirichlet_x
+
+    @property
+    def problem(self) -> AlphaZeroProblem:
+        return self._problem
 
     @property
     def min_reward(self) -> float:
@@ -66,23 +71,5 @@ class AlphaZeroGame(MCTSGame):
     def dirichlet_x(self) -> float:
         return self._dirichlet_x
 
-    @abstractmethod
-    def policy_predictions(self, policy_inputs_with_children):
-        """
-         un the policy network to get value and prior_logit predictions
-        :param policy_inputs_with_children:
-        :return: (values, prior_logits) as a tuple
-        """
-        pass
-
-    @abstractmethod
-    def construct_feature_matrices(self, node: AlphaZeroNode):
-        """
-        :param node:
-        :return:  _policy_inputs
-        """
-        pass
-
-    @abstractmethod
     def compute_reward(self, node: AlphaZeroNode) -> float:
-        pass
+        return self._problem.compute_reward(node.state, node.policy_inputs)

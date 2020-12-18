@@ -1,22 +1,24 @@
 import logging
 import math
 import random
-from abc import abstractmethod
-from typing import Iterable, Iterator, List, Optional
+from typing import Iterator, List, Optional
 
 import numpy as np
 
-from rlmolecule.mcts.mcts_game import MCTSGame
-from rlmolecule.state import State
+# from rlmolecule.mcts.mcts_game import MCTSGame
+from rlmolecule.tree_search.tree_search_game import TreeSearchGame
+from rlmolecule.tree_search.tree_search_node import TreeSearchNode
+from rlmolecule.tree_search.tree_search_state import TreeSearchState
 
 logger = logging.getLogger(__name__)
 
 
-class MCTSNode(object):
-    def __init__(self, state: State, game: Optional[MCTSGame] = None) -> None:
+class MCTSNode(TreeSearchNode):
+    def __init__(self, state: TreeSearchState, game: 'MCTSGame') -> None:
         """A node that coordinates 'vanilla' MCTS optimization. This class must be subclassed with a `compute_reward`
         function, and provided a State class that defines the allowable action space.
 
+        TODO: update documentation
        For instance, to optimize QED of a molecule:
         >>> class QEDNode(MCTSNode):
         ...     def compute_reward(self):
@@ -25,46 +27,15 @@ class MCTSNode(object):
         :param state: The starting State instance that is used to initialize the tree search
         :param game: A MCTSGame instance that provides overall configuration parameters to all the nodes.
         """
-        if game is None:
-            game = MCTSGame()
-
-        self._state = state
-        self._game = game
+        super().__init__(state, game)
 
         self._visits: int = 0  # visit count
         self._total_value: float = 0.0
         self._reward: Optional[float] = None  # lazily initialized
-        self._successors: Optional[List[MCTSNode]] = None
-
-    @abstractmethod
-    def compute_reward(self) -> float:
-        pass
-
-    @property
-    def state(self) -> State:
-        """
-        :return: delegate which defines the graph structure being explored
-        """
-        return self._state
-
-    @property
-    def game(self) -> MCTSGame:
-        """
-        :return: delegate which contains game-level configuration
-        """
-        return self._game
 
     @property
     def expanded(self) -> bool:
-        return bool(self.successors)
-
-    @property
-    def successors(self) -> List['MCTSNode']:
-        return self._successors
-
-    def expand(self) -> 'MCTSNode':
-        self._successors = [self.__class__(action, self.game) for action in self._state.get_next_actions()]
-        return self
+        return self.successors is not None
 
     @property
     def visits(self) -> int:
@@ -75,7 +46,8 @@ class MCTSNode(object):
         return self._total_value / self._visits if self._visits != 0 else 0
 
     def ucb_score(self, child: 'MCTSNode') -> float:
-        game = self._game
+        # noinspection PyTypeChecker
+        game: 'MCTSGame' = self._game
         if self.visits == 0:
             raise RuntimeError("Child {} of parent {} with zero visits".format(child, self))
         if child.visits == 0:
@@ -91,28 +63,6 @@ class MCTSNode(object):
         self._total_value += reward
         return self
 
-    def __eq__(self, other: any) -> bool:
-        """
-        equals method delegates to self._graph_node for easy hashing based on graph structure
-        """
-        return isinstance(other, self.__class__) and self._state == other._state
-
-    def __hash__(self) -> int:
-        """
-        hash method delegates to self._graph_node for easy hashing based on graph structure
-        """
-        return hash(self._state)
-
-    def __repr__(self) -> str:
-        """
-        repr method delegates to self._graph_node
-        """
-        return self._state.__repr__()
-
-    @property
-    def terminal(self) -> bool:
-        return self.state.terminal
-
     def tree_policy(self) -> Iterator['MCTSNode']:
         """
         Implements the tree search part of an MCTS search. Recursive function which
@@ -121,13 +71,14 @@ class MCTSNode(object):
         yield self
         if self.expanded:
             successor = max(self.successors, key=lambda successor: self.ucb_score(successor))
+
+            # noinspection PyUnresolvedReferences
             yield from successor.tree_policy()
 
     @property
     def reward(self) -> float:
-        assert self.terminal, "Accessing reward of non-terminal state"
         if self._reward is None:
-            self._reward = self.compute_reward()
+            self._reward = self._game.compute_reward(self)
         return self._reward
 
     def evaluate(self) -> float:
@@ -140,14 +91,15 @@ class MCTSNode(object):
         if (self.visits > 0) and not self.terminal:
             self.expand()
 
-        def random_rollout(state: State) -> float:
+        def random_rollout(node: MCTSNode) -> float:
             """Recursively descend the action space until a final node is reached"""
-            if state.terminal:
-                return self.__class__(state).compute_reward()
+            if node.terminal:
+                return node.reward
             else:
-                return random_rollout(random.choice(list(state.get_next_actions())))
+                # noinspection PyTypeChecker
+                return random_rollout(random.choice(node.successors))
 
-        return random_rollout(self.state)
+        return random_rollout(self)
 
     def mcts_step(self) -> 'MCTSNode':
         """
@@ -173,7 +125,8 @@ class MCTSNode(object):
         Returns:
             choice: Node, the chosen successor node.
         """
-        successors = self.successors
+        # noinspection PyTypeChecker
+        successors: List[MCTSNode] = self.successors
         visit_counts = np.array([n._visits for n in successors])
         visit_softmax = np.exp(visit_counts) / sum(np.exp(visit_counts))
         return successors[np.random.choice(range(len(successors)), size=1, p=visit_softmax)[0]]
@@ -203,3 +156,7 @@ class MCTSNode(object):
                 choice = sorted((node for node in self.successors), key=lambda x: -x.visits)[0]
 
             yield from choice.run_mcts(num_simulations, explore=explore)
+
+    def _make_successor(self, action: TreeSearchState) -> 'MCTSNode':
+        # noinspection PyTypeChecker
+        return MCTSNode(action, self._game)

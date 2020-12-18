@@ -1,5 +1,5 @@
 import stable_rad_config
-from molecule_game.stable_radical_optimization.stable_radical_optimization_game import StableRadicalOptimizationGame
+from molecule_game.stable_radical_optimization.stable_radical_optimization_problem import StableRadicalOptimizationGame
 
 # G = Game(StabilityNode, 'C')
 # game = list(G.run_mcts())

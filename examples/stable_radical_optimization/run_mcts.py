@@ -10,7 +10,7 @@ import psycopg2
 
 import molecule_game.config as config
 from rlmolecule.node import Node
-from rlmolecule.game import Game
+from rlmolecule.tree_search.tree_search_game import TreeSearchGame
 
 import tensorflow as tf
 
@@ -119,7 +119,7 @@ class StabilityNode(Node):
 def run_game():
     """Run game, saving the results in a Postgres replay buffer"""
 
-    G = Game(StabilityNode, 'C')
+    G = TreeSearchGame(StabilityNode, 'C')
     logging.info(f"Starting {G.id}")
     
     game = list(G.run_mcts())

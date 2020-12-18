@@ -3,7 +3,6 @@ import itertools
 import logging
 
 from typing import (
-    Iterator,
     List,
     Optional,
 )
@@ -14,7 +13,7 @@ from keras_preprocessing.sequence import pad_sequences
 
 from rlmolecule.alphazero.alphazero_game import AlphaZeroGame
 from rlmolecule.mcts.mcts_node import MCTSNode
-from rlmolecule.state import State
+from rlmolecule.tree_search.tree_search_state import TreeSearchState
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +24,8 @@ class AlphaZeroNode(MCTSNode):
     AlphaZeroGame implementation ("game").
     """
 
-    def __init__(self, state: State, game: Optional[AlphaZeroGame] = None) -> None:
-        if game is None:
-            game = AlphaZeroGame()
-
-        super(AlphaZeroNode, self).__init__(state, game)
+    def __init__(self, state: TreeSearchState, game: AlphaZeroGame) -> None:
+        super().__init__(state, game)
 
         self._prior_logit: float = np.nan
         self._child_priors: Optional[List['AlphaZeroNode']] = None  # lazily initialized
@@ -49,16 +45,15 @@ class AlphaZeroNode(MCTSNode):
         if self.terminal:
             return self.reward
 
-        self._expanded = True
+        children = self.successors
 
-        children = self.get_successors_list()
-
-        # Handle the case where a node doesn't have any valid children
-        if len(children) == 0:
-            return self._game.min_reward  # TODO: what? This doesn't make sense to me.
+        # Handle the case where a node doesn't have any children
+        if self.terminal:
+            return self.reward
 
         # Run the policy network to get value and prior_logit predictions
-        values, prior_logits = self._game.policy_predictions(self.policy_inputs_with_children())
+        # noinspection PyUnresolvedReferences
+        values, prior_logits = self._game.problem.policy_predictions(self.policy_inputs_with_children())
 
         # inputs to policy network
         prior_logits = prior_logits[1:].numpy().flatten()
@@ -84,11 +79,12 @@ class AlphaZeroNode(MCTSNode):
         """
         if self._child_priors is None:
             # Perform the softmax over the children node's prior logits
-            children = self.get_successors_list()
+            children: [AlphaZeroNode] = self.successors
             priors = tf.nn.softmax([child._prior_logit for child in children]).numpy()
 
             # Add the optional exploration noise
-            game = self._game
+            # noinspection PyTypeChecker
+            game: AlphaZeroGame = self._game
             if game.dirichlet_noise:
                 random_state = np.random.RandomState()
                 noise = random_state.dirichlet(
@@ -107,7 +103,8 @@ class AlphaZeroNode(MCTSNode):
         :return GNN inputs for the node
         """
         if self._policy_inputs is None:
-            self._policy_inputs = self._game.construct_feature_matrices(self)
+            # noinspection PyUnresolvedReferences
+            self._policy_inputs = self._game.problem.construct_feature_matrices(self)
         return self._policy_inputs
 
     def policy_inputs_with_children(self) -> {}:
@@ -117,13 +114,13 @@ class AlphaZeroNode(MCTSNode):
         network
         """
 
-        policy_inputs = [node.policy_inputs for node in itertools.chain((self,), self.get_successors())]
+        policy_inputs = [node.policy_inputs for node in itertools.chain((self,), self.successors)]
         return {key: pad_sequences([elem[key] for elem in policy_inputs], padding='post')
                 for key in policy_inputs[0].keys()}
 
     def store_policy_data(self):
         data = self.policy_inputs_with_children()
-        visit_counts = np.array([child.visits for child in self.get_successors()])
+        visit_counts = np.array([child.visits for child in self.successors])
         data['visit_probs'] = visit_counts / visit_counts.sum()
 
         with io.BytesIO() as f:
@@ -135,3 +132,7 @@ class AlphaZeroNode(MCTSNode):
         if self._policy_data is None:
             self.store_policy_data()
         return self._policy_data
+
+    def _make_successor(self, action: TreeSearchState) -> 'AlphaZeroNode':
+        # noinspection PyTypeChecker
+        return AlphaZeroNode(action, self._game)
