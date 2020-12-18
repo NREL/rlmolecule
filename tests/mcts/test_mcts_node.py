@@ -78,4 +78,4 @@ def test_mcts_step(qed_case):
 def test_run_mcts(qed_case):
     random.seed(42)
     history = list(qed_case.run_mcts(5, explore=False))
-    assert history[-1].reward > 0.3
+    assert history[-1].reward > 0.25
