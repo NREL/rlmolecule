@@ -1,16 +1,8 @@
-import io
-import itertools
 import logging
-
-from typing import (
-    Iterator,
-    List,
-    Optional,
-)
+from abc import abstractmethod
+from typing import (Dict, List, Optional)
 
 import numpy as np
-import tensorflow as tf
-from keras_preprocessing.sequence import pad_sequences
 
 from rlmolecule.alphazero.alphazero_game import AlphaZeroGame
 from rlmolecule.mcts.mcts_node import MCTSNode
@@ -23,6 +15,9 @@ class AlphaZeroNode(MCTSNode):
     """
     A class which implements the AlphaZero search methodology, with the assistance of a supplied
     AlphaZeroGame implementation ("game").
+
+    Users must implement a `policy` function, that takes as inputs the next possible actions and returns a value
+    score for the current node and prior score for each successor.
     """
 
     def __init__(self, state: State, game: Optional[AlphaZeroGame] = None) -> None:
@@ -31,107 +26,81 @@ class AlphaZeroNode(MCTSNode):
 
         super(AlphaZeroNode, self).__init__(state, game)
 
-        self._prior_logit: float = np.nan
-        self._child_priors: Optional[List['AlphaZeroNode']] = None  # lazily initialized
-        self._policy_inputs: Optional[{}] = None  # lazily initialized
+        self._successor_priors: Optional[Dict['MCTSNode', float]] = None  # lazily initialized
+        self._policy_inputs: Optional[Dict[str, np.ndarray]] = None  # lazily initialized
         self._policy_data = None  # lazily initialized
 
-    def evaluate(self):
+    @abstractmethod
+    def policy(self, successors: List['MCTSNode']) -> (float, Dict['MCTSNode', float]):
         """
-        For a given node, build the children, add them to the graph, and run the
-        policy network to get prior_logits and a value.
+        A user-provided function to get value and prior estimates for the given node. Accepts a list of successor
+        nodes for the given state, and should return both the predicted value of the current node, as well as prior
+        scores for each successor node.
+
+        :param successors: A list of AlphaZeroNodes corresponding to next potential actions
+        :return: (value_of_current_node, {successor_node: successor_prior for successor_node in successors})
+        """
+        pass
+
+    def ucb_score(self, child: 'AlphaZeroNode') -> float:
+        """A modified upper confidence bound score for the nodes value, incorporating the prior prediction.
+
+        :param child: Node for which the UCB score is desired
+        :return: UCB score for the given child
+        """
+        game: AlphaZeroGame = self._game
+        pb_c = np.log((self.visits + game.pb_c_base + 1) / game.pb_c_base) + game.pb_c_init
+        pb_c *= np.sqrt(self.visits) / (child.visits + 1)
+        prior_score = pb_c * self.successor_prior(child)
+        return prior_score + child.value
+
+    def evaluate_and_expand(self) -> float:
+        """In alphazero, these steps must happen simultaneously. For a given node, expand and run the policy network to
+        get prior predictions and a value estimate.
 
         Returns:
-        value (float): the estimated value of `parent`.
+        :return: value (float), the estimated value of the current node
         """
-        # Looks like in rlmolecule, we always expand, even if this is the
-        # first time we've visited the node
         if self.terminal:
             return self.reward
 
-        self._expanded = True
+        MCTSNode.expand(self)
 
-        children = self.get_successors_list()
+        # This will cause issues later, so we catch an incorrect state.terminal definition here
+        assert self.expanded, f"{self} has no valid successors, but is not a terminal state"
 
-        # Handle the case where a node doesn't have any valid children
-        if len(children) == 0:
-            return self._game.min_reward  # TODO: what? This doesn't make sense to me.
+        value, successor_priors = self.policy(self.successors)
+        self.store_successor_priors_with_noise(successor_priors)
 
-        # Run the policy network to get value and prior_logit predictions
-        values, prior_logits = self._game.policy_predictions(self.policy_inputs_with_children())
+        return value
 
-        # inputs to policy network
-        prior_logits = prior_logits[1:].numpy().flatten()
+    def evaluate(self) -> float:
+        return self.evaluate_and_expand()
 
-        # Update child nodes with predicted prior_logits
-        for child, prior_logit in zip(children, prior_logits):
-            child._prior_logit = float(prior_logit)
+    def expand(self) -> 'MCTSNode':
+        self.evaluate_and_expand()
+        return self
 
-        # Return the parent's predicted value
-        return float(tf.nn.sigmoid(values[0]))
+    def store_successor_priors_with_noise(self, successor_priors: Dict['MCTSNode', float]) -> None:
+        """Store prior values for successor nodes predicted from the policy network, and add dirichlet noise as
+        specified in the game configuration.
 
-    def child_prior(self, child: 'AlphaZeroNode') -> float:
+        :param successor_priors: A dictionary of prior scores predicted by the policy network.
+        """
+        game: AlphaZeroGame = self._game
+        successors = self.successors
+        priors = np.array([successor_priors[successor] for successor in successors])
+
+        if game.dirichlet_noise:
+            random_state = np.random.RandomState()
+            noise = random_state.dirichlet(np.ones_like(priors) * game.dirichlet_alpha)
+            priors = priors * (1 - game.dirichlet_x) + (noise * game.dirichlet_x)
+
+        assert np.isclose(priors.sum(), 1.), "successor priors need to sum to one"
+        self._successor_priors = {successor: prior for successor, prior in zip(successors, priors)}
+
+    def successor_prior(self, child: 'AlphaZeroNode') -> float:
         """
         Prior probabilities (unlike logits) depend on the parent
         """
-        return self.child_priors[child]
-
-    @property
-    def child_priors(self) -> {'AlphaZeroNode': float}:
-        """
-        Get a list of priors for the node's children, with optionally added dirichlet noise.
-        Caches the result, so the noise is consistent.
-        """
-        if self._child_priors is None:
-            # Perform the softmax over the children node's prior logits
-            children = self.get_successors_list()
-            priors = tf.nn.softmax([child._prior_logit for child in children]).numpy()
-
-            # Add the optional exploration noise
-            game = self._game
-            if game.dirichlet_noise:
-                random_state = np.random.RandomState()
-                noise = random_state.dirichlet(
-                    np.ones_like(priors) * game.dirichlet_alpha)
-
-                priors = priors * (1 - game.dirichlet_x) + (noise * game.dirichlet_x)
-
-            assert np.isclose(priors.sum(), 1.)  # Just a sanity check
-            self._child_priors = {child: prior for child, prior in zip(children, priors)}
-
-        return self._child_priors
-
-    @property
-    def policy_inputs(self):
-        """
-        :return GNN inputs for the node
-        """
-        if self._policy_inputs is None:
-            self._policy_inputs = self._game.construct_feature_matrices(self)
-        return self._policy_inputs
-
-    def policy_inputs_with_children(self) -> {}:
-        """
-        :return the given nodes policy inputs, concatenated together with the
-        inputs of its successor nodes. Used as the inputs for the policy neural
-        network
-        """
-
-        policy_inputs = [node.policy_inputs for node in itertools.chain((self,), self.get_successors())]
-        return {key: pad_sequences([elem[key] for elem in policy_inputs], padding='post')
-                for key in policy_inputs[0].keys()}
-
-    def store_policy_data(self):
-        data = self.policy_inputs_with_children()
-        visit_counts = np.array([child.visits for child in self.get_successors()])
-        data['visit_probs'] = visit_counts / visit_counts.sum()
-
-        with io.BytesIO() as f:
-            np.savez_compressed(f, **data)
-            self._policy_data = f.getvalue()
-
-    @property
-    def policy_data(self):
-        if self._policy_data is None:
-            self.store_policy_data()
-        return self._policy_data
+        return self._successor_priors[child]

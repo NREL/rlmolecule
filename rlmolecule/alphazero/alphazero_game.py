@@ -1,8 +1,4 @@
 import logging
-import uuid
-from abc import abstractmethod
-
-from rlmolecule.alphazero.alphazero_state.py import AlphaZeroNode
 
 from rlmolecule.mcts.mcts_game import MCTSGame
 
@@ -65,24 +61,3 @@ class AlphaZeroGame(MCTSGame):
     @property
     def dirichlet_x(self) -> float:
         return self._dirichlet_x
-
-    @abstractmethod
-    def policy_predictions(self, policy_inputs_with_children):
-        """
-         un the policy network to get value and prior_logit predictions
-        :param policy_inputs_with_children:
-        :return: (values, prior_logits) as a tuple
-        """
-        pass
-
-    @abstractmethod
-    def construct_feature_matrices(self, node: AlphaZeroNode):
-        """
-        :param node:
-        :return:  _policy_inputs
-        """
-        pass
-
-    @abstractmethod
-    def compute_reward(self, node: AlphaZeroNode) -> float:
-        pass
