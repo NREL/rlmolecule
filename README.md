@@ -1,4 +1,4 @@
-![](./docs/logo/logo.svg)
+# rlmolecule
 
 ## About
 
