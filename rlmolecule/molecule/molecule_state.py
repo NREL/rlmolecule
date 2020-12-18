@@ -1,9 +1,6 @@
 from typing import Iterable, List, Optional
 
-from rdkit.Chem.rdchem import Mol
-from rdkit.Chem.rdmolfiles import (
-    MolToSmiles,
-)
+from rdkit.Chem import Mol, MolToSmiles
 
 from molecule_game.molecule_config import MoleculeConfig
 from rlmolecule.molecule.molecule_tools import build_molecules

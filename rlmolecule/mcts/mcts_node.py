@@ -46,8 +46,17 @@ class MCTSNode(TreeSearchNode):
         return self._total_value / self._visits if self._visits != 0 else 0
 
     def ucb_score(self, child: 'MCTSNode') -> float:
+        """Calculates the UCB1 score for the given child node. From Auer, P., Cesa-Bianchi, N., & Fischer, P. (2002).
+        Machine Learning, 47(2/3), 235–256. doi:10.1023/a:1013689704352
+
+        :param child: Node for which the UCB score is desired
+        :return: UCB1 score.
+        """
+
         # noinspection PyTypeChecker
         game: 'MCTSGame' = self._game
+
+        game = self._game
         if self.visits == 0:
             raise RuntimeError("Child {} of parent {} with zero visits".format(child, self))
         if child.visits == 0:
@@ -82,7 +91,7 @@ class MCTSNode(TreeSearchNode):
         return self._reward
 
     def evaluate(self) -> float:
-        """ In MCTS, we evaluate nodes through a random rollout of potential future actions.
+        """In MCTS, we evaluate nodes through a random rollout of potential future actions.
 
         :return: reward of a terminal state selected from the current node
         """
@@ -138,6 +147,10 @@ class MCTSNode(TreeSearchNode):
         (explore=True) for subsequent iterations.
         Called recursively, returning a generator of game positions:
         >>> game = list(start.run_mcts(explore=True))
+
+        :param num_simulations: Number of simulations to perform per MCTS step
+        :param explore: whether to use softmax sampling (on visit counts) in choosing the next node, or to simply
+            choose the node with the highest number of visits.
         """
 
         logger.info(
