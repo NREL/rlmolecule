@@ -1,6 +1,7 @@
 from typing import Dict, List
 
 import numpy as np
+
 from rlmolecule.alphazero.alphazero_node import AlphaZeroNode
 
 

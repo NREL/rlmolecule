@@ -28,7 +28,7 @@ class NetworkxSuccessorMixin(object):
 
     @property
     def successors(self) -> List['MCTSNode']:
-        return list(self.game._graph.successors(self))
+        return list(self.game._graph.children(self))
 
     def expand(self) -> 'NetworkxSuccessorMixin':
         children = [self.__class__(action, self.game) for action in self._state.get_next_actions()]

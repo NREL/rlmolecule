@@ -1,4 +1,4 @@
-from typing import Iterable, List, Optional
+from typing import Iterable
 
 from rdkit.Chem import Mol, MolToSmiles
 

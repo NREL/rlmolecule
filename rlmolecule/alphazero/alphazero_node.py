@@ -1,6 +1,5 @@
 import logging
 from abc import abstractmethod
-
 from typing import (
     List,
     Optional, Dict,
@@ -22,25 +21,25 @@ class AlphaZeroNode(TreeSearchNode):
     AlphaZeroGame implementation ("game").
 
     Users must implement a `policy` function, that takes as inputs the next possible actions and returns a value
-    score for the current node and prior score for each successor.
+    score for the current node and prior score for each child.
     """
 
     def __init__(self, state: TreeSearchState, game: AlphaZeroGame) -> None:
         super().__init__(state, game)
 
-        self._successor_priors: Optional[Dict['MCTSNode', float]] = None  # lazily initialized
+        self._child_priors: Optional[Dict['MCTSNode', float]] = None  # lazily initialized
         self._policy_inputs: Optional[Dict[str, np.ndarray]] = None  # lazily initialized
         self._policy_data = None  # lazily initialized
 
     @abstractmethod
-    def policy(self, successors: List['MCTSNode']) -> (float, Dict['MCTSNode', float]):
+    def policy(self, children: List['MCTSNode']) -> (float, Dict['MCTSNode', float]):
         """
-        A user-provided function to get value and prior estimates for the given node. Accepts a list of successor
+        A user-provided function to get value and prior estimates for the given node. Accepts a list of child
         nodes for the given state, and should return both the predicted value of the current node, as well as prior
-        scores for each successor node.
+        scores for each child node.
 
-        :param successors: A list of AlphaZeroNodes corresponding to next potential actions
-        :return: (value_of_current_node, {successor_node: successor_prior for successor_node in successors})
+        :param children: A list of AlphaZeroNodes corresponding to next potential actions
+        :return: (value_of_current_node, {child_node: child_prior for child_node in children})
         """
         pass
 
@@ -53,7 +52,7 @@ class AlphaZeroNode(TreeSearchNode):
         game: AlphaZeroGame = self._game
         pb_c = np.log((self.visits + game.pb_c_base + 1) / game.pb_c_base) + game.pb_c_init
         pb_c *= np.sqrt(self.visits) / (child.visits + 1)
-        prior_score = pb_c * self.successor_prior(child)
+        prior_score = pb_c * self.child_prior(child)
         return prior_score + child.value
 
     def evaluate_and_expand(self) -> float:
@@ -69,11 +68,11 @@ class AlphaZeroNode(TreeSearchNode):
         MCTSNode.expand(self)
 
         # This will cause issues later, so we catch an incorrect state.terminal definition here
-        assert self.expanded, f"{self} has no valid successors, but is not a terminal state"
+        assert self.expanded, f"{self} has no valid children, but is not a terminal state"
 
         # noinspection PyTypeChecker
-        value, successor_priors = self.policy(self.successors)
-        self.store_successor_priors_with_noise(successor_priors)
+        value, child_priors = self.policy(self.children)
+        self.store_child_priors_with_noise(child_priors)
 
         return value
 
@@ -83,28 +82,28 @@ class AlphaZeroNode(TreeSearchNode):
     def expand(self) -> List['AlphaZeroNode']:
         self.evaluate_and_expand()
         # noinspection PyTypeChecker
-        return self.successors
+        return self.children
 
-    def store_successor_priors_with_noise(self, successor_priors: Dict['MCTSNode', float]) -> None:
-        """Store prior values for successor nodes predicted from the policy network, and add dirichlet noise as
+    def store_child_priors_with_noise(self, child_priors: Dict['MCTSNode', float]) -> None:
+        """Store prior values for child nodes predicted from the policy network, and add dirichlet noise as
         specified in the game configuration.
 
-        :param successor_priors: A dictionary of prior scores predicted by the policy network.
+        :param child_priors: A dictionary of prior scores predicted by the policy network.
         """
         game: AlphaZeroGame = self._game
-        successors = self.successors
-        priors = np.array([successor_priors[successor] for successor in successors])
+        children = self.children
+        priors = np.array([child_priors[child] for child in children])
 
         if game.dirichlet_noise:
             random_state = np.random.RandomState()
             noise = random_state.dirichlet(np.ones_like(priors) * game.dirichlet_alpha)
             priors = priors * (1 - game.dirichlet_x) + (noise * game.dirichlet_x)
 
-        assert np.isclose(priors.sum(), 1.), "successor priors need to sum to one"
-        self._successor_priors = {successor: prior for successor, prior in zip(successors, priors)}
+        assert np.isclose(priors.sum(), 1.), "child priors need to sum to one"
+        self._child_priors = {child: prior for child, prior in zip(children, priors)}
 
-    def successor_prior(self, child: 'AlphaZeroNode') -> float:
+    def child_prior(self, child: 'AlphaZeroNode') -> float:
         """
         Prior probabilities (unlike logits) depend on the parent
         """
-        return self._successor_priors[child]
+        return self._child_priors[child]

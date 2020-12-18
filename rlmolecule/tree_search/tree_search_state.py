@@ -3,7 +3,7 @@ from abc import (
     abstractmethod,
 )
 from typing import (
-    Iterable,
+    Sequence,
     # final
 )
 
@@ -40,7 +40,7 @@ class TreeSearchState(ABC):
         pass
 
     @abstractmethod
-    def get_next_actions(self) -> Iterable['TreeSearchState']:
+    def get_next_actions(self) -> Sequence['TreeSearchState']:
         """
         Defines the next possible states that are reachable from the current state. Should return nothing if the
         state is a final or terminal state, where a reward should be calculated.
@@ -48,10 +48,10 @@ class TreeSearchState(ABC):
         """
         pass
 
-    @property
-    def terminal(self) -> bool:
-        """
-        Should be overridden if get_successors() is not performant
-        :return: True iff this state has no successors
-        """
-        return not any(True for _ in self.get_next_actions())
+    # @property
+    # def terminal(self) -> bool:
+    #     """
+    #     Should be overridden if get_successors() is not performant
+    #     :return: True iff this state has no successors
+    #     """
+    #     return not any(True for _ in self.get_next_actions())

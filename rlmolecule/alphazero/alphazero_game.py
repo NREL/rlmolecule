@@ -2,7 +2,6 @@ import logging
 
 from rlmolecule.alphazero.alphazero_node import AlphaZeroNode
 from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
-from rlmolecule.mcts.mcts_game import MCTSGame
 from rlmolecule.tree_search.tree_search_game import TreeSearchGame
 
 logger = logging.getLogger(__name__)
