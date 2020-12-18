@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import Sequence
 
 from rdkit.Chem import Mol, MolToSmiles
 
@@ -31,7 +31,7 @@ class MoleculeState(TreeSearchState):
         """
         delegates to the SMILES string
         """
-        return f"{self._smiles}{' (t)' if self.terminal else ''}"
+        return f"{self._smiles}{' (t)' if self.is_terminal else ''}"
 
     def equals(self, other: 'MoleculeState') -> bool:
         """
@@ -39,7 +39,7 @@ class MoleculeState(TreeSearchState):
         """
         return (isinstance(other, self.__class__) and
                 self._smiles == other._smiles and
-                self.terminal == other.terminal)
+                self.is_terminal == other.is_terminal)
 
     def hash(self) -> int:
         """
@@ -63,17 +63,31 @@ class MoleculeState(TreeSearchState):
     def num_atoms(self) -> int:
         return self.molecule.GetNumAtoms()
 
-    def get_next_actions(self) -> Iterable['TreeSearchState']:
-        if (self.num_atoms < self.config.max_atoms) and not self._is_terminal:
-            bml = list((MoleculeState(molecule, self.config) for molecule in
-                        build_molecules(
-                            self.molecule,
-                            atom_additions=self.config.atom_additions,
-                            stereoisomers=self.config.stereoisomers,
-                            sa_score_threshold=self.config.sa_score_threshold,
-                            tryEmbedding=self.config.tryEmbedding
-                        )))
-            yield from bml
+    @property
+    def is_terminal(self) -> bool:
+        """
+        Should be overridden if get_successors() is not performant
+        :return: True iff this state has no successors
+        """
+        return self._is_terminal
 
-        if (self.num_atoms >= self.config.min_atoms) and not self._is_terminal:
-            yield MoleculeState(self.molecule, self.config, is_terminal=True)
+    def get_next_actions(self) -> Sequence['TreeSearchState']:
+        result = []
+
+        if self.is_terminal:
+            return result
+
+        if self.num_atoms < self.config.max_atoms:
+            result.extend((MoleculeState(molecule, self.config) for molecule in
+                           build_molecules(
+                               self.molecule,
+                               atom_additions=self.config.atom_additions,
+                               stereoisomers=self.config.stereoisomers,
+                               sa_score_threshold=self.config.sa_score_threshold,
+                               tryEmbedding=self.config.tryEmbedding
+                           )))
+
+        if self.num_atoms >= self.config.min_atoms:
+            result.append(MoleculeState(self.molecule, self.config, is_terminal=True))
+
+        return result

@@ -47,11 +47,3 @@ class TreeSearchState(ABC):
         :return: the state's successors as an iterable.
         """
         pass
-
-    # @property
-    # def terminal(self) -> bool:
-    #     """
-    #     Should be overridden if get_successors() is not performant
-    #     :return: True iff this state has no successors
-    #     """
-    #     return not any(True for _ in self.get_next_actions())

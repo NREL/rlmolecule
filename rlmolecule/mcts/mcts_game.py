@@ -85,7 +85,7 @@ class MCTSGame(TreeSearchGame[MCTSNode]):
         """
         current = start
         while True:
-            children = start.get_next_actions()
+            children = current.get_next_actions()
             if len(children) == 0:
                 break
             current = random.choice(children)

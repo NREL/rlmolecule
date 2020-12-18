@@ -1,13 +1,13 @@
-import pytest
-import unittest
 import random
+import unittest
+
+import rdkit.Chem
+from rdkit.Chem.Descriptors import qed
 
 from rlmolecule.mcts.mcts_game import MCTSGame
-from rlmolecule.mcts.mcts_problem import MCTSProblem
-from rdkit.Chem.Descriptors import qed
 from rlmolecule.mcts.mcts_node import MCTSNode
+from rlmolecule.mcts.mcts_problem import MCTSProblem
 from rlmolecule.molecule.molecule_state import MoleculeState, MoleculeConfig
-import rdkit.Chem
 
 
 class QEDOptimizationProblem(MCTSProblem):
@@ -25,8 +25,6 @@ class QEDOptimizationProblem(MCTSProblem):
 class MCTSHashCanonicalizationTest(unittest.TestCase):
     # noinspection PyTypeChecker
     def test_get_successors(self):
-        print('ran')
-
         config = MoleculeConfig(max_atoms=4,
                                 min_atoms=1,
                                 tryEmbedding=False,
@@ -46,8 +44,8 @@ class MCTSHashCanonicalizationTest(unittest.TestCase):
         successor1.update(1.0)
 
         random.seed(42)
-        for _ in range(2):
-            root.mcts_step()
+        for _ in range(1000):
+            game.run()
 
         child1 = root.children[1].children[0]  # CCN
         child2 = root.children[0].children[1]  # CCN
@@ -59,7 +57,6 @@ class MCTSHashCanonicalizationTest(unittest.TestCase):
         child1.update(1.)
         self.assertEqual(child1.value, child2.value)
         self.assertEqual(child1.visits, child2.visits)
-        self.assertEqual(True, False)
 
 
 if __name__ == '__main__':
