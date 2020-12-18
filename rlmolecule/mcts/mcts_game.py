@@ -28,8 +28,7 @@ class MCTSGame(TreeSearchGame[MCTSNode]):
         return self._problem.compute_reward(node.state)
 
     def run(self, explore: bool = True):
-        root: MCTSNode = self._get_node_for_state(self.problem.get_initial_state())
-
+        root: MCTSNode = self._make_root()
         selection_function = self.visit_selection
         if explore:
             selection_function = self.ucb_selection
@@ -115,6 +114,9 @@ class MCTSGame(TreeSearchGame[MCTSNode]):
         visit_counts = np.array([n.visits for n in children])
         visit_softmax = np.exp(visit_counts) / sum(np.exp(visit_counts))
         return children[np.random.choice(range(len(children)), size=1, p=visit_softmax)[0]]
+
+    def _make_root(self) -> MCTSNode:
+        return self._get_node_for_state(self.problem.get_initial_state())
 
     def _make_new_node(self, state: TreeSearchState) -> MCTSNode:
         return MCTSNode(state)
