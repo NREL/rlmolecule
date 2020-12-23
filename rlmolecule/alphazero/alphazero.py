@@ -1,5 +1,4 @@
 import logging
-from typing import Callable, Generator, Optional
 
 import numpy as np
 
@@ -51,20 +50,16 @@ class AlphaZero(MCTS):
         # noinspection PyTypeChecker
         return self._problem
 
-    def _expand_and_evaluate(
+    def _evaluate(
             self,
             leaf: AlphaZeroVertex,
             search_path: [AlphaZeroVertex],
-            ) -> float:
+    ) -> float:
         """
         Expansion step of AlphaZero, overrides MCTS expansion step
         :return value estimate
         """
-
-        # MCTS expansion
-        children = [self.get_vertex_for_state(state) for state in leaf.state.get_next_actions()]
-        leaf.children = children
-
+        children = leaf.children
         if len(children) == 0:
             return self.problem.get_reward(leaf.state)
 

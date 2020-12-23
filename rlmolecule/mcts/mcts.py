@@ -90,14 +90,15 @@ class MCTS(GraphSearch[MCTSVertex]):
             children = current.children
 
             if children is None:  # node is unexpanded: expand and return its value estimate
-                return search_path, self._expand_and_evaluate(current, search_path)
+                current.children = [self.get_vertex_for_state(state) for state in current.state.get_next_actions()]
+                return search_path, self._evaluate(current, search_path)
 
             if len(children) == 0:  # node is expanded and terminal: return its value
                 return search_path, self.problem.get_reward(current.state)
 
             current = mcts_selection_function(current)
 
-    def _expand_and_evaluate(
+    def _evaluate(
             self,
             leaf: MCTSVertex,
             search_path: [MCTSVertex],
@@ -108,9 +109,7 @@ class MCTS(GraphSearch[MCTSVertex]):
         Expansion: Unless L ends the game decisively (e.g. win/loss/draw) for either player, create one (or more) child
         vertices and choose vertex C from one of them. Child vertices are any valid moves from the game position defined by L.
         """
-        children = [self.get_vertex_for_state(state) for state in leaf.state.get_next_actions()]
-        leaf.children = children
-
+        children = leaf.children
         state = leaf.state
         if len(children) > 0:
             child = random.choice(children)
