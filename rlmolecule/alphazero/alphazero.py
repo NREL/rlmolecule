@@ -65,6 +65,9 @@ class AlphaZero(MCTS):
         children = [self.get_vertex_for_state(state) for state in leaf.state.get_next_actions()]
         leaf.children = children
 
+        if len(children) == 0:
+            return self.problem.get_reward(leaf.state)
+
         # get value estimate and child priors
         value, child_priors = self.problem.get_value_estimate(leaf)
 
