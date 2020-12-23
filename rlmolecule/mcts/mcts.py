@@ -20,23 +20,11 @@ class MCTS(GraphSearch[MCTSVertex]):
         super().__init__()
         self._problem: MCTSProblem = problem
         self._num_mcts_samples: int = num_mcts_samples
-        self.ucb_constant :float = ucb_constant
-
+        self.ucb_constant: float = ucb_constant
 
     @property
     def problem(self) -> MCTSProblem:
         return self._problem
-
-    def run(self, iterations: int, explore: bool = True) -> None:
-        selection_function = self.visit_selection
-        if explore:
-            def ucb_selection(parent):
-                return max(parent.children, key=lambda child: self._ucb_score(parent, child))
-
-            selection_function = ucb_selection
-
-        for _ in range(iterations):
-            self.step(selection_function)
 
     def run(
             self,
