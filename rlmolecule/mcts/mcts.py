@@ -90,7 +90,7 @@ class MCTS(GraphSearch[MCTSVertex]):
             children = current.children
 
             if children is None:  # node is unexpanded: expand and return its value estimate
-                return search_path, self._expand_and_evaluate(current, mcts_selection_function, search_path)
+                return search_path, self._expand_and_evaluate(current, search_path)
 
             if len(children) == 0:  # node is expanded and terminal: return its value
                 return search_path, self.problem.get_reward(current.state)
