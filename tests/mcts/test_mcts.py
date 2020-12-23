@@ -5,23 +5,23 @@ import pytest
 # def test_reward(qed_root):
 # @pytest.mark.parametrize('qed_case', ['mcts', 'nx_mcts', 'az'], indirect=True)
 from molecule_game.molecule_config import MoleculeConfig
-from rlmolecule.mcts.mcts_game import MCTSGame
+from rlmolecule.mcts.mcts import MCTS
 from tests.qed_optimization_problem import QEDOptimizationProblem
 
 @pytest.fixture()
-def game() -> MCTSGame:
+def game() -> MCTS:
     config = MoleculeConfig(max_atoms=4,
                             min_atoms=1,
                             tryEmbedding=False,
                             sa_score_threshold=None,
                             stereoisomers=False)
     problem = QEDOptimizationProblem(config)
-    game = MCTSGame(problem)
+    game = MCTS(problem)
     return game
 
 
 def test_reward(game):
-    root = game._make_root()
+    root = game._get_root()
     assert game.compute_reward(root) == 0.0
 
     game._expand(root)
@@ -32,18 +32,18 @@ def test_reward(game):
 
 
 def test_ucb_score(game):
-    root = game._make_root()
+    root = game._get_root()
     game._expand(root)
     child = root.children[0]
 
     root.update(2.0)
     assert game._ucb_score(root, child) == math.inf
-    assert root.visits == 1
+    assert root.visit_count == 1
     assert root.value == pytest.approx(2.)
 
     root.update(4.0)
     assert game._ucb_score(root, child) == math.inf
-    assert root.visits == 2
+    assert root.visit_count == 2
     assert root.value == pytest.approx(3.)
 
     game._backpropagate([root, child], 3.0)
@@ -51,7 +51,7 @@ def test_ucb_score(game):
 
 
 def test_get_successors(game):
-    root = game._make_root()
+    root = game._get_root()
     successors = game._expand(root)
     assert len(successors) == 9
     assert successors[-1].state.is_terminal

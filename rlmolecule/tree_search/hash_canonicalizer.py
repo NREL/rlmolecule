@@ -1,22 +1,22 @@
 from typing import Optional, TypeVar
 
-from rlmolecule.tree_search.tree_search_canonicalizer import TreeSearchCanonicalizer
-from rlmolecule.tree_search.tree_search_state import TreeSearchState
+from rlmolecule.tree_search.graph_search_canonicalizer import GraphSearchCanonicalizer
+from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
-Node = TypeVar('Node')
+Vertex = TypeVar('Vertex')
 
 
-class HashCanonicalizer(TreeSearchCanonicalizer[Node]):
+class HashCanonicalizer(GraphSearchCanonicalizer[Vertex]):
 
     def __init__(self):
-        self._node_map: {TreeSearchState: Node} = {}
+        self._vertex_map: {GraphSearchState: Vertex} = {}
 
-    def get_canonical_node(self, state: TreeSearchState) -> Optional[Node]:
-        return self._node_map[state] if state in self._node_map else None
+    def get_canonical_vertex(self, state: GraphSearchState) -> Optional[Vertex]:
+        return self._vertex_map[state] if state in self._vertex_map else None
 
-    def canonicalize_node(self, node: Node) -> Node:
-        state = node.state
-        node_map = self._node_map
-        if state not in node_map:
-            node_map[state] = node
-        return node_map[state]
+    def canonicalize_vertex(self, vertex: Vertex) -> Vertex:
+        state = vertex.state
+        vertex_map = self._vertex_map
+        if state not in vertex_map:
+            vertex_map[state] = vertex
+        return vertex_map[state]

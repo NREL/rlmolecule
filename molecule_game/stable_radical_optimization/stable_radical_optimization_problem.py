@@ -10,8 +10,8 @@ import psycopg2
 import tensorflow as tf
 from rdkit.Chem.rdmolfiles import MolFromSmiles
 
-from rlmolecule.alphazero.alphazero_game import AlphaZeroGame
-from rlmolecule.alphazero.alphazero_node import AlphaZeroNode
+from rlmolecule.alphazero.alphazero import AlphaZero
+from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from molecule_game.mol_preprocessor import (
     MolPreprocessor,
     atom_featurizer,
@@ -128,7 +128,7 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
     def config(self) -> any:
         return self._config
 
-    def construct_feature_matrices(self, node: AlphaZeroNode):
+    def construct_feature_matrices(self, node: AlphaZeroVertex):
         return self._preprocessor.construct_feature_matrices(node.state.molecule)
 
     def policy_predictions(self, policy_inputs_with_children):
@@ -142,7 +142,7 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
         else:
             logger.info(f'{self.id}: no checkpoint found')
 
-    def run_mcts(self, num_simulations: Optional[int] = None, explore: bool = True) -> Iterator['AlphaZeroNode']:
+    def run_mcts(self, num_simulations: Optional[int] = None, explore: bool = True) -> Iterator['AlphaZeroVertex']:
         num_simulations = self._config.num_simulations if num_simulations is None else num_simulations
         return self._start.run_mcts(num_simulations, explore)
 

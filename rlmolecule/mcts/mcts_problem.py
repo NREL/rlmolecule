@@ -1,14 +1,14 @@
 from abc import ABC, abstractmethod
 
-from rlmolecule.tree_search.tree_search_state import TreeSearchState
+from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
 
 class MCTSProblem(ABC):
 
     @abstractmethod
-    def get_initial_state(self) -> TreeSearchState:
+    def get_initial_state(self) -> GraphSearchState:
         pass
 
     @abstractmethod
-    def compute_reward(self, state: TreeSearchState) -> float:
+    def evaluate(self, state: GraphSearchState) -> float:
         pass

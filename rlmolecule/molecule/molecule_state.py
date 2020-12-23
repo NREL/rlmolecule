@@ -4,10 +4,10 @@ from rdkit.Chem import Mol, MolToSmiles
 
 from molecule_game.molecule_config import MoleculeConfig
 from rlmolecule.molecule.molecule_tools import build_molecules
-from rlmolecule.tree_search.tree_search_state import TreeSearchState
+from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
 
-class MoleculeState(TreeSearchState):
+class MoleculeState(GraphSearchState):
     """
     A State implementation which uses simple transformations (such as adding a bond) to define a
     graph of molecules that can be navigated.
@@ -71,7 +71,7 @@ class MoleculeState(TreeSearchState):
         """
         return self._is_terminal
 
-    def get_next_actions(self) -> Sequence['TreeSearchState']:
+    def get_next_actions(self) -> Sequence['GraphSearchState']:
         result = []
 
         if self.is_terminal:

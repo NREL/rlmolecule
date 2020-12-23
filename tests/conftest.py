@@ -29,9 +29,9 @@ def QedNode():
 
 @pytest.fixture(scope='function')
 def qed_mcts(QedNode, molecule_start):
-    from rlmolecule.mcts.mcts_node import MCTSNode
+    from rlmolecule.mcts.mcts_vertex import MCTSVertex
 
-    class QEDMcts(QedNode, MCTSNode):
+    class QEDMcts(QedNode, MCTSVertex):
         pass
 
     return QEDMcts(molecule_start)
@@ -39,10 +39,10 @@ def qed_mcts(QedNode, molecule_start):
 
 @pytest.fixture(scope='function')
 def qed_nx_mcts(QedNode, molecule_start):
-    from rlmolecule.mcts.mcts_node import MCTSNode
+    from rlmolecule.mcts.mcts_vertex import MCTSVertex
     from rlmolecule.mcts.networkx_node import NetworkxSuccessorMixin
 
-    class QEDNodeNetworkX(QedNode, NetworkxSuccessorMixin, MCTSNode):
+    class QEDNodeNetworkX(QedNode, NetworkxSuccessorMixin, MCTSVertex):
         pass
 
     return QEDNodeNetworkX(molecule_start)
@@ -50,14 +50,14 @@ def qed_nx_mcts(QedNode, molecule_start):
 
 @pytest.fixture(scope='function')
 def qed_az(QedNode, molecule_start):
-    from rlmolecule.alphazero.alphazero_node import AlphaZeroNode
-    from rlmolecule.alphazero.alphazero_game import AlphaZeroGame
+    from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
+    from rlmolecule.alphazero.alphazero import AlphaZero
     from rlmolecule.alphazero.test import RandomPolicy
 
-    class QEDNodeAz(QedNode, RandomPolicy, AlphaZeroNode):
+    class QEDNodeAz(QedNode, RandomPolicy, AlphaZeroVertex):
         pass
 
-    game = AlphaZeroGame()
+    game = AlphaZero()
 
     return QEDNodeAz(molecule_start, game)
 

@@ -14,7 +14,7 @@ class QEDOptimizationProblem(MCTSProblem):
     def get_initial_state(self) -> MoleculeState:
         return MoleculeState(rdkit.Chem.MolFromSmiles('C'), self.__config)
 
-    def compute_reward(self, state: MoleculeState) -> float:
+    def evaluate(self, state: MoleculeState) -> float:
         if state.is_terminal:
             return qed(state.molecule)
         return 0.0

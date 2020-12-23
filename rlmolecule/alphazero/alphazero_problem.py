@@ -1,44 +1,38 @@
 from abc import abstractmethod, ABC
 
-from rlmolecule.alphazero.alphazero_node import AlphaZeroNode
-from rlmolecule.tree_search.tree_search_state import TreeSearchState
+from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
+from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
 
 class AlphaZeroProblem(ABC):
 
     @abstractmethod
-    def get_initial_state(self) -> TreeSearchState:
+    def get_initial_state(self) -> GraphSearchState:
         pass
 
     @abstractmethod
-    def compute_reward(self, state: TreeSearchState, policy_inputs: any) -> float:
-        pass
-
-    @abstractmethod
-    def policy_predictions(self, policy_inputs_with_children):
+    def evaluate(self, parent: AlphaZeroVertex) -> (float, {AlphaZeroVertex: float}):
         """
-         un the policy network to get value and prior_logit predictions
-        :param policy_inputs_with_children:
-        :return: (values, prior_logits) as a tuple
+        A user-provided function to get value and child prior estimates for the given vertex.
+
+        :return: (value_of_current_vertex, {child_vertex: child_prior for child_vertex in children})
         """
         pass
 
-    @abstractmethod
-    def construct_feature_matrices(self, state: TreeSearchState):
-        """
-        :param node:
-        :return:  _policy_inputs
-        """
-        pass
 
-    @abstractmethod
-    def policy(self, node: AlphaZeroNode) -> (float, {AlphaZeroNode: float}):
-        """
-        A user-provided function to get value and prior estimates for the given node. Accepts a list of child
-        nodes for the given state, and should return both the predicted value of the current node, as well as prior
-        scores for each child node.
+    # @abstractmethod
+    # def policy_predictions(self, policy_inputs_with_children):
+    #     """
+    #      un the policy network to get value and prior_logit predictions
+    #     :param policy_inputs_with_children:
+    #     :return: (values, prior_logits) as a tuple
+    #     """
+    #     pass
 
-        :param children: A list of AlphaZeroNodes corresponding to next potential actions
-        :return: (value_of_current_node, {child_node: child_prior for child_node in children})
-        """
-        pass
+    # @abstractmethod
+    # def construct_feature_matrices(self, state: GraphSearchState):
+    #     """
+    #     :param vertex:
+    #     :return:  _policy_inputs
+    #     """
+    #     pass
