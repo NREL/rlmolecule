@@ -1,6 +1,6 @@
 import math
 import random
-from typing import List, Callable
+from typing import List, Callable, Generator, Optional
 
 import numpy as np
 
@@ -14,11 +14,14 @@ class MCTS(GraphSearch[MCTSVertex]):
     def __init__(
             self,
             problem: MCTSProblem,
+            num_mcts_samples: int = 20,
             ucb_constant: float = math.sqrt(2),
     ) -> None:
         super().__init__()
         self._problem: MCTSProblem = problem
-        self.ucb_constant = ucb_constant
+        self._num_mcts_samples: int = num_mcts_samples
+        self.ucb_constant :float = ucb_constant
+
 
     @property
     def problem(self) -> MCTSProblem:
@@ -29,22 +32,61 @@ class MCTS(GraphSearch[MCTSVertex]):
         if explore:
             def ucb_selection(parent):
                 return max(parent.children, key=lambda child: self._ucb_score(parent, child))
+
             selection_function = ucb_selection
 
         for _ in range(iterations):
             self.step(selection_function)
 
-    def step(self, selection_function: Callable[[MCTSVertex], MCTSVertex]) -> None:
-        root: MCTSVertex = self._get_root()
-        search_path, terminal_state = self._select(root, selection_function)
-        value = self.problem.evaluate(terminal_state)
-        self._backpropagate(search_path, value)
+    def run(
+            self,
+            state: Optional[GraphSearchState] = None,
+            explore: bool = True,
+            num_mcts_samples: Optional[int] = None,
+            mcts_selection_function: Optional[Callable[[MCTSVertex], MCTSVertex]] = None,
+    ) -> Generator[MCTSVertex]:
+        vertex = self._get_root() if state is None else self.get_vertex_for_state(state)
+        action_selection_function = self.softmax_selection if explore else self.visit_selection
+        num_mcts_samples = self._num_mcts_samples if num_mcts_samples is None else num_mcts_samples
+
+        def ucb_selection(parent):
+            return max(parent.children, key=lambda child: self._ucb_score(parent, child))
+
+        mcts_selection_function = ucb_selection if mcts_selection_function is None else mcts_selection_function
+
+        # noinspection PyTypeChecker
+        yield from self.run_from_vertex(vertex, action_selection_function, num_mcts_samples, mcts_selection_function)
+
+    def run_from_vertex(
+            self,
+            vertex: MCTSVertex,
+            action_selection_function: Callable[[MCTSVertex], MCTSVertex],
+            num_mcts_samples: int,
+            mcts_selection_function: Callable[[MCTSVertex], MCTSVertex],
+    ) -> Generator[MCTSVertex]:
+        yield vertex
+        self.sample(vertex, num_mcts_samples, mcts_selection_function)
+        # self.problem.store_policy_inputs_and_targets(state) # elided
+        children = vertex.children
+        if children is not None and len(children) > 0:
+            child = action_selection_function(vertex)
+            yield from self.run_from_vertex(child, action_selection_function, num_mcts_samples, mcts_selection_function)
+
+    def sample(
+            self,
+            vertex: MCTSVertex,
+            num_mcts_samples: int,
+            mcts_selection_function: Callable[[MCTSVertex], MCTSVertex],
+    ) -> None:
+        for _ in range(num_mcts_samples):
+            search_path, value = self._select(vertex, mcts_selection_function)
+            self._backpropagate(search_path, value)
 
     def _select(
             self,
             root: MCTSVertex,
-            selection_function: Callable[[MCTSVertex], MCTSVertex],
-    ) -> [MCTSVertex]:
+            mcts_selection_function: Callable[[MCTSVertex], MCTSVertex],
+    ) -> ([MCTSVertex], float):
         """
         Selection step of MCTS
         From Wikipedia (https://en.wikipedia.org/wiki/Monte_Carlo_tree_search):
@@ -59,21 +101,19 @@ class MCTS(GraphSearch[MCTSVertex]):
             search_path.append(current)
             children = current.children
 
-            if children is None:
-                # node is unexpanded: expand it, choose a child, and simulate from that child to a terminal state
-                children = self._expand(current)
-                if len(children) > 0:
-                    child = selection_function(current)
-                    search_path.append(child)
-                    return search_path, self._simulate(child.state)
+            if children is None:  # node is unexpanded: expand and return its value estimate
+                return search_path, self._expand_and_evaluate(current, mcts_selection_function, search_path)
 
-            if len(children) == 0:
-                # node is expanded and terminal
-                return search_path, current.state
+            if len(children) == 0:  # node is expanded and terminal: return its value
+                return search_path, self.problem.get_reward(current.state)
 
-            current = selection_function(current)
+            current = mcts_selection_function(current)
 
-    def _expand(self, leaf: MCTSVertex) -> [MCTSVertex]:
+    def _expand_and_evaluate(
+            self,
+            leaf: MCTSVertex,
+            search_path: [MCTSVertex],
+    ) -> float:
         """
         Expansion step of MCTS
         From Wikipedia (https://en.wikipedia.org/wiki/Monte_Carlo_tree_search):
@@ -82,7 +122,14 @@ class MCTS(GraphSearch[MCTSVertex]):
         """
         children = [self.get_vertex_for_state(state) for state in leaf.state.get_next_actions()]
         leaf.children = children
-        return children
+
+        state = leaf.state
+        if len(children) > 0:
+            child = random.choice(children)
+            search_path.append(child)
+            state = self._simulate(child.state)
+
+        return self.problem.get_reward(state)
 
     @staticmethod
     def _simulate(start: GraphSearchState) -> GraphSearchState:

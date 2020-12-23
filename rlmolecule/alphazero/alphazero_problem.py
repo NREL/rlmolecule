@@ -1,24 +1,19 @@
-from abc import abstractmethod, ABC
+from abc import abstractmethod
 
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
-from rlmolecule.tree_search.graph_search_state import GraphSearchState
+from rlmolecule.mcts.mcts_problem import MCTSProblem
 
 
-class AlphaZeroProblem(ABC):
-
-    @abstractmethod
-    def get_initial_state(self) -> GraphSearchState:
-        pass
+class AlphaZeroProblem(MCTSProblem):
 
     @abstractmethod
-    def evaluate(self, parent: AlphaZeroVertex) -> (float, {AlphaZeroVertex: float}):
+    def get_value_estimate(self, parent: AlphaZeroVertex) -> (float, {AlphaZeroVertex: float}):
         """
         A user-provided function to get value and child prior estimates for the given vertex.
 
         :return: (value_of_current_vertex, {child_vertex: child_prior for child_vertex in children})
         """
         pass
-
 
     # @abstractmethod
     # def policy_predictions(self, policy_inputs_with_children):

@@ -10,5 +10,5 @@ class MCTSProblem(ABC):
         pass
 
     @abstractmethod
-    def evaluate(self, state: GraphSearchState) -> float:
+    def get_reward(self, state: GraphSearchState) -> float:
         pass

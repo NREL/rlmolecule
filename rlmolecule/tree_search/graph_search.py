@@ -12,7 +12,7 @@ Vertex = TypeVar('Vertex')
 class GraphSearch(Generic[Vertex], ABC):
     def __init__(self, canonicalizer: Optional[GraphSearchCanonicalizer] = None):
         self.__id: uuid.UUID = uuid.uuid4()
-        self.__canonicalizer: HashCanonicalizer[Vertex] = \
+        self.__canonicalizer: GraphSearchCanonicalizer[Vertex] = \
             HashCanonicalizer() if canonicalizer is None else canonicalizer
 
     @property
