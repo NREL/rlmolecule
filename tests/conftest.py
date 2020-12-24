@@ -37,15 +37,15 @@ def qed_mcts(QedNode, molecule_start):
     return QEDMcts(molecule_start)
 
 
-@pytest.fixture(scope='function')
-def qed_nx_mcts(QedNode, molecule_start):
-    from rlmolecule.mcts.mcts_vertex import MCTSVertex
-    from rlmolecule.mcts.networkx_node import NetworkxSuccessorMixin
-
-    class QEDNodeNetworkX(QedNode, NetworkxSuccessorMixin, MCTSVertex):
-        pass
-
-    return QEDNodeNetworkX(molecule_start)
+# @pytest.fixture(scope='function')
+# def qed_nx_mcts(QedNode, molecule_start):
+#     from rlmolecule.mcts.mcts_vertex import MCTSVertex
+#     from rlmolecule.mcts.networkx_node import NetworkxSuccessorMixin
+#
+#     class QEDNodeNetworkX(QedNode, NetworkxSuccessorMixin, MCTSVertex):
+#         pass
+#
+#     return QEDNodeNetworkX(molecule_start)
 
 
 @pytest.fixture(scope='function')

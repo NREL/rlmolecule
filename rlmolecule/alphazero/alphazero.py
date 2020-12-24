@@ -91,9 +91,5 @@ class AlphaZero(MCTS):
         prior_score = pb_c * parent.child_priors[child]
         return prior_score + child.value
 
-    def _get_root(self) -> AlphaZeroVertex:
-        # noinspection PyTypeChecker
-        return self.get_vertex_for_state(self.problem.get_initial_state())
-
     def _make_new_vertex(self, state: GraphSearchState) -> AlphaZeroVertex:
         return AlphaZeroVertex(state)

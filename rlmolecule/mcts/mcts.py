@@ -90,7 +90,7 @@ class MCTS(GraphSearch[MCTSVertex]):
             children = current.children
 
             if children is None:  # node is unexpanded: expand and return its value estimate
-                current.children = [self.get_vertex_for_state(state) for state in current.state.get_next_actions()]
+                self._expand(current)
                 return search_path, self._evaluate(current, search_path)
 
             if len(children) == 0:  # node is expanded and terminal: return its value
@@ -98,42 +98,42 @@ class MCTS(GraphSearch[MCTSVertex]):
 
             current = mcts_selection_function(current)
 
-    def _evaluate(
-            self,
-            leaf: MCTSVertex,
-            search_path: [MCTSVertex],
-    ) -> float:
+    def _expand(self, leaf: MCTSVertex) -> None:
         """
         Expansion step of MCTS
         From Wikipedia (https://en.wikipedia.org/wiki/Monte_Carlo_tree_search):
         Expansion: Unless L ends the game decisively (e.g. win/loss/draw) for either player, create one (or more) child
         vertices and choose vertex C from one of them. Child vertices are any valid moves from the game position defined by L.
         """
+        leaf.children = [self.get_vertex_for_state(state) for state in leaf.state.get_next_actions()]
+
+    def _evaluate(
+            self,
+            leaf: MCTSVertex,
+            search_path: [MCTSVertex],
+    ) -> float:
+        """
+        Estimates the value of a leaf vertex.
+        Simulation step of MCTS.
+        From Wikipedia (https://en.wikipedia.org/wiki/Monte_Carlo_tree_search):
+        Simulation: Complete one random playout from vertex C. This step is sometimes also called playout or rollout.
+        A playout may be as simple as choosing uniform random moves until the game is decided (for example in chess,
+        the game is won, lost, or drawn).
+        :return: value estimate of the given leaf vertex
+        """
         children = leaf.children
         state = leaf.state
         if len(children) > 0:
             child = random.choice(children)
             search_path.append(child)
-            state = self._simulate(child.state)
+
+            while True:
+                children = state.get_next_actions()
+                if len(children) == 0:
+                    break
+                state = random.choice(children)
 
         return self.problem.get_reward(state)
-
-    @staticmethod
-    def _simulate(start: GraphSearchState) -> GraphSearchState:
-        """
-        Simulation step of MCTS
-        From Wikipedia (https://en.wikipedia.org/wiki/Monte_Carlo_tree_search):
-        Simulation: Complete one random playout from vertex C. This step is sometimes also called playout or rollout.
-        A playout may be as simple as choosing uniform random moves until the game is decided (for example in chess,
-        the game is won, lost, or drawn).
-        """
-        current = start
-        while True:
-            children = current.get_next_actions()
-            if len(children) == 0:
-                break
-            current = random.choice(children)
-        return current
 
     @staticmethod
     def _backpropagate(search_path: [MCTSVertex], value: float):

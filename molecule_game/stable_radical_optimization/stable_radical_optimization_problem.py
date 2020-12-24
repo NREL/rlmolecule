@@ -10,17 +10,15 @@ import psycopg2
 import tensorflow as tf
 from rdkit.Chem.rdmolfiles import MolFromSmiles
 
-from rlmolecule.alphazero.alphazero import AlphaZero
-from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
+from examples.stable_radical_optimization.run_mcts import predict
 from molecule_game.mol_preprocessor import (
     MolPreprocessor,
     atom_featurizer,
     bond_featurizer,
 )
-from molecule_game.molecule_policy import build_policy_trainer
-from molecule_game.stable_radical_optimization.stable_radical_optimization_node import StableRadicalOptimizationState
-
+from molecule_game.stable_radical_optimization.stable_radical_optimization_state import StableRadicalOptimizationState
 from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
+from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 
 logger = logging.getLogger(__name__)
 
@@ -43,17 +41,18 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
             start_smiles: str,
             preprocessor: MolPreprocessor = default_preprocessor,
     ) -> None:
-        super().__init__(
-            config.min_reward,
-            config.pb_c_base,
-            config.pb_c_init,
-            config.dirichlet_noise,
-            config.dirichlet_alpha,
-            config.dirichlet_x,
-        )
-        # self._config = config
-        # self._preprocessor: MolPreprocessor = preprocessor
-        #
+        # super().__init__(
+        #     config.min_reward,
+        #     config.pb_c_base,
+        #     config.pb_c_init,
+        #     config.dirichlet_noise,
+        #     config.dirichlet_alpha,
+        #     config.dirichlet_x,
+        # )
+        self._config: any = config
+        self._preprocessor: MolPreprocessor = preprocessor
+        self._start_smiles: str = start_smiles
+
         # memoizer, start = \
         #     AlphaZeroNode.make_memoized_root_node(
         #         StableRadicalOptimizationState(self, MolFromSmiles(start_smiles), False), self)
@@ -64,65 +63,64 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
         # self._policy_model = self._policy_trainer.layers[-1].policy_model
         # self._policy_predictions = tf.function(experimental_relax_shapes=True)(self._policy_model.predict_step)
         # self.load_from_checkpoint()  # TODO: does this ever do anything?
+        pass
 
-    def make_initial_state(self) -> StableRadicalOptimizationState:
-        return StableRadicalOptimizationState(self, MolFromSmiles(self.start_smiles), False)
+    def get_initial_state(self) -> StableRadicalOptimizationState:
+        return StableRadicalOptimizationState(MolFromSmiles(self._start_smiles), self._config, False)
 
-    def compute_reward(self, state: StableRadicalOptimizationState, policy_inputs : any) -> float:
+    def get_reward(self, state: StableRadicalOptimizationState, policy_inputs: any) -> float:
         config = self.config
+        reward = None
+
+        # TODO: consider factoring out this database memoization code
         with psycopg2.connect(**config.dbparams) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "select real_reward from {table}_reward where smiles = %s".format(
                         table=config.sql_basename), (state.smiles,))
                 result = cur.fetchone()
+            if result:
+                reward = result[0]
 
-        if result:
-            # Probably would put RR code here?
-            rr = self.get_ranked_rewards(result[0])
-            self._true_reward = result[0]
-            return rr
+        if reward is None:
+            if ((policy_inputs['atom'] == 1).any() |
+                    (policy_inputs['bond'] == 1).any()):
+                # Node is outside the domain of validity
+                # self._true_reward = 0.
+                return config.min_reward
+            else:
+                spins, buried_vol = predict(
+                    {key: tf.constant(np.expand_dims(val, 0))
+                     for key, val in policy_inputs.items()})
 
-        # Node is outside the domain of validity
-        elif ((policy_inputs['atom'] == 1).any() |
-              (policy_inputs['bond'] == 1).any()):
-            self._true_reward = 0.
-            return config.min_reward
+                spins = spins.numpy().flatten()
+                buried_vol = buried_vol.numpy().flatten()
 
-        else:
+                atom_index = int(spins.argmax())
+                max_spin = spins[atom_index]
+                spin_buried_vol = buried_vol[atom_index]
 
-            spins, buried_vol = predict(
-                {key: tf.constant(np.expand_dims(val, 0))
-                 for key, val in policy_inputs.items()})
+                atom_type = state.molecule.GetAtomWithIdx(atom_index).GetSymbol()
 
-            spins = spins.numpy().flatten()
-            buried_vol = buried_vol.numpy().flatten()
+                # This is a bit of a placeholder; but the range for spin is about 1/50th that
+                # of buried volume.
+                reward = (1 - max_spin) * 50 + spin_buried_vol
 
-            atom_index = int(spins.argmax())
-            max_spin = spins[atom_index]
-            spin_buried_vol = buried_vol[atom_index]
+                with psycopg2.connect(**config.dbparams) as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("""
+                            INSERT INTO {table}_reward
+                            (smiles, real_reward, atom_type, buried_vol, max_spin, atom_index)
+                            values (%s, %s, %s, %s, %s, %s)
+                            ON CONFLICT DO NOTHING;""".format(table=config.sql_basename), (
+                            state.smiles, float(reward), atom_type,  # This should be the real reward
+                            float(spin_buried_vol), float(max_spin), atom_index))
 
-            atom_type = node.state.molecule.GetAtomWithIdx(atom_index).GetSymbol()
-
-            # This is a bit of a placeholder; but the range for spin is about 1/50th that
-            # of buried volume.
-            reward = (1 - max_spin) * 50 + spin_buried_vol
-
-            with psycopg2.connect(**config.dbparams) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        INSERT INTO {table}_reward
-                        (smiles, real_reward, atom_type, buried_vol, max_spin, atom_index)
-                        values (%s, %s, %s, %s, %s, %s)
-                        ON CONFLICT DO NOTHING;""".format(table=config.sql_basename), (
-                        state.smiles, float(reward), atom_type,  # This should be the real reward
-                        float(spin_buried_vol), float(max_spin), atom_index))
-
-            rr = self.get_ranked_rewards(reward)
+            ranked_reward = self.get_ranked_rewards(reward)
 
             # TODO: do we want to store this here?
             # node._true_reward = reward
-            return rr
+            return ranked_reward
 
     @property
     def config(self) -> any:

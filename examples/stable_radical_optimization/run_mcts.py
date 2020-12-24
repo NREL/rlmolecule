@@ -9,7 +9,6 @@ import numpy as np
 import psycopg2
 
 import molecule_game.config as config
-from rlmolecule.node import Node
 from rlmolecule.tree_search.graph_search import GraphSearch
 
 import tensorflow as tf
