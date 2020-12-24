@@ -65,7 +65,7 @@ class MolPreprocessor(nfp.preprocessing.SmilesPreprocessor):
     def padded_shapes(self, *args, **kwargs):
         return filter_keys(super().padded_shapes(*args, **kwargs))
 
-    def construct_feature_matrices(self, mol: rdkit.Chem.Mol, train: bool = False) -> Dict:
+    def construct_feature_matrices(self, mol: rdkit.Chem.Mol, train: bool = False) -> {}:
         """ Convert an rdkit Mol to a list of tensors
         'atom' : (n_atom,) length list of atom classes
         'bond' : (n_bond,) list of bond classes

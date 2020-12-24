@@ -9,7 +9,7 @@ from tensorflow.python.keras.losses import (
 )
 
 import molecule_game.config as config
-from rlmolecule.molecule.policy.preprocessor import preprocessor
+from rlmolecule.molecule.policy.preprocessor import preprocessor  # TODO: trace down the problem here
 
 
 # two models:

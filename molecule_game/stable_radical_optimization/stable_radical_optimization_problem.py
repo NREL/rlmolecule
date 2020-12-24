@@ -13,6 +13,7 @@ from molecule_game.mol_preprocessor import (
     bond_featurizer,
 )
 from rdkit.Chem.rdmolfiles import MolFromSmiles
+from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 
 from examples.stable_radical_optimization.run_mcts import predict
 from molecule_game.stable_radical_optimization.stable_radical_optimization_state import StableRadicalOptimizationState
@@ -78,6 +79,10 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
         # self.load_from_checkpoint()  # TODO: does this ever do anything?
         pass
 
+    @property
+    def config(self) -> any:
+        return self._config
+
     def get_initial_state(self) -> StableRadicalOptimizationState:
         return StableRadicalOptimizationState(MolFromSmiles(self._start_smiles), self._config, False)
 
@@ -129,42 +134,46 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
                             state.smiles, float(reward), atom_type,  # This should be the real reward
                             float(spin_buried_vol), float(max_spin), atom_index))
 
-            ranked_reward = self.get_ranked_rewards(reward)
+            ranked_reward = self._get_ranked_rewards(reward)
 
             # TODO: do we want to store this here?
             # node._true_reward = reward
             return ranked_reward
 
-    def get_value_estimate(self, parent: AlphaZeroVertex) -> (float, {AlphaZeroVertex: float}):
-        pass
+    def get_value_estimate(self, successors: [AlphaZeroVertex]) -> (float, {AlphaZeroVertex: float}):
+        values, prior_logits = self._policy_evaluator(self._make_batched_policy_inputs(successors))
 
-    @property
-    def config(self) -> any:
-        return self._config
+        # inputs to policy network
+        priors = tf.nn.softmax(prior_logits[1:]).numpy().flatten()
 
-    def construct_feature_matrices(self, vertex: AlphaZeroVertex):
+        # Update child nodes with predicted prior_logits
+        successor_priors = {node: prior for node, prior in zip(successors, priors)}
+        value = float(tf.nn.sigmoid(values[0]))
+
+        return value, successor_priors
+
+    def _make_batched_policy_inputs(self, vertices: [AlphaZeroVertex]) -> {}:
+        """
+        :return the given verticies policy inputs concatenated together. Used as the inputs for the policy neural
+        network.
+        """
+        policy_inputs = [self._get_policy_inputs(vertex) for vertex in vertices]
+        return {key: pad_sequences([elem[key] for elem in policy_inputs], padding='post')
+                for key in policy_inputs[0].keys()}
+
+    def _get_policy_inputs(self, vertex: AlphaZeroVertex) -> {}:
+        """
+        :return GNN inputs for the node
+        """
+        # TODO: memoize
+        # if self._policy_inputs is None:
+        #     self._policy_inputs = self.game.preprocessor.construct_feature_matrices(self)
+        # return self._policy_inputs
+
+        # noinspection PyUnresolvedReferences
         return self._preprocessor.construct_feature_matrices(vertex.state.molecule)
 
-    # def policy_predictions(self, policy_inputs_with_children):
-    #     return self._policy_predictions(policy_inputs_with_children)
-
-    # def get_policy_inputs(self, vertex: AlphaZeroVertex) -> Dict:
-    #     """
-    #     :return GNN inputs for the node
-    #     """
-    #     if self._policy_inputs is None:
-    #         self._policy_inputs = self.game.preprocessor.construct_feature_matrices(self)
-    #     return self._policy_inputs
-
-    def load_from_checkpoint(self):
-        latest = tf.train.latest_checkpoint(self._config.checkpoint_filepath)
-        if latest:
-            self._policy_trainer.load_weights(latest)
-            logger.info(f'{self.id}: loaded checkpoint {latest}')
-        else:
-            logger.info(f'{self.id}: no checkpoint found')
-
-    def get_ranked_rewards(self, reward: float) -> float:
+    def _get_ranked_rewards(self, reward: float) -> float:
         config = self.config
         with psycopg2.connect(**config.dbparams) as conn:
             with conn.cursor() as cur:
@@ -199,14 +208,3 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
 
                 elif reward < r_alpha:
                     return 0.
-
-    def get_batched_policy_inputs(self, verticies:[]) -> Dict:
-        """
-        :return the given nodes policy inputs, concatenated together with the
-        inputs of its successor nodes. Used as the inputs for the policy neural
-        network
-        """
-
-        policy_inputs = [node.get_policy_inputs() for node in itertools.chain((self,), successors)]
-        return {key: pad_sequences([elem[key] for elem in policy_inputs], padding='post')
-                for key in policy_inputs[0].keys()}
