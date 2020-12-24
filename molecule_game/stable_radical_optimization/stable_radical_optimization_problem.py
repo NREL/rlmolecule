@@ -1,24 +1,25 @@
 import logging
 import os
 from typing import (
-    Iterator,
     Optional,
 )
 
 import numpy as np
 import psycopg2
 import tensorflow as tf
-from rdkit.Chem.rdmolfiles import MolFromSmiles
-
-from examples.stable_radical_optimization.run_mcts import predict
 from molecule_game.mol_preprocessor import (
     MolPreprocessor,
     atom_featurizer,
     bond_featurizer,
 )
+from rdkit.Chem.rdmolfiles import MolFromSmiles
+
+from examples.stable_radical_optimization.run_mcts import predict
 from molecule_game.stable_radical_optimization.stable_radical_optimization_state import StableRadicalOptimizationState
 from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
+from rlmolecule.molecule.policy.model import build_policy_evaluator
+from rlmolecule.molecule.policy.preprocessor import load_preprocessor
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,9 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
             self,
             config: any,
             start_smiles: str,
-            preprocessor: MolPreprocessor = default_preprocessor,
+            preprocessor: Optional[MolPreprocessor] = None,
+            preprocessor_data=None,
+            policy_checkpoint_dir=None,
     ) -> None:
         # super().__init__(
         #     config.min_reward,
@@ -50,8 +53,18 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
         #     config.dirichlet_x,
         # )
         self._config: any = config
-        self._preprocessor: MolPreprocessor = preprocessor
         self._start_smiles: str = start_smiles
+        assert (preprocessor is None and preprocessor_data is not None) or \
+               (preprocessor is not None and preprocessor_data is None)
+        self._preprocessor: MolPreprocessor = preprocessor if preprocessor else load_preprocessor(preprocessor_data)
+
+        policy_evaluator, loaded_checkpoint = build_policy_evaluator(policy_checkpoint_dir)
+        self._policy_evaluator: tf.function = policy_evaluator
+
+        if loaded_checkpoint:
+            logger.info(f'{self.id}: Loaded checkpoint {loaded_checkpoint}')
+        else:
+            logger.info(f'{self.id}: No checkpoint found {loaded_checkpoint}')
 
         # memoizer, start = \
         #     AlphaZeroNode.make_memoized_root_node(
@@ -122,15 +135,26 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
             # node._true_reward = reward
             return ranked_reward
 
+    def get_value_estimate(self, parent: AlphaZeroVertex) -> (float, {AlphaZeroVertex: float}):
+        pass
+
     @property
     def config(self) -> any:
         return self._config
 
-    def construct_feature_matrices(self, node: AlphaZeroVertex):
-        return self._preprocessor.construct_feature_matrices(node.state.molecule)
+    def construct_feature_matrices(self, vertex: AlphaZeroVertex):
+        return self._preprocessor.construct_feature_matrices(vertex.state.molecule)
 
-    def policy_predictions(self, policy_inputs_with_children):
-        return self._policy_predictions(policy_inputs_with_children)
+    # def policy_predictions(self, policy_inputs_with_children):
+    #     return self._policy_predictions(policy_inputs_with_children)
+
+    # def get_policy_inputs(self, vertex: AlphaZeroVertex) -> Dict:
+    #     """
+    #     :return GNN inputs for the node
+    #     """
+    #     if self._policy_inputs is None:
+    #         self._policy_inputs = self.game.preprocessor.construct_feature_matrices(self)
+    #     return self._policy_inputs
 
     def load_from_checkpoint(self):
         latest = tf.train.latest_checkpoint(self._config.checkpoint_filepath)
@@ -139,10 +163,6 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
             logger.info(f'{self.id}: loaded checkpoint {latest}')
         else:
             logger.info(f'{self.id}: no checkpoint found')
-
-    def run_mcts(self, num_simulations: Optional[int] = None, explore: bool = True) -> Iterator['AlphaZeroVertex']:
-        num_simulations = self._config.num_simulations if num_simulations is None else num_simulations
-        return self._start.run_mcts(num_simulations, explore)
 
     def get_ranked_rewards(self, reward: float) -> float:
         config = self.config
@@ -179,3 +199,14 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
 
                 elif reward < r_alpha:
                     return 0.
+
+    def get_batched_policy_inputs(self, verticies:[]) -> Dict:
+        """
+        :return the given nodes policy inputs, concatenated together with the
+        inputs of its successor nodes. Used as the inputs for the policy neural
+        network
+        """
+
+        policy_inputs = [node.get_policy_inputs() for node in itertools.chain((self,), successors)]
+        return {key: pad_sequences([elem[key] for elem in policy_inputs], padding='post')
+                for key in policy_inputs[0].keys()}
