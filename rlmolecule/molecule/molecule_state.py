@@ -24,13 +24,13 @@ class MoleculeState(GraphSearchState):
         self._config: any = config
         self._molecule: Mol = molecule
         self._smiles: str = MolToSmiles(self._molecule)
-        self._force_terminal: bool = force_terminal
+        self._forced_terminal: bool = force_terminal
 
     def __repr__(self) -> str:
         """
         delegates to the SMILES string
         """
-        return f"{self._smiles}{' (t)' if self._force_terminal else ''}"
+        return f"{self._smiles}{' (t)' if self._forced_terminal else ''}"
 
     # noinspection PyUnresolvedReferences
     def equals(self, other: any) -> bool:
@@ -39,17 +39,17 @@ class MoleculeState(GraphSearchState):
         """
         return type(other) == type(self) and \
                self._smiles == other._smiles and \
-               self._force_terminal == other._force_terminal
+               self._forced_terminal == other._force_terminal
 
     def hash(self) -> int:
         """
         delegates to the SMILES string
         """
-        return hash(self.__repr__()) ^ (13 * self._force_terminal)
+        return hash(self.__repr__()) ^ (13 * self._forced_terminal)
 
     def get_next_actions(self) -> Sequence['MoleculeState']:
         result = []
-        if not self._force_terminal:
+        if not self._forced_terminal:
             if self.num_atoms < self.config.max_atoms:
                 result.extend((MoleculeState(molecule, self.config) for molecule in
                                build_molecules(
@@ -64,6 +64,10 @@ class MoleculeState(GraphSearchState):
                 result.append(MoleculeState(self.molecule, self.config, force_terminal=True))
 
         return result
+
+    @property
+    def forced_terminal(self) -> bool:
+        return self._forced_terminal
 
     @property
     def config(self) -> any:

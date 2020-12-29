@@ -1,6 +1,6 @@
 import math
 import random
-from typing import List, Callable, Generator, Optional
+from typing import List, Callable, Optional, Type
 
 import numpy as np
 
@@ -16,8 +16,9 @@ class MCTS(GraphSearch[MCTSVertex]):
             problem: MCTSProblem,
             num_mcts_samples: int = 20,
             ucb_constant: float = math.sqrt(2),
+            vertex_class: Optional[Type[MCTSVertex]] = None,
     ) -> None:
-        super().__init__()
+        super().__init__(MCTSVertex if vertex_class is None else vertex_class)
         self._problem: MCTSProblem = problem
         self._num_mcts_samples: int = num_mcts_samples
         self.ucb_constant: float = ucb_constant
@@ -32,7 +33,7 @@ class MCTS(GraphSearch[MCTSVertex]):
             explore: bool = True,
             num_mcts_samples: Optional[int] = None,
             mcts_selection_function: Optional[Callable[[MCTSVertex], MCTSVertex]] = None,
-    ) -> Generator[MCTSVertex]:
+    ) -> []:
         vertex = self._get_root() if state is None else self.get_vertex_for_state(state)
         action_selection_function = self.softmax_selection if explore else self.visit_selection
         num_mcts_samples = self._num_mcts_samples if num_mcts_samples is None else num_mcts_samples
@@ -42,8 +43,7 @@ class MCTS(GraphSearch[MCTSVertex]):
 
         mcts_selection_function = ucb_selection if mcts_selection_function is None else mcts_selection_function
 
-        # noinspection PyTypeChecker
-        yield from self.run_from_vertex(vertex, action_selection_function, num_mcts_samples, mcts_selection_function)
+        return self.run_from_vertex(vertex, action_selection_function, num_mcts_samples, mcts_selection_function)
 
     def run_from_vertex(
             self,
@@ -51,14 +51,18 @@ class MCTS(GraphSearch[MCTSVertex]):
             action_selection_function: Callable[[MCTSVertex], MCTSVertex],
             num_mcts_samples: int,
             mcts_selection_function: Callable[[MCTSVertex], MCTSVertex],
-    ) -> Generator[MCTSVertex]:
-        yield vertex
-        self.sample(vertex, num_mcts_samples, mcts_selection_function)
-        # self.problem.store_policy_inputs_and_targets(state) # elided
-        children = vertex.children
-        if children is not None and len(children) > 0:
-            child = action_selection_function(vertex)
-            yield from self.run_from_vertex(child, action_selection_function, num_mcts_samples, mcts_selection_function)
+    ) -> []:
+        path: [] = []
+        while True:
+            # path.append(vertex)
+            self.sample(vertex, num_mcts_samples, mcts_selection_function)
+            self._accumulate_path_data(vertex, path)
+            children = vertex.children
+            if children is None or len(children) == 0:
+                break
+            vertex = action_selection_function(vertex)
+
+        return path
 
     def sample(
             self,
@@ -69,6 +73,10 @@ class MCTS(GraphSearch[MCTSVertex]):
         for _ in range(num_mcts_samples):
             search_path, value = self._select(vertex, mcts_selection_function)
             self._backpropagate(search_path, value)
+
+    # noinspection PyMethodMayBeStatic
+    def _accumulate_path_data(self, vertex: MCTSVertex, path: []):
+        path.append(vertex)
 
     def _select(
             self,
@@ -90,7 +98,6 @@ class MCTS(GraphSearch[MCTSVertex]):
             children = current.children
 
             if children is None:  # node is unexpanded: expand and return its value estimate
-                self._expand(current)
                 return search_path, self._evaluate(current, search_path)
 
             if len(children) == 0:  # node is expanded and terminal: return its value
@@ -105,7 +112,8 @@ class MCTS(GraphSearch[MCTSVertex]):
         Expansion: Unless L ends the game decisively (e.g. win/loss/draw) for either player, create one (or more) child
         vertices and choose vertex C from one of them. Child vertices are any valid moves from the game position defined by L.
         """
-        leaf.children = [self.get_vertex_for_state(state) for state in leaf.state.get_next_actions()]
+        if leaf.children is None:
+            leaf.children = [self.get_vertex_for_state(state) for state in leaf.state.get_next_actions()]
 
     def _evaluate(
             self,
@@ -121,6 +129,8 @@ class MCTS(GraphSearch[MCTSVertex]):
         the game is won, lost, or drawn).
         :return: value estimate of the given leaf vertex
         """
+        self._expand(leaf)
+
         children = leaf.children
         state = leaf.state
         if len(children) > 0:

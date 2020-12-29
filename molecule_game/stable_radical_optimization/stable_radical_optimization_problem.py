@@ -140,7 +140,7 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
             # node._true_reward = reward
             return ranked_reward
 
-    def get_value_estimate(self, successors: [AlphaZeroVertex]) -> (float, {AlphaZeroVertex: float}):
+    def get_value_and_policy(self, successors: [AlphaZeroVertex]) -> (float, {AlphaZeroVertex: float}):
         values, prior_logits = self._policy_evaluator(self._make_batched_policy_inputs(successors))
 
         # inputs to policy network

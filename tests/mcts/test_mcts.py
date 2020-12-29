@@ -2,37 +2,53 @@ import math
 
 import pytest
 
-# def test_reward(qed_root):
-# @pytest.mark.parametrize('qed_case', ['mcts', 'nx_mcts', 'az'], indirect=True)
 from molecule_game.molecule_config import MoleculeConfig
+from rlmolecule.alphazero.alphazero import AlphaZero
 from rlmolecule.mcts.mcts import MCTS
 from tests.qed_optimization_problem import QEDOptimizationProblem
 
-@pytest.fixture()
-def game() -> MCTS:
+
+@pytest.fixture
+def problem() -> QEDOptimizationProblem:
     config = MoleculeConfig(max_atoms=4,
                             min_atoms=1,
                             tryEmbedding=False,
                             sa_score_threshold=None,
                             stereoisomers=False)
-    problem = QEDOptimizationProblem(config)
-    game = MCTS(problem)
-    return game
+    return QEDOptimizationProblem(config)
 
 
-def test_reward(game):
+@pytest.fixture
+def solver(request):
+    name = request.param
+    if name == 'MCTS':
+        return MCTS
+    if name == 'AlphaZero':
+        return AlphaZero
+    raise ValueError('Unknown problem type.')
+
+
+def setup_game(solver, problem):
+    game = solver(problem)
     root = game._get_root()
-    assert game.compute_reward(root) == 0.0
+    return game, root
+
+
+@pytest.mark.parametrize('solver', ["MCTS", "AlphaZero"], indirect=True)
+def test_reward(solver, problem):
+    game, root = setup_game(solver, problem)
+    assert problem.get_reward(root.state) == 0.0
 
     game._expand(root)
 
-    assert game.compute_reward(root) == 0.0
-    assert game.compute_reward(root.children[-1]) == 0.3597849378839701
-    assert game.compute_reward(root) == 0.0
+    assert problem.get_reward(root.state) == 0.0
+    assert problem.get_reward(root.children[-1].state) == 0.3597849378839701
+    assert problem.get_reward(root.state) == 0.0
 
 
-def test_ucb_score(game):
-    root = game._get_root()
+@pytest.mark.parametrize('solver', ["MCTS", "AlphaZero"], indirect=True)
+def test_ucb_score(solver, problem):
+    game, root = setup_game(solver, problem)
     game._expand(root)
     child = root.children[0]
 
@@ -46,62 +62,71 @@ def test_ucb_score(game):
     assert root.visit_count == 2
     assert root.value == pytest.approx(3.)
 
-    game._backpropagate([root, child], 3.0)
-    assert game._ucb_score(root, child) == pytest.approx(5.09629414793641)
+    child.update(-1.0)
+    child.update(0.0)
+    if solver is MCTS:
+        assert game._ucb_score(root, child) == pytest.approx(0.6774100225154747)
 
 
-def test_get_successors(game):
-    root = game._get_root()
-    successors = game._expand(root)
-    assert len(successors) == 9
-    assert successors[-1].state.is_terminal
-    assert not successors[0].state.is_terminal
+@pytest.mark.parametrize('solver', ["MCTS", "AlphaZero"], indirect=True)
+def test_get_successors(solver, problem):
+    game, root = setup_game(solver, problem)
+    game._expand(root)
+    children = root.children
+    assert len(children) == 9
+    assert children[-1].state._forced_terminal
+    assert not children[0].state._forced_terminal
 
-# @pytest.mark.parametrize('qed_case', ['mcts', 'nx_mcts', 'az'], indirect=True)
-# def test_reward(qed_case):
-#     with pytest.raises(AssertionError):
-#         qed_case.reward
+
+@pytest.mark.parametrize('solver', ["MCTS", "AlphaZero"], indirect=True)
+def test_reward(solver, problem):
+    game, root = setup_game(solver, problem)
+    game._expand(root)
+    assert problem.get_reward(root.children[-1].state) == 0.3597849378839701
+
+
+@pytest.mark.parametrize('solver', ["MCTS", "AlphaZero"], indirect=True)
+def test_update(solver, problem):
+    game, root = setup_game(solver, problem)
+
+    root.update(2.)
+    assert root.visit_count == 1
+    assert root.value == pytest.approx(2.)
+
+    root.update(4.)
+    assert root.visit_count == 2
+    assert root.value == pytest.approx(3.)
+
+
+@pytest.mark.parametrize('solver', ["MCTS", "AlphaZero"], indirect=True)
+def test_children(solver, problem):
+    game, root = setup_game(solver, problem)
+    game._expand(root)
+
+    children = root.children
+    assert root.children is not None
+    assert children[-1].state.forced_terminal
+    assert not children[0].state.forced_terminal
+
+    children[0].update(4.)
+
+    assert root.children[0].value == 4.
+    assert root.children[0].visit_count == 1
+
+
+@pytest.mark.parametrize('solver', ["MCTS", "AlphaZero"], indirect=True)
+def test_evaluate(solver, problem):
+    game, root = setup_game(solver, problem)
+    assert game._evaluate(root, [root]) > 0.
 #
-#     qed_case.expand()
-#     assert qed_case.successors[-1].reward == 0.3597849378839701
+
+# @pytest.mark.parametrize('solver', ["MCTS", "AlphaZero"], indirect=True)
+# def test_tree_policy(solver, problem):
+#     game, root = setup_game(solver, problem)
 #
-# @pytest.mark.parametrize('qed_case', ['mcts', 'nx_mcts'], indirect=True)
-# def test_ucb_score(qed_case):
-#     qed_case.expand()
-#     child = qed_case.successors[0]
-#     qed_case._visits = 10
+#     for i in range(100):
+#         assert(len)
 #
-#     child._visits = 0
-#     assert qed_case.ucb_score(child) == math.inf
-#
-#     child._visits = 3
-#     assert qed_case.ucb_score(child) == pytest.approx(1.7521739232523108)
-#
-# @pytest.mark.parametrize('qed_case', ['mcts', 'nx_mcts', 'az'], indirect=True)
-# def test_update(qed_case):
-#     qed_case.update(2.)
-#     assert qed_case.visits == 1
-#     assert qed_case.value == pytest.approx(2.)
-#
-#     qed_case.update(4.)
-#     assert qed_case.visits == 2
-#     assert qed_case.value == pytest.approx(3.)
-#
-# @pytest.mark.parametrize('qed_case', ['mcts', 'nx_mcts', 'az'], indirect=True)
-# def test_get_successors(qed_case):
-#     qed_case.expand()
-#     successors = qed_case.successors
-#     assert qed_case.expanded
-#     assert successors[-1].terminal
-#     assert not successors[0].terminal
-#
-#     successors[0].update(4.)
-#
-#     assert qed_case.successors[0].value == 4.
-#     assert qed_case.successors[0].visits == 1
-#
-# @pytest.mark.parametrize('qed_case', ['mcts', 'nx_mcts', 'az'], indirect=True)
-# def test_tree_policy(qed_case):
 #     assert len(list(qed_case.tree_policy())) == 1
 #
 #     qed_case.update(1.)
@@ -113,11 +138,10 @@ def test_get_successors(game):
 #         child.expand()
 #
 #     assert len(list(qed_case.tree_policy())) == 3
+
+
 #
-# @pytest.mark.parametrize('qed_case', ['mcts', 'nx_mcts', 'az'], indirect=True)
-# def test_evaluate(qed_case):
-#     assert qed_case.evaluate() > 0.
-#
+
 # @pytest.mark.parametrize('qed_case', ['mcts', 'nx_mcts', 'az'], indirect=True)
 # def test_mcts_step(qed_case):
 #     random.seed(42)

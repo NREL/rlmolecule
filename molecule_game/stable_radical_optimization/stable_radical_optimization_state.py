@@ -20,13 +20,13 @@ class StableRadicalOptimizationState(MoleculeState):
 
     @property
     def is_radical(self) -> bool:
-        return self._force_terminal
+        return self._forced_terminal
 
     def get_next_actions(self) -> Iterable['StableRadicalOptimizationState']:
         # TODO: should these functions be brought into this class?
         config = self.config
         result = []
-        if not self._force_terminal:
+        if not self._forced_terminal:
             if self.num_atoms < config.max_atoms:
                 result.extend((StableRadicalOptimizationState(molecule, config, False)
                                for molecule in build_molecules(self.molecule, **config.build_kwargs)))

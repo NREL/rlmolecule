@@ -7,7 +7,7 @@ from rlmolecule.mcts.mcts_problem import MCTSProblem
 class AlphaZeroProblem(MCTSProblem):
 
     @abstractmethod
-    def get_value_estimate(self, parent: AlphaZeroVertex) -> (float, {AlphaZeroVertex: float}):
+    def get_value_and_policy(self, parent: AlphaZeroVertex) -> (float, {AlphaZeroVertex: float}):
         """
         A user-provided function to get value and child prior estimates for the given vertex.
 

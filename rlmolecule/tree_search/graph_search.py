@@ -1,19 +1,20 @@
 import uuid
-from abc import ABC, abstractmethod
-from typing import Optional, TypeVar, Generic
+from abc import ABC
+from typing import Optional, TypeVar, Generic, Type
 
-from rlmolecule.tree_search.graph_search_canonicalizer import GraphSearchCanonicalizer
-from rlmolecule.tree_search.hash_canonicalizer import HashCanonicalizer
+from rlmolecule.tree_search.canonicalizer.graph_search_canonicalizer import GraphSearchCanonicalizer
+from rlmolecule.tree_search.canonicalizer.hash_canonicalizer import HashCanonicalizer
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
 Vertex = TypeVar('Vertex')
 
 
 class GraphSearch(Generic[Vertex], ABC):
-    def __init__(self, canonicalizer: Optional[GraphSearchCanonicalizer] = None):
+    def __init__(self, vertex_class: Type[Vertex], canonicalizer: Optional[GraphSearchCanonicalizer] = None):
         self.__id: uuid.UUID = uuid.uuid4()
         self.__canonicalizer: GraphSearchCanonicalizer[Vertex] = \
             HashCanonicalizer() if canonicalizer is None else canonicalizer
+        self._vertex_class = vertex_class
 
     @property
     def id(self) -> uuid.UUID:
@@ -28,4 +29,4 @@ class GraphSearch(Generic[Vertex], ABC):
 
     # noinspection PyMethodMayBeStatic
     def _make_new_vertex(self, state: GraphSearchState) -> Vertex:
-        return Vertex(state)
+        return self._vertex_class(state)

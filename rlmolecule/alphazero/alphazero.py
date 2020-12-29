@@ -1,10 +1,12 @@
 import logging
+import math
 
 import numpy as np
 
 from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from rlmolecule.mcts.mcts import MCTS
+from rlmolecule.mcts.mcts_vertex import MCTSVertex
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
 logger = logging.getLogger(__name__)
@@ -37,7 +39,7 @@ class AlphaZero(MCTS):
         :param dirichlet_alpha: dirichlet 'shape' parameter. Larger values spread out probability over more moves.
         :param dirichlet_x: percentage to favor dirichlet noise vs. prior estimation. Smaller means less noise
         """
-        super().__init__(problem, num_mcts_samples=num_mcts_samples)
+        super().__init__(problem, vertex_class=AlphaZeroVertex, num_mcts_samples=num_mcts_samples)
         self._min_reward: float = min_reward
         self._pb_c_base: float = pb_c_base
         self._pb_c_init: float = pb_c_init
@@ -50,6 +52,15 @@ class AlphaZero(MCTS):
         # noinspection PyTypeChecker
         return self._problem
 
+    def _accumulate_path_data(self, vertex: MCTSVertex, path: []):
+        children = vertex.children
+        visit_sum = sum(child.visit_count for child in children)
+        child_visits = [
+            child.visit_count / visit_sum
+            for child in children
+        ]
+        path.append((vertex, child_visits))
+
     def _evaluate(
             self,
             leaf: AlphaZeroVertex,
@@ -59,12 +70,14 @@ class AlphaZero(MCTS):
         Expansion step of AlphaZero, overrides MCTS expansion step
         :return value estimate
         """
+        self._expand(leaf)
+
         children = leaf.children
         if len(children) == 0:
             return self.problem.get_reward(leaf.state)
 
         # get value estimate and child priors
-        value, child_priors = self.problem.get_value_estimate(leaf)
+        value, child_priors = self.problem.get_value_and_policy(leaf)
 
         # Store prior values for child vertices predicted from the policy network, and add dirichlet noise as
         # specified in the game configuration.
@@ -74,7 +87,7 @@ class AlphaZero(MCTS):
             noise = random_state.dirichlet(np.ones_like(prior_array) * self._dirichlet_alpha)
             prior_array = prior_array * (1 - self._dirichlet_x) + (noise * self._dirichlet_x)
             child_priors = prior_array.tolist()
-        normalization_factor = child_priors.sum()
+        normalization_factor = sum(child_priors)
         leaf.child_priors = {child: prior / normalization_factor for child, prior in zip(children, child_priors)}
 
         return value
@@ -86,9 +99,13 @@ class AlphaZero(MCTS):
         :param child: Vertex for which the UCB score is desired
         :return: UCB score for the given child
         """
+        child_priors = parent.child_priors
+        if child_priors is None:
+            return math.inf
+
         pb_c = np.log((parent.visit_count + self._pb_c_base + 1) / self._pb_c_base) + self._pb_c_init
         pb_c *= np.sqrt(parent.visit_count) / (child.visit_count + 1)
-        prior_score = pb_c * parent.child_priors[child]
+        prior_score = pb_c * child_priors[child]
         return prior_score + child.value
 
     def _make_new_vertex(self, state: GraphSearchState) -> AlphaZeroVertex:
