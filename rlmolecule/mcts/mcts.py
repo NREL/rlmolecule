@@ -30,20 +30,14 @@ class MCTS(GraphSearch[MCTSVertex]):
     def run(
             self,
             state: Optional[GraphSearchState] = None,
-            explore: bool = True,
-            num_mcts_samples: Optional[int] = None,
+            num_mcts_samples: int = 1,
+            action_selection_function: Optional[Callable[[MCTSVertex], MCTSVertex]] = None,
     ) -> []:
         vertex = self._get_root() if state is None else self.get_vertex_for_state(state)
-        action_selection_function = self.softmax_selection if explore else self.visit_selection
+        action_selection_function = self.softmax_selection if action_selection_function is None \
+            else self.visit_selection
         num_mcts_samples = self._num_mcts_samples if num_mcts_samples is None else num_mcts_samples
-        return self.run_from_vertex(vertex, action_selection_function, num_mcts_samples)
 
-    def run_from_vertex(
-            self,
-            vertex: MCTSVertex,
-            action_selection_function: Callable[[MCTSVertex], MCTSVertex],
-            num_mcts_samples: int,
-    ) -> []:
         path: [] = []
         while True:
             self.sample(vertex, num_mcts_samples)
