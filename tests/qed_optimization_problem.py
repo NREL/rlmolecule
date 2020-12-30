@@ -1,3 +1,5 @@
+import functools
+
 import numpy as np
 import rdkit
 from rdkit.Chem.QED import qed
@@ -18,6 +20,7 @@ class QEDOptimizationProblem(AlphaZeroProblem):
     def get_initial_state(self) -> MoleculeState:
         return MoleculeState(rdkit.Chem.MolFromSmiles('C'), self.__config)
 
+    @functools.lru_cache(maxsize=None)
     def get_reward(self, state: MoleculeState) -> float:
         if state.forced_terminal:
             return qed(state.molecule)
