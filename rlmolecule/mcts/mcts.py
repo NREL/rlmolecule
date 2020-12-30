@@ -32,30 +32,21 @@ class MCTS(GraphSearch[MCTSVertex]):
             state: Optional[GraphSearchState] = None,
             explore: bool = True,
             num_mcts_samples: Optional[int] = None,
-            mcts_selection_function: Optional[Callable[[MCTSVertex], MCTSVertex]] = None,
     ) -> []:
         vertex = self._get_root() if state is None else self.get_vertex_for_state(state)
         action_selection_function = self.softmax_selection if explore else self.visit_selection
         num_mcts_samples = self._num_mcts_samples if num_mcts_samples is None else num_mcts_samples
-
-        def ucb_selection(parent):
-            return max(parent.children, key=lambda child: self._ucb_score(parent, child))
-
-        mcts_selection_function = ucb_selection if mcts_selection_function is None else mcts_selection_function
-
-        return self.run_from_vertex(vertex, action_selection_function, num_mcts_samples, mcts_selection_function)
+        return self.run_from_vertex(vertex, action_selection_function, num_mcts_samples)
 
     def run_from_vertex(
             self,
             vertex: MCTSVertex,
             action_selection_function: Callable[[MCTSVertex], MCTSVertex],
             num_mcts_samples: int,
-            mcts_selection_function: Callable[[MCTSVertex], MCTSVertex],
     ) -> []:
         path: [] = []
         while True:
-            # path.append(vertex)
-            self.sample(vertex, num_mcts_samples, mcts_selection_function)
+            self.sample(vertex, num_mcts_samples)
             self._accumulate_path_data(vertex, path)
             children = vertex.children
             if children is None or len(children) == 0:
@@ -67,11 +58,10 @@ class MCTS(GraphSearch[MCTSVertex]):
     def sample(
             self,
             vertex: MCTSVertex,
-            num_mcts_samples: int,
-            mcts_selection_function: Callable[[MCTSVertex], MCTSVertex],
+            num_mcts_samples: int = 1,
     ) -> None:
         for _ in range(num_mcts_samples):
-            search_path, value = self._select(vertex, mcts_selection_function)
+            search_path, value = self._select(vertex)
             self._backpropagate(search_path, value)
 
     # noinspection PyMethodMayBeStatic
@@ -81,7 +71,6 @@ class MCTS(GraphSearch[MCTSVertex]):
     def _select(
             self,
             root: MCTSVertex,
-            mcts_selection_function: Callable[[MCTSVertex], MCTSVertex],
     ) -> ([MCTSVertex], float):
         """
         Selection step of MCTS
@@ -103,7 +92,7 @@ class MCTS(GraphSearch[MCTSVertex]):
             if len(children) == 0:  # node is expanded and terminal: return its value
                 return search_path, self.problem.get_reward(current.state)
 
-            current = mcts_selection_function(current)
+            current = max(children, key=lambda child: self._ucb_score(current, child))
 
     def _expand(self, leaf: MCTSVertex) -> None:
         """
