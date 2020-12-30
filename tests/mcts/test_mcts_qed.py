@@ -83,11 +83,6 @@ class TestMCTSwithMoleculeState:
         assert children[-1].state._forced_terminal
         assert not children[0].state._forced_terminal
 
-    def test_reward(self, solver, problem):
-        game, root = setup_game(solver, problem)
-        game._expand(root)
-        assert problem.get_reward(root.children[-1].state) == 0.3597849378839701
-
     def test_update(self, solver, problem):
         game, root = setup_game(solver, problem)
 
@@ -117,8 +112,6 @@ class TestMCTSwithMoleculeState:
         game, root = setup_game(solver, problem)
         assert game._evaluate(root, [root]) > 0.
 
-    #
-
     def test_mcts_sample(self, solver, problem):
         random.seed(42)
 
@@ -134,8 +127,8 @@ class TestMCTSwithMoleculeState:
         random.seed(42)
         game, root = setup_game(solver, problem)
 
-        history, reward = game.run(num_mcts_samples=20)
-        assert len(history) > 3
+        history, reward = game.run(num_mcts_samples=5)
+        assert len(history) > 1
         assert np.isfinite(reward)
 
         leaf = history[-1]
