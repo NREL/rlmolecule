@@ -6,11 +6,13 @@ from rlmolecule.molecule.molecule_config import MoleculeConfig
 from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from rlmolecule.molecule.molecule_state import MoleculeState
+from rlmolecule.molecule.policy.molecule_problem import MoleculeAlphaZeroProblem
 
 
 class QEDOptimizationProblem(AlphaZeroProblem):
 
     def __init__(self, config: MoleculeConfig) -> None:
+        super(QEDOptimizationProblem, self).__init__()
         self.__config = config
 
     def get_initial_state(self) -> MoleculeState:
@@ -27,3 +29,7 @@ class QEDOptimizationProblem(AlphaZeroProblem):
         priors = random_state.dirichlet(np.ones(len(children)))
 
         return random_state.random(), {vertex: prior for vertex, prior in zip(children, priors)}
+
+
+class QEDWithMoleculePolicy(QEDOptimizationProblem, MoleculeAlphaZeroProblem):
+    pass

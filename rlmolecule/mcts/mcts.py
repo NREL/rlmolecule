@@ -1,5 +1,8 @@
+import itertools
+import logging
 import math
 import random
+import sys
 from typing import Callable, List, Optional, Type
 
 import numpy as np
@@ -9,6 +12,7 @@ from rlmolecule.mcts.mcts_vertex import MCTSVertex
 from rlmolecule.tree_search.graph_search import GraphSearch
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
+logger = logging.getLogger(__name__)
 
 class MCTS(GraphSearch[MCTSVertex]):
     def __init__(
@@ -27,25 +31,45 @@ class MCTS(GraphSearch[MCTSVertex]):
 
     def run(
             self,
-            num_mcts_samples: int = 1,
             state: Optional[GraphSearchState] = None,
+            num_mcts_samples: int = 1,
             action_selection_function: Optional[Callable[[MCTSVertex], MCTSVertex]] = None,
-    ) -> []:
+            max_depth: Optional[int] = None,
+    ) -> ([], float):
+        """Run the MCTS search from the given starting state (or the root node if not provided). This function runs a
+        given number of MCTS iterations per step, and then recursively descends the action space according to the
+        provided `action_selection_function` (softmax sampling of visit counts if not provided).
 
+        todo: we might want to provide a max-depth option?
+
+        :param num_mcts_samples: number of samples to perform at each level of the MCTS search
+        :param state: the starting state, or if not provided, the state returned from _get_root()
+        :param action_selection_function: a function used to select among the possible next actions. Defaults to
+            softmax sampling by visit counts.
+        :return: The search path (as a list of vertexes) and the final reward from the last state.
+        :param max_depth: the maximum number of times to recurse. Defaults to system recursion limit.
+        """
         vertex = self._get_root() if state is None else self.get_vertex_for_state(state)
         if action_selection_function is None:
             action_selection_function = self.softmax_selection
 
         path: [] = []
-        while not vertex.expanded or len(vertex.children) == 0:
-            for i in range(num_mcts_samples):
-                self.sample_from(vertex)
+        value = 0.
+        for depth in itertools.count():
+            for _ in range(num_mcts_samples):
+                value = self.sample_from(vertex)
             self._accumulate_path_data(vertex, path)
+            children = vertex.children
+            if children is None or len(children) == 0:
+                break
+            if depth > (max_depth if max_depth is not None else sys.getrecursionlimit()):
+                logger.warning(f"{self} reached max_depth or recursion limit")
+                break
             vertex = action_selection_function(vertex)
 
-        return path
+        return path, value
 
-    def sample_from(self, vertex: MCTSVertex) -> None:
+    def sample_from(self, vertex: MCTSVertex) -> float:
         """Run a single MCTS sample from the given vertex
 
         :param vertex: The starting vertex for MCTS sampling
@@ -53,6 +77,7 @@ class MCTS(GraphSearch[MCTSVertex]):
         search_path = self._select(vertex)
         value = self._evaluate(search_path[-1], search_path)
         self._backpropagate(search_path, value)
+        return value
 
     # noinspection PyMethodMayBeStatic
     def _accumulate_path_data(self, vertex: MCTSVertex, path: []):

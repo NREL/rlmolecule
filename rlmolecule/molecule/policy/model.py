@@ -82,7 +82,7 @@ class KLWithLogits(LossFunctionWrapper):
 class PolicyWrapper(layers.Layer):
 
     def build(self, input_shape):
-        self.policy_model = policy_model()
+        self.policy_model = policy_model()  # todo: allow passing a custom preprocessor location
 
     def call(self, inputs, mask=None):
         atom, bond, connectivity = inputs
@@ -116,6 +116,11 @@ class PolicyWrapper(layers.Layer):
 
 
 def build_policy_trainer() -> tf.keras.Model:
+    """Builds a keras model that expects [bsz, actions] molecules as inputs and predicts batches of value scores and
+    prior logits
+
+    :return: the built keras model
+    """
     atom_class = layers.Input(shape=[None, None], dtype=tf.int64, name='atom')
     bond_class = layers.Input(shape=[None, None], dtype=tf.int64, name='bond')
     connectivity = layers.Input(shape=[None, None, 2], dtype=tf.int64, name='connectivity')
@@ -131,6 +136,11 @@ def build_policy_trainer() -> tf.keras.Model:
 
 
 def build_policy_evaluator(checkpoint_filepath: Optional[str] = None) -> Tuple[tf.function, Optional[str]]:
+    """Builds (or loads from a checkpoint) a model that expects a single batch of input molecules.
+
+    :param checkpoint_filepath: A filename specifying a checkpoint from a saved policy iteration
+    :return: The policy_model layer of the loaded or initalized molecule.
+    """
     policy_trainer = build_policy_trainer()
 
     latest = tf.train.latest_checkpoint(checkpoint_filepath) if checkpoint_filepath else None
