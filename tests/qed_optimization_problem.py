@@ -2,7 +2,7 @@ import numpy as np
 import rdkit
 from rdkit.Chem.QED import qed
 
-from molecule_game.molecule_config import MoleculeConfig
+from rlmolecule.molecule.molecule_config import MoleculeConfig
 from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from rlmolecule.molecule.molecule_state import MoleculeState

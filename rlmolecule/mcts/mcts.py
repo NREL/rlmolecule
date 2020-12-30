@@ -1,6 +1,6 @@
 import math
 import random
-from typing import List, Callable, Optional, Type
+from typing import Callable, List, Optional, Type
 
 import numpy as np
 
@@ -14,13 +14,11 @@ class MCTS(GraphSearch[MCTSVertex]):
     def __init__(
             self,
             problem: MCTSProblem,
-            num_mcts_samples: int = 20,
             ucb_constant: float = math.sqrt(2),
             vertex_class: Optional[Type[MCTSVertex]] = None,
     ) -> None:
         super().__init__(MCTSVertex if vertex_class is None else vertex_class)
         self._problem: MCTSProblem = problem
-        self._num_mcts_samples: int = num_mcts_samples
         self.ucb_constant: float = ucb_constant
 
     @property
@@ -29,60 +27,38 @@ class MCTS(GraphSearch[MCTSVertex]):
 
     def run(
             self,
+            num_mcts_samples: int = 1,
             state: Optional[GraphSearchState] = None,
-            explore: bool = True,
-            num_mcts_samples: Optional[int] = None,
-            mcts_selection_function: Optional[Callable[[MCTSVertex], MCTSVertex]] = None,
+            action_selection_function: Optional[Callable[[MCTSVertex], MCTSVertex]] = None,
     ) -> []:
+
         vertex = self._get_root() if state is None else self.get_vertex_for_state(state)
-        action_selection_function = self.softmax_selection if explore else self.visit_selection
-        num_mcts_samples = self._num_mcts_samples if num_mcts_samples is None else num_mcts_samples
+        if action_selection_function is None:
+            action_selection_function = self.softmax_selection
 
-        def ucb_selection(parent):
-            return max(parent.children, key=lambda child: self._ucb_score(parent, child))
-
-        mcts_selection_function = ucb_selection if mcts_selection_function is None else mcts_selection_function
-
-        return self.run_from_vertex(vertex, action_selection_function, num_mcts_samples, mcts_selection_function)
-
-    def run_from_vertex(
-            self,
-            vertex: MCTSVertex,
-            action_selection_function: Callable[[MCTSVertex], MCTSVertex],
-            num_mcts_samples: int,
-            mcts_selection_function: Callable[[MCTSVertex], MCTSVertex],
-    ) -> []:
         path: [] = []
-        while True:
-            # path.append(vertex)
-            self.sample(vertex, num_mcts_samples, mcts_selection_function)
+        while not vertex.expanded or len(vertex.children) == 0:
+            for i in range(num_mcts_samples):
+                self.sample_from(vertex)
             self._accumulate_path_data(vertex, path)
-            children = vertex.children
-            if children is None or len(children) == 0:
-                break
             vertex = action_selection_function(vertex)
 
         return path
 
-    def sample(
-            self,
-            vertex: MCTSVertex,
-            num_mcts_samples: int,
-            mcts_selection_function: Callable[[MCTSVertex], MCTSVertex],
-    ) -> None:
-        for _ in range(num_mcts_samples):
-            search_path, value = self._select(vertex, mcts_selection_function)
-            self._backpropagate(search_path, value)
+    def sample_from(self, vertex: MCTSVertex) -> None:
+        """Run a single MCTS sample from the given vertex
+
+        :param vertex: The starting vertex for MCTS sampling
+        """
+        search_path = self._select(vertex)
+        value = self._evaluate(search_path[-1], search_path)
+        self._backpropagate(search_path, value)
 
     # noinspection PyMethodMayBeStatic
     def _accumulate_path_data(self, vertex: MCTSVertex, path: []):
         path.append(vertex)
 
-    def _select(
-            self,
-            root: MCTSVertex,
-            mcts_selection_function: Callable[[MCTSVertex], MCTSVertex],
-    ) -> ([MCTSVertex], float):
+    def _select(self, root: MCTSVertex) -> [MCTSVertex]:
         """
         Selection step of MCTS
         From Wikipedia (https://en.wikipedia.org/wiki/Monte_Carlo_tree_search):
@@ -91,19 +67,14 @@ class MCTS(GraphSearch[MCTSVertex]):
         (playout) has yet been initiated. The section below says more about a way of biasing choice of child vertices that
         lets the game tree expand towards the most promising moves, which is the essence of Monte Carlo tree search.
         """
-        current = root
-        search_path = []
-        while True:
-            search_path.append(current)
-            children = current.children
 
-            if children is None:  # node is unexpanded: expand and return its value estimate
-                return search_path, self._evaluate(current, search_path)
+        def _iter_select(parent: MCTSVertex) -> [MCTSVertex]:
+            yield parent
+            if parent.expanded and len(parent.children) > 0:
+                next_parent = max(parent.children, key=lambda child: self._ucb_score(parent, child))
+                yield from _iter_select(next_parent)
 
-            if len(children) == 0:  # node is expanded and terminal: return its value
-                return search_path, self.problem.get_reward(current.state)
-
-            current = mcts_selection_function(current)
+        return list(_iter_select(root))
 
     def _expand(self, leaf: MCTSVertex) -> None:
         """
@@ -112,14 +83,10 @@ class MCTS(GraphSearch[MCTSVertex]):
         Expansion: Unless L ends the game decisively (e.g. win/loss/draw) for either player, create one (or more) child
         vertices and choose vertex C from one of them. Child vertices are any valid moves from the game position defined by L.
         """
-        if leaf.children is None:
+        if not leaf.expanded:
             leaf.children = [self.get_vertex_for_state(state) for state in leaf.state.get_next_actions()]
 
-    def _evaluate(
-            self,
-            leaf: MCTSVertex,
-            search_path: [MCTSVertex],
-    ) -> float:
+    def _evaluate(self, leaf: MCTSVertex, search_path: [MCTSVertex],) -> float:
         """
         Estimates the value of a leaf vertex.
         Simulation step of MCTS.
@@ -129,19 +96,17 @@ class MCTS(GraphSearch[MCTSVertex]):
         the game is won, lost, or drawn).
         :return: value estimate of the given leaf vertex
         """
+
+        # This `expand` call sets up further visits for this node, but visits to children
+        # aren't tracked below the given leaf node
         self._expand(leaf)
 
-        children = leaf.children
         state = leaf.state
-        if len(children) > 0:
-            child = random.choice(children)
-            search_path.append(child)
+        children = state.get_next_actions()
 
-            while True:
-                children = state.get_next_actions()
-                if len(children) == 0:
-                    break
-                state = random.choice(children)
+        while len(children) > 0:
+            state = random.choice(children)
+            children = state.get_next_actions()
 
         return self.problem.get_reward(state)
 

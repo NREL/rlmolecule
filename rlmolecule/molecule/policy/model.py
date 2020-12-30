@@ -9,14 +9,18 @@ from tensorflow.python.keras.losses import (
 )
 
 import molecule_game.config as config
-from rlmolecule.molecule.policy.preprocessor import preprocessor  # TODO: trace down the problem here
+from rlmolecule.molecule.policy.preprocessor import MolPreprocessor, load_preprocessor
 
 
 # two models:
 # first, a policy model that predicts value, pi_logits from a batch of molecule inputs
 # Then, a wrapper model that expects batches of games and normalizes logit values
 
-def policy_model():
+def policy_model(preprocessor: Optional[MolPreprocessor] = None):
+
+    if preprocessor is None:
+        preprocessor = load_preprocessor()
+
     # Define inputs
     atom_class = layers.Input(shape=[None], dtype=tf.int64, name='atom')  # batch_size, num_atoms
     bond_class = layers.Input(shape=[None], dtype=tf.int64, name='bond')  # batch_size, num_bonds
@@ -48,7 +52,7 @@ def policy_model():
     return tf.keras.Model(input_tensors, [value_logit, pi_logit], name='policy_model')
 
 
-def kl_with_logits(y_true, y_pred):
+def kl_with_logits(y_true, y_pred) -> tf.Tensor:
     """ It's typically more numerically stable *not* to perform the softmax,
     but instead define the loss based on the raw logit predictions. This loss
     function corrects a tensorflow omission where there isn't a KLD loss that

@@ -39,7 +39,7 @@ class MoleculeState(GraphSearchState):
         """
         return type(other) == type(self) and \
                self._smiles == other._smiles and \
-               self._forced_terminal == other._force_terminal
+               self._forced_terminal == other._forced_terminal
 
     def hash(self) -> int:
         """

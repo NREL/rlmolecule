@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from molecule_game.molecule_config import MoleculeConfig
+from rlmolecule.molecule.molecule_config import MoleculeConfig
 from rlmolecule.alphazero.alphazero import AlphaZero
 from rlmolecule.mcts.mcts import MCTS
 from tests.qed_optimization_problem import QEDOptimizationProblem
