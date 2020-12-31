@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, TypeVar, Generic
+from typing import Generic, Optional, TypeVar
 
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 

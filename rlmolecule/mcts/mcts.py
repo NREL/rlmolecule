@@ -1,3 +1,4 @@
+import logging
 import math
 import random
 from typing import List, Callable, Optional, Type
@@ -9,18 +10,18 @@ from rlmolecule.mcts.mcts_vertex import MCTSVertex
 from rlmolecule.tree_search.graph_search import GraphSearch
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
+logger = logging.getLogger(__name__)
+
 
 class MCTS(GraphSearch[MCTSVertex]):
     def __init__(
             self,
             problem: MCTSProblem,
-            num_mcts_samples: int = 20,
             ucb_constant: float = math.sqrt(2),
             vertex_class: Optional[Type[MCTSVertex]] = None,
     ) -> None:
         super().__init__(MCTSVertex if vertex_class is None else vertex_class)
         self._problem: MCTSProblem = problem
-        self._num_mcts_samples: int = num_mcts_samples
         self.ucb_constant: float = ucb_constant
 
     @property
@@ -30,30 +31,45 @@ class MCTS(GraphSearch[MCTSVertex]):
     def run(
             self,
             state: Optional[GraphSearchState] = None,
-            num_mcts_samples: int = 1,
+            num_mcts_samples: int = 256,
+            max_depth: int = 1000000,
             action_selection_function: Optional[Callable[[MCTSVertex], MCTSVertex]] = None,
-    ) -> []:
+    ) -> ([], float):
+        """
+        Run the MCTS search from the given starting state (or the root node if not provided). This function runs a
+        given number of MCTS iterations per step, and then descends the action space according to the
+        provided `action_selection_function` (softmax sampling of visit counts if not provided).
+
+        :param num_mcts_samples: number of samples to perform at each level of the MCTS search
+        :param max_depth: the maximum search depth.
+        :param state: the starting state, or if not provided, the state returned from _get_root()
+        :param action_selection_function: a function used to select among the possible next actions. Defaults to
+            softmax sampling by visit counts.
+        :return: The search path (as a list of vertexes) and the reward from this search.
+        """
         vertex = self._get_root() if state is None else self.get_vertex_for_state(state)
         action_selection_function = self.softmax_selection if action_selection_function is None \
             else self.visit_selection
-        num_mcts_samples = self._num_mcts_samples if num_mcts_samples is None else num_mcts_samples
 
         path: [] = []
-        while True:
+        for _ in range(max_depth):
             self.sample(vertex, num_mcts_samples)
             self._accumulate_path_data(vertex, path)
             children = vertex.children
             if children is None or len(children) == 0:
-                break
+                return path, self.problem.get_reward(vertex.state)
             vertex = action_selection_function(vertex)
-
-        return path
+        logger.warning(f"{self} reached max_depth.")
+        return path, math.nan
 
     def sample(
             self,
             vertex: MCTSVertex,
             num_mcts_samples: int = 1,
     ) -> None:
+        """
+        Perform MCTS sampling from the given vertex.
+        """
         for _ in range(num_mcts_samples):
             search_path, value = self._select(vertex)
             self._backpropagate(search_path, value)
@@ -112,19 +128,17 @@ class MCTS(GraphSearch[MCTSVertex]):
         the game is won, lost, or drawn).
         :return: value estimate of the given leaf vertex
         """
+
+        # This `expand` call sets up further visits for this node, but visits to children
+        # aren't tracked below the given leaf node
         self._expand(leaf)
 
-        children = leaf.children
         state = leaf.state
-        if len(children) > 0:
-            child = random.choice(children)
-            search_path.append(child)
-
-            while True:
-                children = state.get_next_actions()
-                if len(children) == 0:
-                    break
-                state = random.choice(children)
+        while True:
+            children = state.get_next_actions()
+            if len(children) == 0:
+                break
+            state = random.choice(children)
 
         return self.problem.get_reward(state)
 

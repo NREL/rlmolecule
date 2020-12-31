@@ -2,7 +2,7 @@ import random
 
 from rlmolecule.mcts.mcts import MCTS
 from rlmolecule.mcts.mcts_vertex import MCTSVertex
-from rlmolecule.molecule.molecule_state import MoleculeConfig
+from rlmolecule.molecule.molecule_config import MoleculeConfig
 # class MCTSHashCanonicalizationTest(unittest.TestCase):
 from tests.qed_optimization_problem import QEDOptimizationProblem
 
@@ -27,8 +27,8 @@ def test_get_successors():
     successor1.update(1.0)
 
     random.seed(42)
-    for _ in range(1000):
-        game.step()
+    for _ in range(5):
+        game.sample_from(root)
 
     child1 = root.children[1].children[0]  # CCN
     child2 = root.children[0].children[1]  # CCN

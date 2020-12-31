@@ -39,7 +39,7 @@ class AlphaZero(MCTS):
         :param dirichlet_alpha: dirichlet 'shape' parameter. Larger values spread out probability over more moves.
         :param dirichlet_x: percentage to favor dirichlet noise vs. prior estimation. Smaller means less noise
         """
-        super().__init__(problem, vertex_class=AlphaZeroVertex, num_mcts_samples=num_mcts_samples)
+        super().__init__(problem, vertex_class=AlphaZeroVertex)
         self._min_reward: float = min_reward
         self._pb_c_base: float = pb_c_base
         self._pb_c_init: float = pb_c_init

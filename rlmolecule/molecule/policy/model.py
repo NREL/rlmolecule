@@ -9,14 +9,17 @@ from tensorflow.python.keras.losses import (
 )
 
 import molecule_game.config as config
-from rlmolecule.molecule.policy.preprocessor import preprocessor  # TODO: trace down the problem here
+from rlmolecule.molecule.policy.preprocessor import MolPreprocessor, load_preprocessor
 
 
 # two models:
 # first, a policy model that predicts value, pi_logits from a batch of molecule inputs
 # Then, a wrapper model that expects batches of games and normalizes logit values
 
-def policy_model():
+def policy_model(preprocessor: Optional[MolPreprocessor] = None):
+    if preprocessor is None:
+        preprocessor = load_preprocessor()
+
     # Define inputs
     atom_class = layers.Input(shape=[None], dtype=tf.int64, name='atom')  # batch_size, num_atoms
     bond_class = layers.Input(shape=[None], dtype=tf.int64, name='bond')  # batch_size, num_bonds
@@ -48,7 +51,7 @@ def policy_model():
     return tf.keras.Model(input_tensors, [value_logit, pi_logit], name='policy_model')
 
 
-def kl_with_logits(y_true, y_pred):
+def kl_with_logits(y_true, y_pred) -> tf.Tensor:
     """ It's typically more numerically stable *not* to perform the softmax,
     but instead define the loss based on the raw logit predictions. This loss
     function corrects a tensorflow omission where there isn't a KLD loss that
@@ -78,7 +81,7 @@ class KLWithLogits(LossFunctionWrapper):
 class PolicyWrapper(layers.Layer):
 
     def build(self, input_shape):
-        self.policy_model = policy_model()
+        self.policy_model = policy_model()  # todo: allow passing a custom preprocessor location
 
     def call(self, inputs, mask=None):
         atom, bond, connectivity = inputs
@@ -112,6 +115,11 @@ class PolicyWrapper(layers.Layer):
 
 
 def build_policy_trainer() -> tf.keras.Model:
+    """Builds a keras model that expects [bsz, actions] molecules as inputs and predicts batches of value scores and
+    prior logits
+
+    :return: the built keras model
+    """
     atom_class = layers.Input(shape=[None, None], dtype=tf.int64, name='atom')
     bond_class = layers.Input(shape=[None, None], dtype=tf.int64, name='bond')
     connectivity = layers.Input(shape=[None, None, 2], dtype=tf.int64, name='connectivity')
@@ -127,6 +135,11 @@ def build_policy_trainer() -> tf.keras.Model:
 
 
 def build_policy_evaluator(checkpoint_filepath: Optional[str] = None) -> Tuple[tf.function, Optional[str]]:
+    """Builds (or loads from a checkpoint) a model that expects a single batch of input molecules.
+
+    :param checkpoint_filepath: A filename specifying a checkpoint from a saved policy iteration
+    :return: The policy_model layer of the loaded or initalized molecule.
+    """
     policy_trainer = build_policy_trainer()
 
     latest = tf.train.latest_checkpoint(checkpoint_filepath) if checkpoint_filepath else None

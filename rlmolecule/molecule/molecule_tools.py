@@ -15,8 +15,6 @@ from rdkit.Chem.rdDistGeom import EmbedMolecule
 sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
 import sascorer
 
-# TODO: factor out into molecule specific place
-
 pt = Chem.GetPeriodicTable()
 
 bond_orders = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE, Chem.BondType.TRIPLE]

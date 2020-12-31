@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, List
+from typing import List, Optional
 
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 

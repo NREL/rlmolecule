@@ -14,20 +14,3 @@ class AlphaZeroProblem(MCTSProblem):
         :return: (value_of_current_vertex, {child_vertex: child_prior for child_vertex in children})
         """
         pass
-
-    # @abstractmethod
-    # def policy_predictions(self, policy_inputs_with_children):
-    #     """
-    #      un the policy network to get value and prior_logit predictions
-    #     :param policy_inputs_with_children:
-    #     :return: (values, prior_logits) as a tuple
-    #     """
-    #     pass
-
-    # @abstractmethod
-    # def construct_feature_matrices(self, state: GraphSearchState):
-    #     """
-    #     :param vertex:
-    #     :return:  _policy_inputs
-    #     """
-    #     pass
