@@ -133,10 +133,8 @@ class MCTS(GraphSearch[MCTSVertex]):
         while True:
             children = state.get_next_actions()
             if len(children) == 0:
-                break
+                return self.problem.get_reward(state)
             state = random.choice(children)
-
-        return self.problem.get_reward(state)
 
     @staticmethod
     def _backpropagate(search_path: [MCTSVertex], value: float):
