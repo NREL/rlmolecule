@@ -63,13 +63,14 @@ class AlphaZero(MCTS):
 
     def _evaluate(
             self,
-            leaf: AlphaZeroVertex,
             search_path: [AlphaZeroVertex],
     ) -> float:
         """
-        Expansion step of AlphaZero, overrides MCTS expansion step
-        :return value estimate
+        Expansion step of AlphaZero, overrides MCTS evaluate step.
+        Estimates the value of a leaf vertex.
         """
+        assert len(search_path) > 0, 'Invalid attempt to evaluate an empty search path.'
+        leaf = search_path[-1]
         self._expand(leaf)
 
         children = leaf.children

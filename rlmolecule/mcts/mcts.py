@@ -71,7 +71,8 @@ class MCTS(GraphSearch[MCTSVertex]):
         Perform MCTS sampling from the given vertex.
         """
         for _ in range(num_mcts_samples):
-            search_path, value = self._select(vertex)
+            search_path = self._select(vertex)
+            value = self._evaluate(search_path)
             self._backpropagate(search_path, value)
 
     # noinspection PyMethodMayBeStatic
@@ -81,7 +82,7 @@ class MCTS(GraphSearch[MCTSVertex]):
     def _select(
             self,
             root: MCTSVertex,
-    ) -> ([MCTSVertex], float):
+    ) -> [MCTSVertex]:
         """
         Selection step of MCTS
         From Wikipedia (https://en.wikipedia.org/wiki/Monte_Carlo_tree_search):
@@ -90,19 +91,13 @@ class MCTS(GraphSearch[MCTSVertex]):
         (playout) has yet been initiated. The section below says more about a way of biasing choice of child vertices that
         lets the game tree expand towards the most promising moves, which is the essence of Monte Carlo tree search.
         """
-        current = root
-        search_path = []
+        search_path = [root]
         while True:
-            search_path.append(current)
+            current = search_path[-1]
             children = current.children
-
-            if children is None:  # node is unexpanded: expand and return its value estimate
-                return search_path, self._evaluate(current, search_path)
-
-            if len(children) == 0:  # node is expanded and terminal: return its value
-                return search_path, self.problem.get_reward(current.state)
-
-            current = max(children, key=lambda child: self._ucb_score(current, child))
+            if children is None or len(children) == 0:
+                return search_path
+            search_path.append(max(children, key=lambda child: self._ucb_score(current, child)))
 
     def _expand(self, leaf: MCTSVertex) -> None:
         """
@@ -116,7 +111,6 @@ class MCTS(GraphSearch[MCTSVertex]):
 
     def _evaluate(
             self,
-            leaf: MCTSVertex,
             search_path: [MCTSVertex],
     ) -> float:
         """
@@ -128,6 +122,8 @@ class MCTS(GraphSearch[MCTSVertex]):
         the game is won, lost, or drawn).
         :return: value estimate of the given leaf vertex
         """
+        assert len(search_path) > 0, 'Invalid attempt to evaluate an empty search path.'
+        leaf = search_path[-1]
 
         # This `expand` call sets up further visits for this node, but visits to children
         # aren't tracked below the given leaf node

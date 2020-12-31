@@ -110,14 +110,13 @@ class TestMCTSwithMoleculeState:
 
     def test_evaluate(self, solver, problem):
         game, root = setup_game(solver, problem)
-        assert game._evaluate(root, [root]) > 0.
+        assert game._evaluate([root]) > 0.
 
     def test_mcts_sample(self, solver, problem):
         random.seed(42)
 
         game, root = setup_game(solver, problem)
-        for _ in range(10):
-            game.sample_from(root)
+        game.sample(root, 10)
 
         assert root.visit_count == 10
         assert root.value > 0.1
