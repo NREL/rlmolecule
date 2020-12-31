@@ -1,7 +1,5 @@
 import logging
-from typing import (
-    Optional, Dict,
-)
+from typing import (Dict, Optional)
 
 from rlmolecule.mcts.mcts_vertex import MCTSVertex
 from rlmolecule.tree_search.graph_search_state import GraphSearchState

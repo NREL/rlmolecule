@@ -17,7 +17,6 @@ from rlmolecule.molecule.policy.preprocessor import MolPreprocessor, load_prepro
 # Then, a wrapper model that expects batches of games and normalizes logit values
 
 def policy_model(preprocessor: Optional[MolPreprocessor] = None):
-
     if preprocessor is None:
         preprocessor = load_preprocessor()
 

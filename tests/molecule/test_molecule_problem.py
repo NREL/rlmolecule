@@ -1,12 +1,13 @@
+import numpy as np
 import pytest
 from rdkit.Chem.rdmolfiles import MolFromSmiles
-import numpy as np
 
 from rlmolecule.alphazero.alphazero import AlphaZero
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from rlmolecule.molecule.molecule_config import MoleculeConfig
 from rlmolecule.molecule.molecule_state import MoleculeState
 from tests.qed_optimization_problem import QEDWithMoleculePolicy
+
 
 @pytest.fixture
 def config():
@@ -16,17 +17,21 @@ def config():
                           sa_score_threshold=None,
                           stereoisomers=False)
 
+
 @pytest.fixture
 def problem(config):
     return QEDWithMoleculePolicy(config)
+
 
 @pytest.fixture
 def vertex(config):
     return AlphaZeroVertex(MoleculeState(MolFromSmiles('CCC'), config))
 
+
 @pytest.fixture
 def solver(problem):
     return AlphaZero(problem)
+
 
 def test_get_network_inputs(problem, vertex):
     network_inputs = problem.get_network_inputs(vertex)

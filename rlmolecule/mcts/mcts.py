@@ -14,6 +14,7 @@ from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
 logger = logging.getLogger(__name__)
 
+
 class MCTS(GraphSearch[MCTSVertex]):
     def __init__(
             self,
@@ -111,7 +112,7 @@ class MCTS(GraphSearch[MCTSVertex]):
         if not leaf.expanded:
             leaf.children = [self.get_vertex_for_state(state) for state in leaf.state.get_next_actions()]
 
-    def _evaluate(self, leaf: MCTSVertex, search_path: [MCTSVertex],) -> float:
+    def _evaluate(self, leaf: MCTSVertex, search_path: [MCTSVertex], ) -> float:
         """
         Estimates the value of a leaf vertex.
         Simulation step of MCTS.

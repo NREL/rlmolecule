@@ -1,6 +1,6 @@
 import uuid
 from abc import ABC
-from typing import Optional, TypeVar, Generic, Type
+from typing import Generic, Optional, Type, TypeVar
 
 from rlmolecule.tree_search.canonicalizer.graph_search_canonicalizer import GraphSearchCanonicalizer
 from rlmolecule.tree_search.canonicalizer.hash_canonicalizer import HashCanonicalizer
