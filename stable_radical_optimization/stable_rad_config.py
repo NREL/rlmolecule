@@ -2,10 +2,10 @@ import os
 import alphazero.config as config
 
 # DB table names modified by the user according to their wish
-config.sql_basename = "StablePSJ_newreward"
+config.sql_basename = "StablePSJ_fixed_redox"
 
 # Experiment id
-config.experiment_id = "new_reward"
+config.experiment_id = "001"
 
 with open('/projects/rlmolecule/rlops_pass', 'r') as f:
     passwd = f.read().strip()

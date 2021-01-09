@@ -22,7 +22,7 @@ stability_model = tf.keras.models.load_model(
     compile=False)
 
 redox_model = tf.keras.models.load_model(
-    '/projects/rlmolecule/pstjohn/models/20201030_redox_model/',
+    '/projects/rlmolecule/pstjohn/models/20210107_redox_model/',
     compile=False)
 
 bde_model = tf.keras.models.load_model(
