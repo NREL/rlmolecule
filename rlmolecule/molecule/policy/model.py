@@ -8,15 +8,25 @@ from tensorflow.python.keras.losses import (
     losses_utils,
 )
 
-import molecule_game.config as config
 from rlmolecule.molecule.policy.preprocessor import MolPreprocessor, load_preprocessor
 
 
 # two models:
-# first, a policy model that predicts value, pi_logits from a batch of molecule inputs
+# first,
 # Then, a wrapper model that expects batches of games and normalizes logit values
+def policy_model(preprocessor: Optional[MolPreprocessor] = None,
+                 features: int = 64,
+                 num_heads: int = 4,
+                 num_messages: int = 3) -> tf.keras.Model:
+    """ Constructs a policy model that predicts value, pi_logits from a batch of molecule inputs. Main model used in
+    policy training and loading weights
 
-def policy_model(preprocessor: Optional[MolPreprocessor] = None):
+    :param preprocessor: a MolPreprocessor class for initializing the embedding matrices
+    :param features: Size of network hidden layers
+    :param num_heads: Number of global state attention heads. Must be a factor of `features`
+    :param num_messages: Number of message passing layers
+    :return: The constructed policy model
+    """
     if preprocessor is None:
         preprocessor = load_preprocessor()
 
@@ -28,21 +38,21 @@ def policy_model(preprocessor: Optional[MolPreprocessor] = None):
     input_tensors = [atom_class, bond_class, connectivity]
 
     # Initialize the atom states
-    atom_state = layers.Embedding(preprocessor.atom_classes, config.features,
+    atom_state = layers.Embedding(preprocessor.atom_classes, features,
                                   name='atom_embedding', mask_zero=True)(atom_class)
 
     # Initialize the bond states
-    bond_state = layers.Embedding(preprocessor.bond_classes, config.features,
+    bond_state = layers.Embedding(preprocessor.bond_classes, features,
                                   name='bond_embedding', mask_zero=True)(bond_class)
 
-    units = config.features // config.num_heads
-    global_state = nfp.GlobalUpdate(units=units, num_heads=config.num_heads)(
+    units = features // num_heads
+    global_state = nfp.GlobalUpdate(units=units, num_heads=num_heads)(
         [atom_state, bond_state, connectivity])
 
-    for _ in range(config.num_messages):  # Do the message passing
+    for _ in range(num_messages):  # Do the message passing
         bond_state = nfp.EdgeUpdate()([atom_state, bond_state, connectivity, global_state])
         atom_state = nfp.NodeUpdate()([atom_state, bond_state, connectivity, global_state])
-        global_state = nfp.GlobalUpdate(units=units, num_heads=config.num_heads)(
+        global_state = nfp.GlobalUpdate(units=units, num_heads=num_heads)(
             [atom_state, bond_state, connectivity, global_state])
 
     value_logit = layers.Dense(1)(global_state)
@@ -80,8 +90,23 @@ class KLWithLogits(LossFunctionWrapper):
 
 class PolicyWrapper(layers.Layer):
 
+    def __init__(self,
+                 preprocessor: Optional[MolPreprocessor] = None,
+                 features: int = 64,
+                 num_heads: int = 4,
+                 num_messages: int = 3,
+                 **kwargs):
+        super().__init__(**kwargs)
+        self.preprocessor = preprocessor
+        self.features = features
+        self.num_heads = num_heads
+        self.num_messages = num_messages
+
     def build(self, input_shape):
-        self.policy_model = policy_model()  # todo: allow passing a custom preprocessor location
+        self.policy_model = policy_model(self.preprocessor,
+                                         self.features,
+                                         self.num_heads,
+                                         self.num_messages)
 
     def call(self, inputs, mask=None):
         atom, bond, connectivity = inputs
@@ -114,7 +139,10 @@ class PolicyWrapper(layers.Layer):
         return value_preds, masked_prior_logits
 
 
-def build_policy_trainer() -> tf.keras.Model:
+def build_policy_trainer(preprocessor: Optional[MolPreprocessor] = None,
+                         features: int = 64,
+                         num_heads: int = 4,
+                         num_messages: int = 3) -> tf.keras.Model:
     """Builds a keras model that expects [bsz, actions] molecules as inputs and predicts batches of value scores and
     prior logits
 
@@ -124,12 +152,13 @@ def build_policy_trainer() -> tf.keras.Model:
     bond_class = layers.Input(shape=[None, None], dtype=tf.int64, name='bond')
     connectivity = layers.Input(shape=[None, None, 2], dtype=tf.int64, name='connectivity')
 
-    value_preds, masked_prior_logits = PolicyWrapper()([atom_class, bond_class, connectivity])
+    value_preds, masked_prior_logits = PolicyWrapper(
+        preprocessor, features, num_heads, num_messages)([atom_class, bond_class, connectivity])
 
     policy_trainer = tf.keras.Model([atom_class, bond_class, connectivity], [value_preds, masked_prior_logits])
-    policy_trainer.compile(
-        optimizer=tf.keras.optimizers.Adam(config.policy_lr),  # Do AZ list their optimizer?
-        loss=[tf.keras.losses.BinaryCrossentropy(from_logits=True), KLWithLogits()])
+    # policy_trainer.compile(
+    #     optimizer=tf.keras.optimizers.Adam(config.policy_lr),  # Do AZ list their optimizer?
+    #     loss=[tf.keras.losses.BinaryCrossentropy(from_logits=True), KLWithLogits()])
 
     return policy_trainer
 

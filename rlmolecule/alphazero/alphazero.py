@@ -22,7 +22,6 @@ class AlphaZero(MCTS):
 
     def __init__(self,
                  problem: AlphaZeroProblem,
-                 num_mcts_samples: int = 20,
                  min_reward: float = 0.0,
                  pb_c_base: float = 1.0,
                  pb_c_init: float = 1.25,
@@ -33,7 +32,7 @@ class AlphaZero(MCTS):
         """
         Constructor.
         :param min_reward: Minimum reward to return for invalid actions
-        :param pb_c_base: 19652 in pseudocode
+        :param pb_c_base:
         :param pb_c_init:
         :param dirichlet_noise: whether to add dirichlet noise
         :param dirichlet_alpha: dirichlet 'shape' parameter. Larger values spread out probability over more moves.
@@ -75,7 +74,7 @@ class AlphaZero(MCTS):
 
         children = leaf.children
         if len(children) == 0:
-            return self.problem.get_reward(leaf.state)
+            return self.problem._reward_wrapper(leaf.state)
 
         # get value estimate and child priors
         value, child_priors = self.problem.get_value_and_policy(leaf)
@@ -92,6 +91,11 @@ class AlphaZero(MCTS):
         leaf.child_priors = {child: prior / normalization_factor for child, prior in zip(children, child_priors)}
 
         return value
+
+    def run(self, *args, **kwargs) -> ([], float):
+        path, reward = MCTS.run(self, *args, **kwargs)
+        self.problem._store_search_statistics(path, reward, self)
+        return path, reward
 
     def _ucb_score(self, parent: AlphaZeroVertex, child: AlphaZeroVertex) -> float:
         """

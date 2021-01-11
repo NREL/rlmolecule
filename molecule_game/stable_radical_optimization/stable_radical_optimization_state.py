@@ -3,7 +3,7 @@ from typing import Iterable
 from rdkit.Chem.rdchem import Mol
 
 from rlmolecule.molecule.molecule_state import MoleculeState
-from rlmolecule.molecule.molecule_tools import (
+from rlmolecule.molecule.molecule_building import (
     build_molecules,
     build_radicals,
 )

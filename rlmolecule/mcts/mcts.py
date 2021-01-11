@@ -1,7 +1,7 @@
 import logging
 import math
 import random
-from typing import List, Callable, Optional, Type
+from typing import Callable, List, Optional, Type
 
 import numpy as np
 
@@ -57,7 +57,7 @@ class MCTS(GraphSearch[MCTSVertex]):
             self._accumulate_path_data(vertex, path)
             children = vertex.children
             if children is None or len(children) == 0:
-                return path, self.problem.get_reward(vertex.state)
+                return path, self.problem._reward_wrapper(vertex.state)
             vertex = action_selection_function(vertex)
         logger.warning(f"{self} reached max_depth.")
         return path, math.nan
@@ -133,7 +133,7 @@ class MCTS(GraphSearch[MCTSVertex]):
         while True:
             children = state.get_next_actions()
             if len(children) == 0:
-                return self.problem.get_reward(state)
+                return self.problem._reward_wrapper(state)
             state = random.choice(children)
 
     @staticmethod

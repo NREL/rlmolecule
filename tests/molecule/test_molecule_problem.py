@@ -19,8 +19,8 @@ def config():
 
 
 @pytest.fixture
-def problem(config):
-    return QEDWithMoleculePolicy(config)
+def problem(engine, config):
+    return QEDWithMoleculePolicy(engine, config)
 
 
 @pytest.fixture
@@ -34,7 +34,7 @@ def solver(problem):
 
 
 def test_get_network_inputs(problem, vertex):
-    network_inputs = problem.get_network_inputs(vertex)
+    network_inputs = problem.get_network_inputs(vertex.state)
     assert len(network_inputs['atom']) == vertex.state.num_atoms
     assert len(network_inputs['bond']) == 2 * vertex.state.molecule.GetNumBonds()
 
@@ -47,7 +47,7 @@ def test_get_batched_network_inputs(solver, vertex):
     assert batched_network_inputs['connectivity'].ndim == 3
 
     assert (batched_network_inputs['atom'][5] ==
-            solver.problem.get_network_inputs(vertex.children[4])['atom']).all()
+            solver.problem.get_network_inputs(vertex.children[4].state)['atom']).all()
 
 
 def test_get_value_and_policy(solver, vertex):

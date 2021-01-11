@@ -11,7 +11,7 @@ from tests.qed_optimization_problem import QEDOptimizationProblem, QEDWithMolecu
 
 
 @pytest.fixture
-def problem(request):
+def problem(request, engine):
     name = request.param
     config = MoleculeConfig(max_atoms=4,
                             min_atoms=1,
@@ -20,9 +20,9 @@ def problem(request):
                             stereoisomers=False)
 
     if name == 'random':
-        return QEDOptimizationProblem(config)
+        return QEDOptimizationProblem(engine, config)
     if name == 'MoleculePolicy':
-        return QEDWithMoleculePolicy(config)
+        return QEDWithMoleculePolicy(engine, config, features=8, num_heads=2, num_messages=1)
 
 
 @pytest.fixture
@@ -42,18 +42,20 @@ def setup_game(solver, problem):
 
 
 @pytest.mark.parametrize('solver,problem',
-                         [("MCTS", "random"), ("AlphaZero", "random"), ("AlphaZero", "MoleculePolicy")], indirect=True)
+                         [("MCTS", "random"),
+                          ("AlphaZero", "random"),
+                          ("AlphaZero", "MoleculePolicy")], indirect=True)
 class TestMCTSwithMoleculeState:
 
     def test_reward(self, solver, problem):
         game, root = setup_game(solver, problem)
-        assert problem.get_reward(root.state) == 0.0
+        assert problem._reward_wrapper(root.state) == 0.0
 
         game._expand(root)
 
-        assert problem.get_reward(root.state) == 0.0
-        assert problem.get_reward(root.children[-1].state) == 0.3597849378839701
-        assert problem.get_reward(root.state) == 0.0
+        assert problem._reward_wrapper(root.state) == 0.0
+        assert problem._reward_wrapper(root.children[-1].state) == 0.3597849378839701
+        assert problem._reward_wrapper(root.state) == 0.0
 
     def test_ucb_score(self, solver, problem):
         game, root = setup_game(solver, problem)
@@ -132,6 +134,6 @@ class TestMCTSwithMoleculeState:
 
         leaf = history[-1]
         try:
-            assert reward == problem.get_reward(history[-1].state)
+            assert reward == problem._reward_wrapper(history[-1].state)
         except AttributeError:  # Handle alphazero's history object
-            assert reward == problem.get_reward(history[-1][0].state)
+            assert reward == problem._reward_wrapper(history[-1][0].state)

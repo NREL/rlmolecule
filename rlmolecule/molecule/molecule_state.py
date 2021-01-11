@@ -1,8 +1,8 @@
-from typing import Sequence
+from typing import Optional, Sequence
 
 from rdkit.Chem import Mol, MolToSmiles
 
-from rlmolecule.molecule.molecule_tools import build_molecules
+from rlmolecule.molecule.molecule_building import build_molecules
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
 
@@ -15,15 +15,21 @@ class MoleculeState(GraphSearchState):
     efficient hashing.
     """
 
-    def __init__(self, molecule: Mol, config: any, force_terminal: bool = False) -> None:
+    def __init__(self,
+                 molecule: Mol,
+                 config: any,
+                 force_terminal: bool = False,
+                 smiles: Optional[str] = None,
+                 ) -> None:
         """
         :param molecule: an RDKit molecule specifying the current state
         :param config: A MoleculeConfig class
         :param force_terminal: Whether to force this molecule to be a terminal state
+        :param smiles: An optional smiles string for the molecule; must match `molecule`.
         """
         self._config: any = config
         self._molecule: Mol = molecule
-        self._smiles: str = MolToSmiles(self._molecule)
+        self._smiles: str = MolToSmiles(self._molecule) if smiles is None else smiles
         self._forced_terminal: bool = force_terminal
 
     def __repr__(self) -> str:

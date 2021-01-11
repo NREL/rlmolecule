@@ -1,3 +1,5 @@
+import base64
+import pickle
 from abc import (
     ABC,
     abstractmethod,
@@ -47,3 +49,24 @@ class GraphSearchState(ABC):
         :return: the state's successors as an iterable.
         """
         pass
+
+    def serialize(self) -> str:
+        """
+        Convert the state to a unique string representation of the state, sufficient to recreate the state with
+        GraphSearchState.deserialize(). Defaults to using python's pickle and base64 encoding. For non-pickleable
+        objects, __getstate__ and __setstate__ methods can also be provided.
+
+        :return: A string representation of the state
+        """
+        return base64.b64encode(pickle.dumps(self)).decode('utf-8')
+
+    @staticmethod
+    def deserialize(data: str) -> 'GraphSearchState':
+        """
+        Create an instance of the class from a serialized string. Defaults to assuming the data was stored using
+        python's pickle and base64 encoding.
+
+        :param data: A string representation of the state
+        :return: An initialized GraphSearchState instance
+        """
+        return pickle.loads(base64.b64decode(data))

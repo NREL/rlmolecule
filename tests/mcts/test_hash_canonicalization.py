@@ -7,13 +7,13 @@ from rlmolecule.molecule.molecule_config import MoleculeConfig
 from tests.qed_optimization_problem import QEDOptimizationProblem
 
 
-def test_get_successors():
+def test_get_successors(engine):
     config = MoleculeConfig(max_atoms=4,
                             min_atoms=1,
                             tryEmbedding=False,
                             sa_score_threshold=None,
                             stereoisomers=False)
-    problem = QEDOptimizationProblem(config)
+    problem = QEDOptimizationProblem(engine, config)
     game = MCTS(problem)
     root: MCTSVertex = game._get_root()
     game._expand(root)
@@ -27,8 +27,7 @@ def test_get_successors():
     successor1.update(1.0)
 
     random.seed(42)
-    for _ in range(5):
-        game.sample_from(root)
+    game.sample(root, 5)
 
     child1 = root.children[1].children[0]  # CCN
     child2 = root.children[0].children[1]  # CCN
