@@ -1,13 +1,19 @@
 import uuid
 from abc import ABC, abstractmethod
+from typing import Optional
 
+from rlmolecule.alphazero.reward import RawRewardFactory, RewardFactory, Reward
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
 
 class MCTSProblem(ABC):
 
-    def __init__(self):
+    def __init__(self, reward_class: Optional[RewardFactory] = None):
         self.__id = None
+        if reward_class is None:
+            reward_class = RawRewardFactory()
+
+        self.reward_class = reward_class
 
     @property
     def id(self):
@@ -32,5 +38,6 @@ class MCTSProblem(ABC):
         """
         self.__id = uuid.uuid4()
 
-    def reward_wrapper(self, state: GraphSearchState) -> float:
-        return self.get_reward(state)[0]
+    def reward_wrapper(self, state: GraphSearchState) -> Reward:
+        reward, _ = self.get_reward(state)
+        return self.reward_class(reward)

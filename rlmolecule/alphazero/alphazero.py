@@ -90,7 +90,7 @@ class AlphaZero(MCTS):
         normalization_factor = sum(child_priors)
         leaf.child_priors = {child: prior / normalization_factor for child, prior in zip(children, child_priors)}
 
-        return value
+        return self.problem.reward_class(value)
 
     def run(self, *args, **kwargs) -> ([], float):
         self.problem.initialize_run()

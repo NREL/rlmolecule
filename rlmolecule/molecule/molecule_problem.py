@@ -30,9 +30,10 @@ class MoleculeAlphaZeroProblem(AlphaZeroProblem):
                  features: int = 64,
                  num_heads: int = 4,
                  num_messages: int = 3,
+                 **kwargs
                  ) -> None:
 
-        super(MoleculeAlphaZeroProblem, self).__init__(engine)
+        super(MoleculeAlphaZeroProblem, self).__init__(engine, **kwargs)
         self.preprocessor = preprocessor if preprocessor else load_preprocessor(preprocessor_data)
         self.policy_model = build_policy_trainer(self.preprocessor, features, num_heads, num_messages)
         self.policy_checkpoint_dir = policy_checkpoint_dir

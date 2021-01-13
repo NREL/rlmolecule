@@ -7,6 +7,7 @@ import pytest
 import numpy as np
 
 from rlmolecule.alphazero.alphazero import AlphaZero
+from rlmolecule.alphazero.reward import RankedRewardFactory, RawRewardFactory
 from rlmolecule.molecule.molecule_config import MoleculeConfig
 from tests.qed_optimization_problem import QEDWithMoleculePolicy
 
@@ -20,47 +21,63 @@ def tmpdirname():
         yield tmpdir
 
 
+@pytest.fixture()
+def config():
+    return MoleculeConfig(max_atoms=4,
+                          min_atoms=1,
+                          tryEmbedding=False,
+                          sa_score_threshold=None,
+                          stereoisomers=False)
 
 @pytest.fixture(scope='function')
-def problem(engine, tmpdirname):
+def game(request, engine, tmpdirname, config):
     """
     The scope here is function, so that the problem gets recreated for each test. Otherwise the trained policy
     network doesn't need to be loaded, since the trained model already exists in the problem.
     """
-    config = MoleculeConfig(max_atoms=4,
-                            min_atoms=1,
-                            tryEmbedding=False,
-                            sa_score_threshold=None,
-                            stereoisomers=False)
 
-    return QEDWithMoleculePolicy(engine,
-                                 config,
-                                 features=8,
-                                 num_heads=2,
-                                 num_messages=1,
-                                 policy_checkpoint_dir=tmpdirname)
+    name = request.param
 
 
-@pytest.fixture
-def game(problem):
-    game = AlphaZero(problem)
-    return game
+    if name == 'raw':
+        reward_class = RawRewardFactory()
+
+    elif name == 'ranked':
+        reward_class = RankedRewardFactory(
+            reward_buffer_min_size=2,
+            reward_buffer_max_size=4,
+            run_id=name,
+            engine=engine
+        )
+
+    else:
+        raise RuntimeError(f"{name} not found")
 
 
-def test_reward_caching(game):
-    root = game._get_root()
-    problem = game.problem
+    problem = QEDWithMoleculePolicy(engine,
+                                    config,
+                                    features=8,
+                                    num_heads=2,
+                                    num_messages=1,
+                                    run_id=name,
+                                    reward_class=reward_class,
+                                    policy_checkpoint_dir=tmpdirname)
 
-    game.problem.get_reward = MagicMock(return_value=(1, {}))
+    return AlphaZero(problem)
 
-    reward1 = game.problem.reward_wrapper(root.state)
-    reward2 = game.problem.reward_wrapper(root.state)
-
-    assert reward1 == reward2
-    assert game.problem.get_reward.call_count == 1
-
-
+@pytest.mark.parametrize('game', ['raw', 'ranked'], indirect=True)
 class TestPolicyTraining:
+
+    def test_reward_caching(self, game):
+        root = game._get_root()
+
+        game.problem.get_reward = MagicMock(return_value=(1, {}))
+
+        reward1 = game.problem.reward_wrapper(root.state).raw_reward
+        reward2 = game.problem.reward_wrapper(root.state).raw_reward
+
+        assert reward1 == reward2
+        assert game.problem.get_reward.call_count == 1
 
     def test_create_games(self, game):
 
@@ -71,9 +88,11 @@ class TestPolicyTraining:
             history, reward = game.run(num_mcts_samples=5)
             assert history[0][0].visit_count == 5
 
-            from rlmolecule.sql.tables import Game
-            stored_game = game.problem.session.query(Game).filter_by(id=str(game.problem.id)).one()
-            assert stored_game.scaled_reward == reward
+            from rlmolecule.sql.tables import GameStore
+            stored_game = game.problem.session.query(GameStore).filter_by(id=str(game.problem.id)).one()
+            assert stored_game.scaled_reward == reward.scaled_reward
+            assert stored_game.raw_reward == reward.raw_reward
+
             final_mols += [history[-1][0]]
             rewards += [reward]
 
@@ -81,19 +100,20 @@ class TestPolicyTraining:
         assert len(set(final_mols)) > 1
         assert len(set(rewards)) > 1
 
-
-
-    def test_recent_games(self, problem):
+    def test_recent_games(self, game):
+        problem = game.problem
         recent_games = list(problem.iter_recent_games())
         assert len(recent_games) == 5
 
-    def test_policy_data(self, problem):
+    def test_policy_data(self, game):
+        problem = game.problem
         data = problem._create_dataset()
         inputs, (rewards, visit_probs) = list(data.take(1))[0]
         assert inputs['atom'].shape[1] == visit_probs.shape[1] + 1
         assert inputs['atom'].shape[0] == problem.batch_size
 
-    def test_train_policy_model(self, problem):
+    def test_train_policy_model(self, game):
+        problem = game.problem
 
         weights_before = problem.policy_model.get_weights()[1]
 
@@ -106,8 +126,8 @@ class TestPolicyTraining:
         assert not np.isclose(weights_before, weights_after).all()
 
 
-    def test_load_new_policy(self, engine, problem, game):
-
+    def test_load_new_policy(self, engine, game):
+        problem = game.problem
         assert problem._checkpoint is None
 
         def get_root_value_pred(problem):

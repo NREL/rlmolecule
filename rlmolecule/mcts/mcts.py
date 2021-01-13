@@ -5,6 +5,7 @@ from typing import Callable, List, Optional, Type
 
 import numpy as np
 
+from rlmolecule.alphazero.reward import Reward
 from rlmolecule.mcts.mcts_problem import MCTSProblem
 from rlmolecule.mcts.mcts_vertex import MCTSVertex
 from rlmolecule.tree_search.graph_search import GraphSearch
@@ -118,7 +119,7 @@ class MCTS(GraphSearch[MCTSVertex]):
     def _evaluate(
             self,
             search_path: [MCTSVertex],
-    ) -> float:
+    ) -> Reward:
         """
         Estimates the value of a leaf vertex.
         Simulation step of MCTS.
@@ -143,14 +144,14 @@ class MCTS(GraphSearch[MCTSVertex]):
             state = random.choice(children)
 
     @staticmethod
-    def _backpropagate(search_path: [MCTSVertex], value: float):
+    def _backpropagate(search_path: [MCTSVertex], value: Reward):
         """
         Backpropagation step of MCTS
         From Wikipedia (https://en.wikipedia.org/wiki/Monte_Carlo_tree_search):
         Backpropagation: Use the result of the playout to update information in the vertices on the search_path from C to R.
         """
         for vertex in reversed(search_path):
-            vertex.update(value)
+            vertex.update(value.scaled_reward)
 
     @staticmethod
     def visit_selection(parent: MCTSVertex) -> MCTSVertex:

@@ -49,13 +49,13 @@ class TestMCTSwithMoleculeState:
 
     def test_reward(self, solver, problem):
         game, root = setup_game(solver, problem)
-        assert problem.reward_wrapper(root.state) == 0.0
+        assert problem.reward_wrapper(root.state).raw_reward == 0.0
 
         game._expand(root)
 
-        assert problem.reward_wrapper(root.state) == 0.0
-        assert problem.reward_wrapper(root.children[-1].state) == 0.3597849378839701
-        assert problem.reward_wrapper(root.state) == 0.0
+        assert problem.reward_wrapper(root.state).raw_reward == 0.0
+        assert problem.reward_wrapper(root.children[-1].state).raw_reward == 0.3597849378839701
+        assert problem.reward_wrapper(root.state).raw_reward == 0.0
 
     def test_ucb_score(self, solver, problem):
         game, root = setup_game(solver, problem)
@@ -112,7 +112,8 @@ class TestMCTSwithMoleculeState:
 
     def test_evaluate(self, solver, problem):
         game, root = setup_game(solver, problem)
-        assert game._evaluate([root]) > 0.
+        reward = game._evaluate([root])
+        assert reward.raw_reward > 0.
 
     def test_mcts_sample(self, solver, problem):
         random.seed(42)
@@ -130,9 +131,9 @@ class TestMCTSwithMoleculeState:
 
         history, reward = game.run(num_mcts_samples=5)
         assert len(history) > 1
-        assert np.isfinite(reward)
+        assert np.isfinite(reward.raw_reward)
 
         try:
-            assert reward == problem.reward_wrapper(history[-1].state)
+            assert reward.raw_reward == problem.reward_wrapper(history[-1].state).raw_reward
         except AttributeError:  # Handle alphazero's history object
-            assert reward == problem.reward_wrapper(history[-1][0].state)
+            assert reward.raw_reward == problem.reward_wrapper(history[-1][0].state).raw_reward
