@@ -20,6 +20,7 @@ class AlphaZeroProblem(MCTSProblem):
                  engine: sqlalchemy.engine.Engine,
                  run_id: Optional[str] = None,
                  max_buffer_size: int = 200,
+                 min_buffer_size: int = 50,
                  batch_size: int = 32,
                  **kwargs):
 
@@ -30,6 +31,7 @@ class AlphaZeroProblem(MCTSProblem):
         self.run_id = run_id if run_id is not None else os.environ.get('AZ_RUNID', 'not specified')
         self.batch_size = batch_size
         self.max_buffer_size = max_buffer_size
+        self.min_buffer_size = min_buffer_size
 
     @property
     def session(self) -> 'sqlalchemy.orm.session.Session':

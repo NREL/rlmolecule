@@ -60,6 +60,7 @@ def game(request, engine, tmpdirname, config):
                                     num_heads=2,
                                     num_messages=1,
                                     run_id=name,
+                                    min_buffer_size=0,
                                     reward_class=reward_class,
                                     policy_checkpoint_dir=tmpdirname)
 

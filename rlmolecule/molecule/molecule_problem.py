@@ -1,6 +1,7 @@
 import itertools
 import logging
 import os
+import time
 from functools import partial
 from pathlib import Path
 from typing import Dict, Optional
@@ -139,6 +140,11 @@ class MoleculeAlphaZeroProblem(AlphaZeroProblem):
             epochs: int = int(1E4),
             **kwargs
     ) -> tf.keras.callbacks.History:
+
+        # wait to start training until enough games have occurred
+        while len(list(self.iter_recent_games())) < self.min_buffer_size:
+            logging.info(f"Policy trainer: waiting, not enough games found ({len(list(self.iter_recent_games()))})")
+            time.sleep(60)
 
         # Create the games dataset
         dataset = self._create_dataset()
