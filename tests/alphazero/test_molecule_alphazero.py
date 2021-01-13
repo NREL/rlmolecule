@@ -129,8 +129,3 @@ class TestPolicyTraining:
         # Make sure the policy changes the value prediction
         assert not np.isclose(initial_value, next_value)
         assert not np.isclose(initial_priors, next_priors).all()
-
-
-
-    # outputs = list(game_iterator(engine))
-    # outputs[0]
