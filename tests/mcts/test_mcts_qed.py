@@ -49,13 +49,13 @@ class TestMCTSwithMoleculeState:
 
     def test_reward(self, solver, problem):
         game, root = setup_game(solver, problem)
-        assert problem._reward_wrapper(root.state) == 0.0
+        assert problem.reward_wrapper(root.state) == 0.0
 
         game._expand(root)
 
-        assert problem._reward_wrapper(root.state) == 0.0
-        assert problem._reward_wrapper(root.children[-1].state) == 0.3597849378839701
-        assert problem._reward_wrapper(root.state) == 0.0
+        assert problem.reward_wrapper(root.state) == 0.0
+        assert problem.reward_wrapper(root.children[-1].state) == 0.3597849378839701
+        assert problem.reward_wrapper(root.state) == 0.0
 
     def test_ucb_score(self, solver, problem):
         game, root = setup_game(solver, problem)
@@ -132,8 +132,7 @@ class TestMCTSwithMoleculeState:
         assert len(history) > 1
         assert np.isfinite(reward)
 
-        leaf = history[-1]
         try:
-            assert reward == problem._reward_wrapper(history[-1].state)
+            assert reward == problem.reward_wrapper(history[-1].state)
         except AttributeError:  # Handle alphazero's history object
-            assert reward == problem._reward_wrapper(history[-1][0].state)
+            assert reward == problem.reward_wrapper(history[-1][0].state)

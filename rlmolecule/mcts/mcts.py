@@ -34,6 +34,7 @@ class MCTS(GraphSearch[MCTSVertex]):
             num_mcts_samples: int = 256,
             max_depth: int = 1000000,
             action_selection_function: Optional[Callable[[MCTSVertex], MCTSVertex]] = None,
+            reset_canonicalizer: bool = True,
     ) -> ([], float):
         """
         Run the MCTS search from the given starting state (or the root node if not provided). This function runs a
@@ -45,20 +46,25 @@ class MCTS(GraphSearch[MCTSVertex]):
         :param state: the starting state, or if not provided, the state returned from _get_root()
         :param action_selection_function: a function used to select among the possible next actions. Defaults to
             softmax sampling by visit counts.
+        :param reset_canonicalizer: whether to reset the graph canonicalizer in advance of the run
         :return: The search path (as a list of vertexes) and the reward from this search.
         """
+        if reset_canonicalizer:
+            self.canonicalizer.reset()
+
         vertex = self._get_root() if state is None else self.get_vertex_for_state(state)
         action_selection_function = self.softmax_selection if action_selection_function is None \
             else self.visit_selection
 
         path: [] = []
         for _ in range(max_depth):
+            # todo: this loop is odd, we're sampling terminal nodes a whole bunch of extra times
             self.sample(vertex, num_mcts_samples)
             self._accumulate_path_data(vertex, path)
-            children = vertex.children
-            if children is None or len(children) == 0:
-                return path, self.problem._reward_wrapper(vertex.state)
+            if len(vertex.children) == 0:
+                return path, self.problem.reward_wrapper(vertex.state)
             vertex = action_selection_function(vertex)
+
         logger.warning(f"{self} reached max_depth.")
         return path, math.nan
 
@@ -133,7 +139,7 @@ class MCTS(GraphSearch[MCTSVertex]):
         while True:
             children = state.get_next_actions()
             if len(children) == 0:
-                return self.problem._reward_wrapper(state)
+                return self.problem.reward_wrapper(state)
             state = random.choice(children)
 
     @staticmethod

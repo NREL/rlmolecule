@@ -15,7 +15,7 @@ from molecule_game.mol_preprocessor import (
 from rdkit.Chem.rdmolfiles import MolFromSmiles
 from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 
-from examples.stable_radical_optimization.run_mcts import predict
+from examples.old.stable_radical_optimization.run_mcts import predict
 from molecule_game.stable_radical_optimization.stable_radical_optimization_state import StableRadicalOptimizationState
 from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex

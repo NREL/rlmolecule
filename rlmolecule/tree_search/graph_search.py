@@ -11,20 +11,19 @@ Vertex = TypeVar('Vertex')
 
 class GraphSearch(Generic[Vertex], ABC):
     def __init__(self, vertex_class: Type[Vertex], canonicalizer: Optional[GraphSearchCanonicalizer] = None):
-        self.__id: uuid.UUID = uuid.uuid4()
-        self.__canonicalizer: GraphSearchCanonicalizer[Vertex] = \
+        self._canonicalizer: GraphSearchCanonicalizer[Vertex] = \
             HashCanonicalizer() if canonicalizer is None else canonicalizer
         self._vertex_class = vertex_class
 
     @property
-    def id(self) -> uuid.UUID:
-        return self.__id
+    def canonicalizer(self) -> GraphSearchCanonicalizer:
+        return self._canonicalizer
 
     def get_vertex_for_state(self, state: GraphSearchState) -> Vertex:
-        vertex = self.__canonicalizer.get_canonical_vertex(state)
+        vertex = self._canonicalizer.get_canonical_vertex(state)
         if vertex is None:
             vertex = self._make_new_vertex(state)
-            vertex = self.__canonicalizer.canonicalize_vertex(vertex)
+            vertex = self._canonicalizer.canonicalize_vertex(vertex)
         return vertex
 
     # noinspection PyMethodMayBeStatic

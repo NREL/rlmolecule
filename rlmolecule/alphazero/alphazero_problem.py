@@ -33,7 +33,7 @@ class AlphaZeroProblem(MCTSProblem):
     def session(self) -> 'sqlalchemy.orm.session.Session':
         return self._session
 
-    def _reward_wrapper(self, state: GraphSearchState) -> float:
+    def reward_wrapper(self, state: GraphSearchState) -> float:
         """A wrapper that caches reward calculations in a SQL database, and calls self.get_scaled_reward
 
         :param state: The state for which rewards are cached
@@ -62,11 +62,13 @@ class AlphaZeroProblem(MCTSProblem):
         :param reward: The final state's unscaled reward
         :param game: The game object just played
         """
+
+        # path[-1] is the terminal state with no children
         search_statistics = [
             (vertex.state.serialize(), visit_probabilities)
-            for (vertex, visit_probabilities) in path]
+            for (vertex, visit_probabilities) in path[:-1]]
 
-        record = Game(id=str(game.id),
+        record = Game(id=str(self.id),
                       run_id=self.run_id,
                       raw_reward=reward,
                       scaled_reward=self.get_scaled_reward(reward),
@@ -86,7 +88,7 @@ class AlphaZeroProblem(MCTSProblem):
 
         for game in recent_games:
             parent_state_string, visit_probabilities = random.choice(game.search_statistics)
-            yield parent_state_string, visit_probabilities, game.scaled_reward
+            yield parent_state_string, game.scaled_reward, visit_probabilities
 
     def get_scaled_reward(self, reward: float) -> float:
         """

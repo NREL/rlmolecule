@@ -3,10 +3,6 @@ from typing import Optional, Tuple
 import nfp
 import tensorflow as tf
 from tensorflow.keras import layers
-from tensorflow.python.keras.losses import (
-    LossFunctionWrapper,
-    losses_utils,
-)
 
 from rlmolecule.molecule.policy.preprocessor import MolPreprocessor, load_preprocessor
 
@@ -59,33 +55,6 @@ def policy_model(preprocessor: Optional[MolPreprocessor] = None,
     pi_logit = layers.Dense(1)(global_state)
 
     return tf.keras.Model(input_tensors, [value_logit, pi_logit], name='policy_model')
-
-
-def kl_with_logits(y_true, y_pred) -> tf.Tensor:
-    """ It's typically more numerically stable *not* to perform the softmax,
-    but instead define the loss based on the raw logit predictions. This loss
-    function corrects a tensorflow omission where there isn't a KLD loss that
-    accepts raw logits. """
-
-    # Mask nan values in y_true with zeros
-    y_true = tf.where(tf.math.is_finite(y_true), y_true, tf.zeros_like(y_true))
-
-    return (
-            tf.keras.losses.categorical_crossentropy(y_true, y_pred, from_logits=True) -
-            tf.keras.losses.categorical_crossentropy(y_true, y_true, from_logits=False))
-
-
-class KLWithLogits(LossFunctionWrapper):
-    """ Keras sometimes wants these loss function wrappers to define how to
-    reduce the loss over variable batch sizes """
-
-    def __init__(self,
-                 reduction=losses_utils.ReductionV2.AUTO,
-                 name='kl_with_logits'):
-        super(KLWithLogits, self).__init__(
-            kl_with_logits,
-            name=name,
-            reduction=reduction)
 
 
 class PolicyWrapper(layers.Layer):

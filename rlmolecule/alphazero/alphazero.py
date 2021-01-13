@@ -74,14 +74,14 @@ class AlphaZero(MCTS):
 
         children = leaf.children
         if len(children) == 0:
-            return self.problem._reward_wrapper(leaf.state)
+            return self.problem.reward_wrapper(leaf.state)
 
         # get value estimate and child priors
         value, child_priors = self.problem.get_value_and_policy(leaf)
 
         # Store prior values for child vertices predicted from the policy network, and add dirichlet noise as
         # specified in the game configuration.
-        if self._dirichlet_noise != 0:
+        if self._dirichlet_noise:
             prior_array: np.ndarray = np.array([child_priors[child] for child in children])
             random_state = np.random.RandomState()
             noise = random_state.dirichlet(np.ones_like(prior_array) * self._dirichlet_alpha)
@@ -93,6 +93,7 @@ class AlphaZero(MCTS):
         return value
 
     def run(self, *args, **kwargs) -> ([], float):
+        self.problem.initialize_run()
         path, reward = MCTS.run(self, *args, **kwargs)
         self.problem._store_search_statistics(path, reward, self)
         return path, reward

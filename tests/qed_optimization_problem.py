@@ -16,10 +16,10 @@ class QEDOptimizationProblem(AlphaZeroProblem):
 
     def __init__(self, engine: sqlalchemy.engine.Engine, config: MoleculeConfig, **kwargs) -> None:
         super(QEDOptimizationProblem, self).__init__(engine, **kwargs)
-        self.__config = config
+        self._config = config
 
     def get_initial_state(self) -> MoleculeState:
-        return MoleculeState(rdkit.Chem.MolFromSmiles('C'), self.__config)
+        return MoleculeState(rdkit.Chem.MolFromSmiles('C'), self._config)
 
     @functools.lru_cache(maxsize=None)
     def get_reward(self, state: MoleculeState) -> (float, {}):

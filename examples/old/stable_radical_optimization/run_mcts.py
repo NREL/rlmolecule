@@ -2,7 +2,7 @@ import os
 import sys
 import logging
 
-sys.path.append('..')
+sys.path.append('../..')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import numpy as np

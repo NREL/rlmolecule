@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import sys
 import time
-sys.path.append('..')
+sys.path.append('../..')
 
 
 import psycopg2

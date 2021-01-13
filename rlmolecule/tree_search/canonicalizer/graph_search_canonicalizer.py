@@ -15,3 +15,7 @@ class GraphSearchCanonicalizer(Generic[Vertex], ABC):
     @abstractmethod
     def canonicalize_vertex(self, vertex: Vertex) -> Vertex:
         pass
+
+    @abstractmethod
+    def reset(self) -> None:
+        pass

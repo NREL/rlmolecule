@@ -1,6 +1,6 @@
 import argparse
 import sys
-sys.path.append("..")
+sys.path.append("../..")
 
 import psycopg2
 

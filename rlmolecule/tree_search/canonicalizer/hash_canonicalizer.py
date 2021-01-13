@@ -20,3 +20,6 @@ class HashCanonicalizer(GraphSearchCanonicalizer[Vertex]):
         if state not in vertex_map:
             vertex_map[state] = vertex
         return vertex_map[state]
+
+    def reset(self) -> None:
+        self._vertex_map = {}
