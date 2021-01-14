@@ -51,17 +51,21 @@ class RankedRewardFactory(RewardFactory):
         self._reward_buffer_min_size = reward_buffer_min_size
         self._reward_buffer_max_size = reward_buffer_max_size
         self._ranked_reward_alpha = ranked_reward_alpha
+        self._has_enough_games = False
 
     def _scale(self, reward: float) -> float:
 
         all_games = self._session.query(GameStore).filter_by(run_id=self.run_id)
-        n_games = all_games.count()
 
-        if n_games < self._reward_buffer_min_size:
-            # Here, we don't have enough of a game buffer
-            # to decide if the move is good or not
-            logger.debug(f"ranked_reward: not enough games ({n_games})")
-            return np.random.choice([0., 1.])
+        if not self._has_enough_games:
+            n_games = all_games.count()
+            if n_games < self._reward_buffer_min_size:
+                # Here, we don't have enough of a game buffer
+                # to decide if the move is good or not
+                logger.debug(f"ranked_reward: not enough games ({n_games})")
+                return np.random.choice([0., 1.])
+            else:
+                self._has_enough_games = True  # todo: write tests?
 
         buffer_games = all_games.order_by(GameStore.index.desc()).limit(self._reward_buffer_max_size)
         buffer_raw_rewards = self._session.query(buffer_games.subquery().c.raw_reward).all()

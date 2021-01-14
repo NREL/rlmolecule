@@ -39,7 +39,10 @@ config = MoleculeConfig(max_atoms=4,
                         stereoisomers=False)
 
 engine = create_engine(f'sqlite:///qed_data.db',
-                       connect_args={'check_same_thread': False})
+                       connect_args={'check_same_thread': False},
+                       execution_options={"isolation_level": "AUTOCOMMIT"},
+                       echo=True)
+
 
 run_id = 'qed_example'
 
@@ -52,14 +55,15 @@ reward_factory = RankedRewardFactory(
 )
 
 problem = QEDOptimizationProblem(
-    engine,
-    config,
-    run_id=run_id,
-    reward_class=reward_factory,
-    features=8,
-    num_heads=2,
-    num_messages=1,
-    policy_checkpoint_dir='policy_checkpoints')
+        engine,
+        config,
+        run_id=run_id,
+        reward_class=reward_factory,
+        features=8,
+        num_heads=2,
+        num_messages=1,
+        min_buffer_size=15,
+        policy_checkpoint_dir='policy_checkpoints')
 
 def run_games():
     game = AlphaZero(problem)
@@ -84,16 +88,24 @@ def train_model():
 
 
 if __name__ == "__main__":
-    run_games()
-    #
+
+    # run_games()
+    # train_model()
+
     # job = multiprocessing.Process(target=run_games)
     # job.start()
-    # job.join(300)
+    # job.join()
 
-    #
-    # p = multiprocessing.Process(target=train_model)
-    # p.start()
 
-    # p = multiprocessing.Process(target=monitor)
-    # p.start()
-    # p.join(timeout=300)
+
+    jobs = []
+    for i in range(1):
+        jobs += [multiprocessing.Process(target=run_games)]
+
+    jobs += [multiprocessing.Process(target=train_model)]
+
+    for job in jobs:
+        job.start()
+
+    for job in jobs:
+        job.join(300)

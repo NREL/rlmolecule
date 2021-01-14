@@ -50,6 +50,8 @@ class MCTS(GraphSearch[MCTSVertex]):
         :param reset_canonicalizer: whether to reset the graph canonicalizer in advance of the run
         :return: The search path (as a list of vertexes) and the reward from this search.
         """
+        self.problem.initialize_run()
+
         if reset_canonicalizer:
             self.canonicalizer.reset()
 
@@ -67,7 +69,7 @@ class MCTS(GraphSearch[MCTSVertex]):
             vertex = action_selection_function(vertex)
 
         logger.warning(f"{self} reached max_depth.")
-        return path, math.nan
+        return path, math.nan  # todo: make sure this returns a reward class
 
     def sample(
             self,

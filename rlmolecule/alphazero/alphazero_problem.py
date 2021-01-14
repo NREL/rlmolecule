@@ -54,7 +54,7 @@ class AlphaZeroProblem(MCTSProblem):
                                  state=state.serialize(),
                                  reward=reward,
                                  data=data)
-            self.session.add(record)
+            self.session.add(record)  # todo: replace instead of insert? (on conflict do nothing)
             self.session.commit()
 
         return self.reward_class(reward)

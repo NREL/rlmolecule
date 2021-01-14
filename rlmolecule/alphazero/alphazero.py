@@ -93,7 +93,6 @@ class AlphaZero(MCTS):
         return self.problem.reward_class(value)
 
     def run(self, *args, **kwargs) -> ([], float):
-        self.problem.initialize_run()
         path, reward = MCTS.run(self, *args, **kwargs)
         self.problem._store_search_statistics(path, reward, self)
         return path, reward
