@@ -94,7 +94,7 @@ class AlphaZero(MCTS):
 
     def run(self, *args, **kwargs) -> ([], float):
         path, reward = MCTS.run(self, *args, **kwargs)
-        self.problem._store_search_statistics(path, reward, self)
+        self.problem._store_search_statistics(path, reward)
         return path, reward
 
     def _ucb_score(self, parent: AlphaZeroVertex, child: AlphaZeroVertex) -> float:

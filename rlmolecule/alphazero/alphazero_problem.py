@@ -25,7 +25,7 @@ class AlphaZeroProblem(MCTSProblem):
                  **kwargs):
 
         super(AlphaZeroProblem, self).__init__(**kwargs)
-        Base.metadata.create_all(engine)
+        Base.metadata.create_all(engine, checkfirst=True)
         Session.configure(bind=engine)
         self._session = Session()
         self.run_id = run_id if run_id is not None else os.environ.get('AZ_RUNID', 'not specified')
@@ -54,17 +54,16 @@ class AlphaZeroProblem(MCTSProblem):
                                  state=state.serialize(),
                                  reward=reward,
                                  data=data)
-            self.session.add(record)  # todo: replace instead of insert? (on conflict do nothing)
+            self.session.merge(record)
             self.session.commit()
 
         return self.reward_class(reward)
 
-    def _store_search_statistics(self, path: [], reward: Reward, game: 'AlphaZero') -> None:
+    def _store_search_statistics(self, path: [], reward: Reward) -> None:
         """Store the game data in the replay buffer
 
         :param path: The path data collected by AlphaZero._accumulate_path_data
         :param reward: The final state's unscaled reward
-        :param game: The game object just played
         """
 
         # path[-1] is the terminal state with no children

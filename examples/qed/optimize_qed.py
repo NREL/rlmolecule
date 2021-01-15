@@ -1,60 +1,62 @@
-import multiprocessing
 import logging
+import multiprocessing
+import time
 
 import rdkit
 from rdkit.Chem.QED import qed
 from sqlalchemy import create_engine
 
-from rlmolecule.alphazero.alphazero import AlphaZero
-from rlmolecule.alphazero.reward import RankedRewardFactory
-from rlmolecule.molecule.molecule_config import MoleculeConfig
-from rlmolecule.molecule.molecule_problem import MoleculeAlphaZeroProblem
-from rlmolecule.molecule.molecule_state import MoleculeState
-from rlmolecule.sql.tables import RewardStore
-
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class QEDOptimizationProblem(MoleculeAlphaZeroProblem):
+def construct_problem():
+    # We have to delay all importing of tensorflow until the child processes launch,
+    # see https://github.com/tensorflow/tensorflow/issues/8220. We should be more careful about where / when we
+    # import tensorflow, especially if there's a chance we'll use tf.serving to do the policy / reward evaluations on
+    # the workers. Might require upstream changes to nfp as well.
+    from rlmolecule.alphazero.reward import RankedRewardFactory
+    from rlmolecule.molecule.molecule_config import MoleculeConfig
+    from rlmolecule.molecule.molecule_problem import MoleculeAlphaZeroProblem
+    from rlmolecule.molecule.molecule_state import MoleculeState
 
-    def __init__(self,
-                 engine: 'sqlalchemy.engine.Engine',
-                 config: 'MoleculeConfig', **kwargs) -> None:
-        super(QEDOptimizationProblem, self).__init__(engine, **kwargs)
-        self._config = config
+    class QEDOptimizationProblem(MoleculeAlphaZeroProblem):
 
-    def get_initial_state(self) -> MoleculeState:
-        return MoleculeState(rdkit.Chem.MolFromSmiles('C'), self._config)
+        def __init__(self,
+                     engine: 'sqlalchemy.engine.Engine',
+                     config: 'MoleculeConfig', **kwargs) -> None:
+            super(QEDOptimizationProblem, self).__init__(engine, **kwargs)
+            self._config = config
 
-    def get_reward(self, state: MoleculeState) -> (float, {}):
-        if state.forced_terminal:
-            return qed(state.molecule), {'forced_terminal': True}
-        return 0.0, {'forced_terminal': False}
+        def get_initial_state(self) -> MoleculeState:
+            return MoleculeState(rdkit.Chem.MolFromSmiles('C'), self._config)
 
-config = MoleculeConfig(max_atoms=4,
-                        min_atoms=1,
-                        tryEmbedding=False,
-                        sa_score_threshold=None,
-                        stereoisomers=False)
+        def get_reward(self, state: MoleculeState) -> (float, {}):
+            if state.forced_terminal:
+                return qed(state.molecule), {'forced_terminal': True, 'smiles': state.smiles}
+            return 0.0, {'forced_terminal': False, 'smiles': state.smiles}
 
-engine = create_engine(f'sqlite:///qed_data.db',
-                       connect_args={'check_same_thread': False},
-                       execution_options={"isolation_level": "AUTOCOMMIT"},
-                       echo=True)
+    config = MoleculeConfig(max_atoms=25,
+                            min_atoms=1,
+                            tryEmbedding=True,
+                            sa_score_threshold=4.,
+                            stereoisomers=False)
 
+    engine = create_engine(f'sqlite:///qed_data.db',
+                           connect_args={'check_same_thread': False},
+                           execution_options = {"isolation_level": "AUTOCOMMIT"})
 
-run_id = 'qed_example'
+    run_id = 'qed_example'
 
-reward_factory = RankedRewardFactory(
-    engine=engine,
-    run_id=run_id,
-    reward_buffer_min_size=10,
-    reward_buffer_max_size=50,
-    ranked_reward_alpha=0.75
-)
+    reward_factory = RankedRewardFactory(
+        engine=engine,
+        run_id=run_id,
+        reward_buffer_min_size=10,
+        reward_buffer_max_size=50,
+        ranked_reward_alpha=0.75
+    )
 
-problem = QEDOptimizationProblem(
+    problem = QEDOptimizationProblem(
         engine,
         config,
         run_id=run_id,
@@ -63,48 +65,57 @@ problem = QEDOptimizationProblem(
         num_heads=2,
         num_messages=1,
         min_buffer_size=15,
-        policy_checkpoint_dir='policy_checkpoints')
+        policy_checkpoint_dir='policy_checkpoints'
+    )
+
+    return problem
+
 
 def run_games():
-    game = AlphaZero(problem)
+    from rlmolecule.alphazero.alphazero import AlphaZero
+    game = AlphaZero(construct_problem())
     while True:
         path, reward = game.run(num_mcts_samples=50)
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
 
 
 def train_model():
-    problem.train_policy_model(steps_per_epoch=100)
+    construct_problem().train_policy_model(steps_per_epoch=100,
+                                           game_count_delay=20,
+                                           verbose=2)
 
-# def monitor():
-#
-#     while True:
-#         best_reward = problem.session.query(RewardStore) \
-#             .filter_by(run_id=problem.run_id) \
-#             .order_by(RewardStore.reward.desc()).first().reward
-#
-#         print(f"Best Reward: {best_reward}")
-#
-#         time.sleep(1)
+
+def monitor():
+
+    from rlmolecule.sql.tables import RewardStore
+    problem = construct_problem()
+
+    while True:
+        best_reward = problem.session.query(RewardStore) \
+            .filter_by(run_id=problem.run_id) \
+            .order_by(RewardStore.reward.desc()).first()
+
+        num_games = len(list(problem.iter_recent_games()))
+
+        if best_reward:
+            print(f"Best Reward: {best_reward.reward:.3f} for molecule "
+                  f"{best_reward.data['smiles']} with {num_games} games played")
+
+        time.sleep(5)
 
 
 if __name__ == "__main__":
 
-    # run_games()
-    # train_model()
+    jobs = [multiprocessing.Process(target=monitor)]
+    jobs[0].start()
+    time.sleep(1)
 
-    # job = multiprocessing.Process(target=run_games)
-    # job.start()
-    # job.join()
-
-
-
-    jobs = []
-    for i in range(1):
+    for i in range(5):
         jobs += [multiprocessing.Process(target=run_games)]
 
     jobs += [multiprocessing.Process(target=train_model)]
 
-    for job in jobs:
+    for job in jobs[1:]:
         job.start()
 
     for job in jobs:

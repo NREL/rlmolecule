@@ -49,11 +49,14 @@ class MoleculeAlphaZeroProblem(AlphaZeroProblem):
         super(MoleculeAlphaZeroProblem, self).initialize_run()
 
         if self.policy_checkpoint_dir:
-            self._checkpoint = tf.train.latest_checkpoint(self.policy_checkpoint_dir)
-            if self._checkpoint:
+            new_checkpoint = tf.train.latest_checkpoint(self.policy_checkpoint_dir)
+            if new_checkpoint != self._checkpoint:
+                self._checkpoint = new_checkpoint
                 status = self.policy_model.load_weights(self._checkpoint)
                 status.assert_existing_objects_matched()
                 logger.info(f'Loaded checkpoint {self._checkpoint}')
+            elif new_checkpoint == self._checkpoint:
+                logger.info(f'Skipping already loaded {self._checkpoint}')
             else:
                 logger.info('No checkpoint found')
 
@@ -138,13 +141,14 @@ class MoleculeAlphaZeroProblem(AlphaZeroProblem):
             steps_per_epoch: int = 750,
             lr: float = 1E-3,
             epochs: int = int(1E4),
+            game_count_delay: int = 30,
             **kwargs
     ) -> tf.keras.callbacks.History:
 
         # wait to start training until enough games have occurred
         while len(list(self.iter_recent_games())) < self.min_buffer_size:
             logging.info(f"Policy trainer: waiting, not enough games found ({len(list(self.iter_recent_games()))})")
-            time.sleep(60)
+            time.sleep(game_count_delay)
 
         # Create the games dataset
         dataset = self._create_dataset()
