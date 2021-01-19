@@ -139,5 +139,7 @@ cython_debug/
 Untitled*.ipynb
 .*.sh
 
-/stable_radical_optimization/rlops_pass
+#/stable_radical_optimization/rlops_pass
+# can ignore the file anywhere it appears by simply using its name?
+rlops_pass     
 .idea/
