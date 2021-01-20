@@ -7,6 +7,8 @@ from functools import partial
 from pathlib import Path
 from typing import Dict, Optional
 
+from numpy import array
+
 import sqlalchemy
 import tensorflow as tf
 from tensorflow.python.keras.preprocessing.sequence import pad_sequences
@@ -26,7 +28,8 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
     def __init__(self,
                  engine: sqlalchemy.engine.Engine,
                  policy_checkpoint_dir: Optional[str] = None,
-                 hallway_size: int = None,
+                 hallway_size: int = 5,
+                 max_steps: int = 32,
                  features: int = 8,
                  hidden_layers: int = 3,
                  hidden_dim: int = 16,
@@ -34,8 +37,9 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
                  ) -> None:
 
         super(HallwayAlphaZeroProblem, self).__init__(engine, **kwargs)
-        hallway_size = hallway_size if hallway_size is not None else HallwayConfig().size
-        self.policy_model = build_policy_trainer(hallway_size, features, hidden_layers, hidden_dim)
+        hallway_size = hallway_size
+        max_steps = max_steps
+        self.policy_model = build_policy_trainer(hallway_size, max_steps, features, hidden_layers, hidden_dim)
         self.policy_checkpoint_dir = policy_checkpoint_dir
         policy_model_layer = self.policy_model.layers[-1].policy_model
         self.policy_evaluator = tf.function(experimental_relax_shapes=True)(policy_model_layer.predict_step)
@@ -61,7 +65,7 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
                 logger.info('No checkpoint found')
 
     def _get_network_inputs(self, state: HallwayState) -> Dict:
-        return {"position": [state.position]}
+        return {"position": array([[state.position]]), "steps": array([[state.steps]])}
 
     def _get_batched_network_inputs(self, parent: AlphaZeroVertex) -> Dict:
         """
@@ -91,7 +95,7 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
 
     def _get_network_inputs_from_serialized_parent(
             self,
-            serialized_parent: tf.Tensor) -> {}:
+            serialized_parent: tf.Tensor) -> ({}, {}):
 
         parent = HallwayState.deserialize(serialized_parent.numpy().decode())
 
@@ -101,7 +105,7 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
         policy_inputs = {key: pad_sequences([elem[key] for elem in policy_inputs], padding='post')
                          for key in policy_inputs[0].keys()}
 
-        return policy_inputs['position']
+        return policy_inputs['position'], policy_inputs['steps']
 
 
     def _create_dataset(self) -> tf.data.Dataset:
@@ -114,26 +118,28 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
 
         def get_policy_inputs_tf(parent, reward, visit_probabilities,
                                  problem: HallwayAlphaZeroProblem) -> {}:
-            position = tf.py_function(
+            position, steps = tf.py_function(
                 problem._get_network_inputs_from_serialized_parent, inp=[parent],
-                Tout=[tf.int64])
-            print(position)
-            position.set_shape([None, None])
-            return {"position": position}, (reward, visit_probabilities)
+                Tout=[tf.int64, tf.int64])
+            position.set_shape([None, 1])
+            steps.set_shape([None, 1])
+            return {"position": position, "steps": steps}, (reward, visit_probabilities)
 
         dataset = tf.data.Dataset.from_generator(
             self.iter_recent_games,
-            output_shapes=((), (), (None,)),
+            output_shapes=((), (), (None, )),
             output_types=(tf.string, tf.float32, tf.float32)) \
             .repeat() \
             .shuffle(self.max_buffer_size) \
             .map(partial(get_policy_inputs_tf, problem=self),
                  num_parallel_calls=tf.data.experimental.AUTOTUNE) \
+            .padded_batch(self.batch_size,
+                          padding_values=(
+                              {"position": tf.constant(-1, dtype=tf.int64), 
+                               "steps": tf.constant(-1, dtype=tf.int64)},
+                              (0., 0.))) \
             .prefetch(tf.data.experimental.AUTOTUNE)
-            #.padded_batch(self.batch_size,
-            #              padding_values=({"position": -2}, (0., 0.))) \
-            #.prefetch(tf.data.experimental.AUTOTUNE)
-
+            
         return dataset
 
     def train_policy_model(
@@ -151,6 +157,7 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
 
         # Create the games dataset
         dataset = self._create_dataset()
+        print(dataset)
 
         # Create a callback to store optimized models at given frequencies
         model_checkpoint = tf.keras.callbacks.ModelCheckpoint(

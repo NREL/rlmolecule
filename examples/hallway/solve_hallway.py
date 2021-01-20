@@ -24,15 +24,12 @@ def construct_problem():
 
         
         def get_initial_state(self) -> HallwayState:
-            return HallwayState(int(self._config.size/2), self._config)
+            return HallwayState(int(self._config.size/2), 0, self._config)
 
         def get_reward(self, state: HallwayState) -> (float, {}):
-            if state.forced_terminal:
-                return self._config.terminal_reward, {'forced_terminal': True, 'position': state.position}
-            else:
-                return self._config.step_reward, {'forced_terminal': False, 'position': state.position}
+            return -1.*state.steps, {'position': state.position}
 
-    config = HallwayConfig()
+    config = HallwayConfig(size=8, max_steps=6)
 
     engine = create_engine(f'sqlite:///hallway_data.db',
                            connect_args={'check_same_thread': False},
@@ -69,7 +66,8 @@ def run_games():
     from rlmolecule.alphazero.alphazero import AlphaZero
     game = AlphaZero(construct_problem())
     while True:
-        path, reward = game.run(num_mcts_samples=50)
+        path, reward = game.run(num_mcts_samples=3)
+        #print(path, reward.__dict__)
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
 
 
@@ -91,7 +89,7 @@ def monitor():
 
         num_games = len(list(problem.iter_recent_games()))
 
-        if "position" in best_reward.data:
+        if hasattr(best_reward, "data") and "position" in best_reward.data:
             print(f"Best Reward: {best_reward.reward:.3f} for final position "
                   f"{best_reward.data['position']} with {num_games} games played")
 
@@ -105,7 +103,7 @@ if __name__ == "__main__":
         jobs[0].start()
         time.sleep(1)
 
-        for i in range(2):
+        for i in range(5):
             jobs += [multiprocessing.Process(target=run_games)]
 
         jobs += [multiprocessing.Process(target=train_model)]
@@ -119,3 +117,4 @@ if __name__ == "__main__":
     else:
 
         run_games()
+
