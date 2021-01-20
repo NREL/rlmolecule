@@ -65,7 +65,7 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
                 logger.info('No checkpoint found')
 
     def _get_network_inputs(self, state: HallwayState) -> Dict:
-        return {"position": array([[state.position]]), "steps": array([[state.steps]])}
+        return {"position": array([state.position]), "steps": array([state.steps])}
 
     def _get_batched_network_inputs(self, parent: AlphaZeroVertex) -> Dict:
         """
@@ -135,8 +135,8 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
                  num_parallel_calls=tf.data.experimental.AUTOTUNE) \
             .padded_batch(self.batch_size,
                           padding_values=(
-                              {"position": tf.constant(-1, dtype=tf.int64), 
-                               "steps": tf.constant(-1, dtype=tf.int64)},
+                              {"position": tf.constant(0, dtype=tf.int64), # Not sure what this should be
+                               "steps": tf.constant(0, dtype=tf.int64)},
                               (0., 0.))) \
             .prefetch(tf.data.experimental.AUTOTUNE)
             

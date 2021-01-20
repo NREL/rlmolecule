@@ -24,12 +24,13 @@ def construct_problem():
 
         
         def get_initial_state(self) -> HallwayState:
-            return HallwayState(int(self._config.size/2), 0, self._config)
+            initial_position = int(self._config.size/2)  # start at mid-point
+            return HallwayState(initial_position, 0, self._config)
 
         def get_reward(self, state: HallwayState) -> (float, {}):
-            return -1.*state.steps, {'position': state.position}
+            return -1.0*state.steps, {'position': state.position}
 
-    config = HallwayConfig(size=8, max_steps=6)
+    config = HallwayConfig(size=63, max_steps=64)
 
     engine = create_engine(f'sqlite:///hallway_data.db',
                            connect_args={'check_same_thread': False},
@@ -66,8 +67,8 @@ def run_games():
     from rlmolecule.alphazero.alphazero import AlphaZero
     game = AlphaZero(construct_problem())
     while True:
-        path, reward = game.run(num_mcts_samples=3)
-        #print(path, reward.__dict__)
+        path, reward = game.run(num_mcts_samples=16)
+        print("REWARD:", reward, "PATH:", path)
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
 
 
