@@ -1,7 +1,6 @@
 import itertools
 import logging
 import os
-from rlmolecule.molecule.policy.preprocessor import MolPreprocessor
 import time
 from functools import partial
 from pathlib import Path
@@ -17,9 +16,8 @@ from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from rlmolecule.alphazero.keras_utils import KLWithLogits, TimeCsvLogger
 
-from rlmolecule.hallway.hallway_state import HallwayState
-from rlmolecule.hallway.hallway_config import HallwayConfig
-from rlmolecule.hallway.policy.model import build_policy_trainer
+from hallway_state import HallwayState
+from model import build_policy_trainer
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +28,6 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
                  policy_checkpoint_dir: Optional[str] = None,
                  hallway_size: int = 5,
                  max_steps: int = 32,
-                 features: int = 8,
                  hidden_layers: int = 3,
                  hidden_dim: int = 16,
                  **kwargs
@@ -39,7 +36,7 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
         super(HallwayAlphaZeroProblem, self).__init__(engine, **kwargs)
         hallway_size = hallway_size
         max_steps = max_steps
-        self.policy_model = build_policy_trainer(hallway_size, max_steps, features, hidden_layers, hidden_dim)
+        self.policy_model = build_policy_trainer(hallway_size, hidden_layers, hidden_dim)
         self.policy_checkpoint_dir = policy_checkpoint_dir
         policy_model_layer = self.policy_model.layers[-1].policy_model
         self.policy_evaluator = tf.function(experimental_relax_shapes=True)(policy_model_layer.predict_step)
@@ -73,7 +70,6 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
         inputs of its successor nodes. Used as the inputs for the policy neural
         network
         """
-
         policy_inputs = [self._get_network_inputs(vertex.state)
                          for vertex in itertools.chain((parent,), parent.children)]
         return {key: pad_sequences([elem[key] for elem in policy_inputs], padding='post')
@@ -83,8 +79,9 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
 
         values, prior_logits = self.policy_evaluator(self._get_batched_network_inputs(parent))
 
-        # inputs to policy network
-        priors = tf.nn.softmax(prior_logits[1:]).numpy().flatten()
+        # Softmax the child priors.  Be careful here that you're slicing all needed
+        # dimensions, otherwise you can end up with elementwise softmax (i.e., all 1's).
+        priors = tf.nn.softmax(prior_logits[1:, 0, 0]).numpy().flatten()
 
         # Update child nodes with predicted prior_logits
         children_priors = {vertex: prior for vertex, prior in zip(parent.children, priors)}

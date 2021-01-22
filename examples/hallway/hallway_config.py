@@ -1,5 +1,3 @@
-from typing import List, Optional
-
 
 class HallwayConfig:
     def __init__(self, 

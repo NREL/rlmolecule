@@ -10,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 def construct_problem():
     from rlmolecule.alphazero.reward import RankedRewardFactory
-    from rlmolecule.hallway.hallway_config import HallwayConfig
-    from rlmolecule.hallway.hallway_problem import HallwayAlphaZeroProblem
-    from rlmolecule.hallway.hallway_state import HallwayState
+    from hallway_config import HallwayConfig
+    from hallway_problem import HallwayAlphaZeroProblem
+    from hallway_state import HallwayState
 
     class HallwayProblem(HallwayAlphaZeroProblem):
         def __init__(self,
@@ -24,13 +24,13 @@ def construct_problem():
 
         
         def get_initial_state(self) -> HallwayState:
-            initial_position = int(self._config.size/2)  # start at mid-point
-            return HallwayState(initial_position, 0, self._config)
+            return HallwayState(1, 0, self._config)
 
         def get_reward(self, state: HallwayState) -> (float, {}):
-            return -1.0*state.steps, {'position': state.position}
+            reward = -1.0 * (state.steps + (self._config.size - state.position))
+            return reward, {'position': state.position}
 
-    config = HallwayConfig(size=63, max_steps=64)
+    config = HallwayConfig(size=16, max_steps=16)
 
     engine = create_engine(f'sqlite:///hallway_data.db',
                            connect_args={'check_same_thread': False},
@@ -52,7 +52,6 @@ def construct_problem():
         run_id=run_id,
         reward_class=reward_factory,
         hallway_size=config.size,
-        features=8,
         hidden_layers=3,
         hidden_dim=16,
         min_buffer_size=15,
@@ -65,10 +64,10 @@ def construct_problem():
 
 def run_games():
     from rlmolecule.alphazero.alphazero import AlphaZero
-    game = AlphaZero(construct_problem())
+    game = AlphaZero(construct_problem(), dirichlet_alpha=0.01, dirichlet_x=0.01)
     while True:
-        path, reward = game.run(num_mcts_samples=16)
-        print("REWARD:", reward, "PATH:", path)
+        path, reward = game.run(num_mcts_samples=50)
+        print("REWARD:", reward.__dict__)
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
 
 

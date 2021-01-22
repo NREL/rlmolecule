@@ -5,25 +5,23 @@ from tensorflow.keras import layers
 
 
 def policy_model(hallway_size: int,
-                 max_steps: int,
-                 features: int = 8,
-                 hidden_layers: int = 3,
-                 hidden_dim: int = 16) -> tf.keras.Model:
+                 hidden_layers: int,
+                 hidden_dim: int) -> tf.keras.Model:
 
-    # Position input and embedding
-    position = layers.Input([None, 1], dtype=tf.int64, name="position")
-    xp = layers.Embedding(hallway_size, features, name="position_emb")(position)
-    xp = tf.squeeze(xp, axis=2)  # so we can concatenate with steps later
+    # Position input
+    position = layers.Input([None, 1], dtype=tf.float32, name="position")
 
-    # Steps input and normalization by max_steps (to [0, 1])
+    # Steps input
     steps = layers.Input([None, 1], dtype=tf.float32, name="steps")
-    xs = layers.Lambda(lambda x: x / float(max_steps), name="steps_norm")(steps)
-    
+
+    # Create a feature that, for a pair of child states, is correlated with
+    # value under an optimal policy (higher = good, lower = bad).
+    x = layers.Add()([hallway_size*tf.ones_like(steps), -position, steps])
+
     # Dense layers and concatenation
     for layer in range(hidden_layers):
-        xp = layers.Dense(hidden_dim, activation="relu")(xp)
-        xs = layers.Dense(hidden_dim, activation="relu")(xs)
-    x = layers.Concatenate()([xp, xs])
+        x = layers.Dense(hidden_dim, activation="relu")(x)
+    x = layers.BatchNormalization()(x)
 
     value_logit = layers.Dense(1)(x)
     pi_logit = layers.Dense(1)(x)
@@ -35,22 +33,16 @@ class PolicyWrapper(layers.Layer):
 
     def __init__(self,
                  hallway_size: int,
-                 max_steps: int,
-                 features: int = 8,
-                 hidden_layers: int = 3,
-                 hidden_dim: int = 16,
+                 hidden_layers: int,
+                 hidden_dim: int,
                  **kwargs):
         super().__init__(**kwargs)
         self.hallway_size = hallway_size
-        self.max_steps = max_steps
-        self.features = features
         self.hidden_layers = hidden_layers
         self.hidden_dim = hidden_dim
 
     def build(self, input_shape):
         self.policy_model = policy_model(self.hallway_size,
-                                         self.max_steps,
-                                         self.features,
                                          self.hidden_layers,
                                          self.hidden_dim)
 
@@ -86,10 +78,8 @@ class PolicyWrapper(layers.Layer):
 
     
 def build_policy_trainer(hallway_size: int,
-                         max_steps: int,
-                         features: int = 8,
-                         hidden_layers: int = 3,
-                         hidden_dim: int = 16) -> tf.keras.Model:
+                         hidden_layers: int,
+                         hidden_dim: int) -> tf.keras.Model:
     """Builds a keras model that expects [bsz, actions] molecules as inputs and predicts batches of value scores and
     prior logits
 
@@ -99,7 +89,7 @@ def build_policy_trainer(hallway_size: int,
     steps = layers.Input(shape=[None, 1], dtype=tf.int64, name="steps")
 
     value_preds, masked_prior_logits = PolicyWrapper(
-        hallway_size, max_steps, features, hidden_layers, hidden_dim)([position, steps])
+        hallway_size, hidden_layers, hidden_dim)([position, steps])
 
     policy_trainer = tf.keras.Model([position, steps], [value_preds, masked_prior_logits])
     
