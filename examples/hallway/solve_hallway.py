@@ -1,15 +1,17 @@
 import logging
-import multiprocessing
 import time
 
 from sqlalchemy import create_engine
 
 # logging.basicConfig(level=logging.INFO)
+from rlmolecule.tree_search.reward import LinearBoundedRewardFactory, RawRewardFactory
+
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
-def construct_problem():
-    from rlmolecule.alphazero.reward import RankedRewardFactory
+def construct_problem(ranked_reward=True):
+    from rlmolecule.tree_search.reward import RankedRewardFactory
     from hallway_config import HallwayConfig
     from hallway_problem import HallwayAlphaZeroProblem
     from hallway_state import HallwayState
@@ -38,13 +40,16 @@ def construct_problem():
 
     run_id = "hallway_example"
 
-    reward_factory = RankedRewardFactory(
-        engine=engine,
-        run_id=run_id,
-        reward_buffer_min_size=10,
-        reward_buffer_max_size=50,
-        ranked_reward_alpha=0.75
-    )
+    if ranked_reward:
+        reward_factory = RankedRewardFactory(
+            engine=engine,
+            run_id=run_id,
+            reward_buffer_min_size=10,
+            reward_buffer_max_size=50,
+            ranked_reward_alpha=0.75
+        )
+    else:
+        reward_factory = LinearBoundedRewardFactory(min_reward=-30, max_reward=-15)
 
     problem = HallwayProblem(
         engine,
@@ -69,12 +74,17 @@ def run_games(use_az=True, num_mcts_samples=50):
         game = AlphaZero(construct_problem(), dirichlet_noise=False)
     else:
         from rlmolecule.mcts.mcts import MCTS
-        game = MCTS(construct_problem())
+        game = MCTS(construct_problem(ranked_reward=False))
 
     rewards_file = "_rewards.csv"
     #with open(rewards_file, "w") as f:  pass
     while True:
-        path, reward = game.run(num_mcts_samples=num_mcts_samples)
+        path, reward = game.run(
+            num_mcts_samples=num_mcts_samples,
+            action_selection_function=MCTS.visit_selection if not use_az else None)
+
+        print(path)
+
         print("REWARD:", reward.__dict__)
         if use_az:
             # Breaks if you use MCTS:
@@ -127,5 +137,5 @@ if __name__ == "__main__":
 
     else:
 
-        run_games(use_az=False, num_mcts_samples=10000)
+        run_games(use_az=False, num_mcts_samples=1000)
 

@@ -1,5 +1,4 @@
 import os
-import random
 import tempfile
 from unittest.mock import MagicMock
 
@@ -7,7 +6,7 @@ import pytest
 import numpy as np
 
 from rlmolecule.alphazero.alphazero import AlphaZero
-from rlmolecule.alphazero.reward import RankedRewardFactory, RawRewardFactory
+from rlmolecule.tree_search.reward import RankedRewardFactory, RawRewardFactory
 from rlmolecule.molecule.molecule_config import MoleculeConfig
 from tests.qed_optimization_problem import QEDWithMoleculePolicy
 
