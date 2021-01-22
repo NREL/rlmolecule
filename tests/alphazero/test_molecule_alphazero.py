@@ -41,6 +41,7 @@ def game(request, engine, tmpdirname, config):
 
     if name == 'raw':
         reward_class = RawRewardFactory()
+        noise = True
 
     elif name == 'ranked':
         reward_class = RankedRewardFactory(
@@ -49,6 +50,11 @@ def game(request, engine, tmpdirname, config):
             run_id=name,
             engine=engine
         )
+        noise = True
+
+    elif name == 'nonoise':
+        reward_class = RawRewardFactory()
+        noise = False
 
     else:
         raise RuntimeError(f"{name} not found")
@@ -64,9 +70,9 @@ def game(request, engine, tmpdirname, config):
                                     reward_class=reward_class,
                                     policy_checkpoint_dir=tmpdirname)
 
-    return AlphaZero(problem)
+    return AlphaZero(problem, dirichlet_noise=noise)
 
-@pytest.mark.parametrize('game', ['raw', 'ranked'], indirect=True)
+@pytest.mark.parametrize('game', ['raw', 'ranked', 'nonoise'], indirect=True)
 class TestPolicyTraining:
 
     def test_reward_caching(self, game):
