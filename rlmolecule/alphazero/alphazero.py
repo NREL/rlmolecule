@@ -81,12 +81,14 @@ class AlphaZero(MCTS):
 
         # Store prior values for child vertices predicted from the policy network, and add dirichlet noise as
         # specified in the game configuration.
+        prior_array: np.ndarray = np.array([child_priors[child] for child in children])
+
         if self._dirichlet_noise:
-            prior_array: np.ndarray = np.array([child_priors[child] for child in children])
             random_state = np.random.RandomState()
             noise = random_state.dirichlet(np.ones_like(prior_array) * self._dirichlet_alpha)
             prior_array = prior_array * (1 - self._dirichlet_x) + (noise * self._dirichlet_x)
-            child_priors = prior_array.tolist()
+
+        child_priors = prior_array.tolist()
         normalization_factor = sum(child_priors)
         leaf.child_priors = {child: prior / normalization_factor for child, prior in zip(children, child_priors)}
 
