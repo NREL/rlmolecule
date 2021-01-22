@@ -14,9 +14,8 @@ def policy_model(hallway_size: int,
     # Steps input
     steps = layers.Input([None, 1], dtype=tf.float32, name="steps")
 
-    # Create a feature that, for a pair of child states, is correlated with
-    # value under an optimal policy (higher = good, lower = bad).
-    x = layers.Add()([hallway_size*tf.ones_like(steps), -position, steps])
+    # Concatenate inputs
+    x = layers.Concatenate()((position, steps))
 
     # Dense layers and concatenation
     for layer in range(hidden_layers):

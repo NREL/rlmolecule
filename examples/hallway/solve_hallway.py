@@ -52,7 +52,7 @@ def construct_problem():
         run_id=run_id,
         reward_class=reward_factory,
         hallway_size=config.size,
-        hidden_layers=3,
+        hidden_layers=1,
         hidden_dim=16,
         min_buffer_size=15,
         policy_checkpoint_dir='policy_checkpoints'
@@ -62,14 +62,25 @@ def construct_problem():
 
 
 
-def run_games():
-    from rlmolecule.alphazero.alphazero import AlphaZero
-    game = AlphaZero(construct_problem(), dirichlet_alpha=0.01, dirichlet_x=0.01)
-    while True:
-        path, reward = game.run(num_mcts_samples=50)
-        print("REWARD:", reward.__dict__)
-        logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
+def run_games(use_az=True, num_mcts_samples=50):
 
+    if use_az:
+        from rlmolecule.alphazero.alphazero import AlphaZero
+        game = AlphaZero(construct_problem(), dirichlet_noise=False)
+    else:
+        from rlmolecule.mcts.mcts import MCTS
+        game = MCTS(construct_problem())
+
+    rewards_file = "_rewards.csv"
+    #with open(rewards_file, "w") as f:  pass
+    while True:
+        path, reward = game.run(num_mcts_samples=num_mcts_samples)
+        print("REWARD:", reward.__dict__)
+        if use_az:
+            # Breaks if you use MCTS:
+            logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
+        #with open(rewards_file, "a") as f: 
+        #    f.write(str(reward.raw_reward) + "\n")
 
 def train_model():
     construct_problem().train_policy_model(steps_per_epoch=100,
@@ -98,7 +109,7 @@ def monitor():
 
 if __name__ == "__main__":
 
-    if 1:
+    if 0:
         jobs = [multiprocessing.Process(target=monitor)]
         jobs[0].start()
         time.sleep(1)
@@ -116,5 +127,5 @@ if __name__ == "__main__":
 
     else:
 
-        run_games()
+        run_games(use_az=False, num_mcts_samples=10000)
 

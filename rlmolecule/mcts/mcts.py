@@ -163,6 +163,7 @@ class MCTS(GraphSearch[MCTSVertex]):
     def softmax_selection(parent: MCTSVertex) -> MCTSVertex:
         children: List[MCTSVertex] = parent.children
         visit_counts = np.array([child.visit_count for child in children])
+        visit_counts -= visit_counts.max()
         visit_softmax = np.exp(visit_counts) / sum(np.exp(visit_counts))
         return children[np.random.choice(range(len(children)), size=1, p=visit_softmax)[0]]
 
