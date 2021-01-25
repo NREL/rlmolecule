@@ -28,8 +28,25 @@ class RewardFactory(ABC):
 
 
 class RawRewardFactory(RewardFactory):
+    """Just passes the raw reward through as the scaled reward"""
     def _scale(self, reward: float) -> float:
         return reward
+
+
+class LinearBoundedRewardFactory(RewardFactory):
+    """Maps rewards to the 0->1 range, where the minimum reward maps to zero and the maximum reward maps to 1. Values
+    above and below the max / min reward are capped at 0 or 1 respectively. """
+    def __init__(self,
+                 min_reward: float = 0.,
+                 max_reward: float = 1.) -> None:
+        self.min_reward = min_reward
+        self.max_reward = max_reward
+
+    def _scale(self, reward: float) -> float:
+
+        scaled_reward = (reward - self.min_reward) / (self.max_reward - self.min_reward)
+        return float(np.clip(scaled_reward, 0, 1))
+
 
 # todo: not ideal to have run_id and engine as init args, but otherwise the rewardFactory and problem classes have a
 #  circular dependency. Ultimately it would probably better to do all the `reward_wrapper` logic in these classes,
@@ -43,7 +60,7 @@ class RankedRewardFactory(RewardFactory):
                  reward_buffer_min_size: int = 50,
                  reward_buffer_max_size: int = 250,
                  ranked_reward_alpha: float = 0.90,
-                 ):
+                 ) -> None:
 
         Session.configure(bind=engine)
         self._session = Session()

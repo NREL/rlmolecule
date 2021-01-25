@@ -2,7 +2,7 @@ import uuid
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from rlmolecule.alphazero.reward import RawRewardFactory, RewardFactory, Reward
+from rlmolecule.tree_search.reward import RawRewardFactory, RewardFactory, Reward
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
 

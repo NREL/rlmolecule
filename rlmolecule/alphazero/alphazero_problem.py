@@ -7,7 +7,7 @@ import sqlalchemy
 
 # from rlmolecule.alphazero.alphazero import AlphaZero
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
-from rlmolecule.alphazero.reward import Reward
+from rlmolecule.tree_search.reward import Reward
 from rlmolecule.mcts.mcts_problem import MCTSProblem
 from rlmolecule.sql import Base, Session
 from rlmolecule.sql.tables import GameStore, RewardStore

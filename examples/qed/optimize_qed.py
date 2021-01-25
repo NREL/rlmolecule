@@ -15,7 +15,7 @@ def construct_problem():
     # see https://github.com/tensorflow/tensorflow/issues/8220. We should be more careful about where / when we
     # import tensorflow, especially if there's a chance we'll use tf.serving to do the policy / reward evaluations on
     # the workers. Might require upstream changes to nfp as well.
-    from rlmolecule.alphazero.reward import RankedRewardFactory
+    from rlmolecule.tree_search.reward import RankedRewardFactory
     from rlmolecule.molecule.molecule_config import MoleculeConfig
     from rlmolecule.molecule.molecule_problem import MoleculeAlphaZeroProblem
     from rlmolecule.molecule.molecule_state import MoleculeState

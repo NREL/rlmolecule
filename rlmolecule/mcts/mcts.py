@@ -5,7 +5,7 @@ from typing import Callable, List, Optional, Type
 
 import numpy as np
 
-from rlmolecule.alphazero.reward import Reward
+from rlmolecule.tree_search.reward import Reward
 from rlmolecule.mcts.mcts_problem import MCTSProblem
 from rlmolecule.mcts.mcts_vertex import MCTSVertex
 from rlmolecule.tree_search.graph_search import GraphSearch
@@ -66,6 +66,7 @@ class MCTS(GraphSearch[MCTSVertex]):
             self._accumulate_path_data(vertex, path)
             if len(vertex.children) == 0:
                 return path, self.problem.reward_wrapper(vertex.state)
+            logger.debug(f'{vertex} has children { {child: (round(child.value, 2), child.visit_count) for child in vertex.children} }')
             vertex = action_selection_function(vertex)
 
         logger.warning(f"{self} reached max_depth.")
@@ -163,6 +164,7 @@ class MCTS(GraphSearch[MCTSVertex]):
     def softmax_selection(parent: MCTSVertex) -> MCTSVertex:
         children: List[MCTSVertex] = parent.children
         visit_counts = np.array([child.visit_count for child in children])
+        visit_counts -= visit_counts.max()
         visit_softmax = np.exp(visit_counts) / sum(np.exp(visit_counts))
         return children[np.random.choice(range(len(children)), size=1, p=visit_softmax)[0]]
 
@@ -180,4 +182,4 @@ class MCTS(GraphSearch[MCTSVertex]):
             raise RuntimeError("Child {} of parent {} with zero visits".format(child, self))
         if child.visit_count == 0:
             return math.inf
-        return child.value + self.ucb_constant * math.sqrt(2 * math.log(parent.visit_count) / child.visit_count)
+        return child.value + self.ucb_constant * math.sqrt(math.log(parent.visit_count) / child.visit_count)
