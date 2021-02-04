@@ -29,21 +29,28 @@ def psql_generator():
     Essentially when this runs out; it should get re-called to grab new data. 
     """
         
-    with psycopg2.connect(**config.dbparams) as conn:
-            
-        df = pd.read_sql_query("""
-        with recent_replays as (
-            select * from rl.{0}_replay where gameid in (
-                select gameid from {0}_game where experiment_id = %s order by id desc limit %s))
+    try:
 
-        select distinct on (gameid) id, ranked_reward, data
-            from recent_replays order by gameid, random();
-        """.format(config.sql_basename), conn, params=(config.experiment_id, config.policy_buffer_max_size,))
+        with psycopg2.connect(**config.dbparams) as conn:
+
+            df = pd.read_sql_query("""
+            with recent_replays as (
+                select * from rl.{0}_replay where gameid in (
+                    select gameid from {0}_game where experiment_id = %s order by id desc limit %s))
+
+            select distinct on (gameid) id, ranked_reward, data
+                from recent_replays order by gameid, random();
+            """.format(config.sql_basename), conn, params=(config.experiment_id, config.policy_buffer_max_size,))
+
+            for _, row in df.iterrows():
+                yield (row.data.tobytes(), row.ranked_reward)
+
+    except psycopg2.OperationalError as ex:
         
-        for _, row in df.iterrows():
-            yield (row.data.tobytes(), row.ranked_reward)
-
-
+        logger.warning(f"Error with database generator {str(ex)}")
+        time.sleep(5)
+        
+                
 class TimeCsvLogger(tf.keras.callbacks.CSVLogger):
     def on_epoch_end(self, epoch, logs=None):
         logs = logs or {}

@@ -32,11 +32,11 @@ checkpoint_filepath = None  # A checkpoint filepath must be provided
 
 
 # Buffers
-ranked_reward_alpha = 0.9
+ranked_reward_alpha = 0.75
 reward_buffer_max_size = 250  # 250 in the R2 paper
 reward_buffer_min_size = 50   # Allow R2 calculations without a full buffer
 
-policy_buffer_max_size = 1024  # Only sample from this many most recent games
+policy_buffer_max_size = 256  # Only sample from this many most recent games
 policy_buffer_min_size = 128   # Don't start training the model until this many games have occurred
 
 # Training
@@ -46,7 +46,7 @@ training_steps = 100
 sql_basename = "Stable"
 
 # Experiment id
-experiment_id = "0001"
+experiment_id = "0002a"
 
 # Optional arguments for molecule builder
 build_kwargs = {}

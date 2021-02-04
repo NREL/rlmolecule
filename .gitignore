@@ -138,3 +138,4 @@ dmypy.json
 cython_debug/
 Untitled*.ipynb
 .*.sh
+slurm*.out

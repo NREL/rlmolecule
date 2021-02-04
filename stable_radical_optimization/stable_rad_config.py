@@ -5,7 +5,7 @@ import alphazero.config as config
 config.sql_basename = "StablePSJ_fixed_redox"
 
 # Experiment id
-config.experiment_id = "001"
+config.experiment_id = "002"
 
 with open('/projects/rlmolecule/rlops_pass', 'r') as f:
     passwd = f.read().strip()

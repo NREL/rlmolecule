@@ -7,8 +7,7 @@
 #SBATCH --gres=gpu:2
 # --- MCTS Rollouts ---
 #SBATCH hetjob
-#SBATCH -n 90
-#SBATCH -c 4
+#SBATCH -N 20
 
 export WORKING_DIR=/scratch/$USER/rlmolecule
 export START_POLICY_SCRIPT="$SLURM_SUBMIT_DIR/$JOB/.policy.sh"
@@ -34,8 +33,9 @@ srun --pack-group=0 \
      --job-name="az-policy" \
      --output=$WORKING_DIR/gpu.%j.out \
      "$START_POLICY_SCRIPT" &
-     
+
 srun --pack-group=1 \
+     --ntasks-per-node=6 \
      --job-name="az-rollout" \
      --output=$WORKING_DIR/mcts.%j.out \
      "$START_ROLLOUT_SCRIPT"
