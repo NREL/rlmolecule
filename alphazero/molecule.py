@@ -8,11 +8,14 @@ import random
 import rdkit
 from rdkit import Chem
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
+from rdkit.Chem.rdMolDescriptors import CalcNumUnspecifiedAtomStereoCenters
 from rdkit.Chem.rdDistGeom import EmbedMolecule
 
 from rdkit.Chem import RDConfig
 sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
 import sascorer
+
+from alphazero.molecule_filters import check_all_filters
 
 pt = Chem.GetPeriodicTable()
 
@@ -27,7 +30,9 @@ def build_molecules(starting_mol,
                     atom_additions=None,
                     stereoisomers=True,
                     sa_score_threshold=3.,
-                    tryEmbedding=True):
+                    tryEmbedding=True,
+                    max_energy_diff=15.):
+    
     """Return an iterator of molecules that result from a single manipulation 
     (i.e., atom / bond addition) to the starting molecule
     
@@ -49,10 +54,24 @@ def build_molecules(starting_mol,
         tryEmbedding: bool
             whether to try an rdkit 3D embedding of the molecule
             
+        max_energy_diff: Optional[float]
+            maximum MMFF between starting and final molecule
+            
     Yields:
         rdkit.Mol, corresponding to modified input
     
     """
+    
+    if stereoisomers:
+        # If we are building stereoisomers, we shouldn't have
+        # unassigned stereochem to begin with
+        if CalcNumUnspecifiedAtomStereoCenters(starting_mol) != 0:
+            logging.warn(f'{rdkit.Chem.MolToSmiles(starting_mol)} has undefined stereochemistry')
+        rdkit.Chem.FindPotentialStereoBonds(starting_mol)
+        for bond in starting_mol.GetBonds():
+            if bond.GetStereo() == rdkit.Chem.rdchem.BondStereo.STEREOANY:
+                logging.warn(f'{rdkit.Chem.MolToSmiles(starting_mol)} has undefined stereo bonds')
+    
     if atom_additions == None:
         atom_additions = ('C', 'N', 'O')
 
@@ -104,15 +123,26 @@ def build_molecules(starting_mol,
 
     generated_smiles = []
     
+#     if max_energy_diff is not None:
+#         starting_energy = get_minimum_ff_energy(starting_mol)
+    
     # Construct the generator
     for i, atom in enumerate(starting_mol.GetAtoms()):
         for partner in get_valid_partners(atom):
             for bond_order in get_valid_bonds(i, partner):
                 mol = add_bond(i, partner, bond_order)
 
-                Chem.SanitizeMol(mol)
+                # Not ideal to roundtrip SMILES here, but there's cleaning steps that often get missed if we dont
+                mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol))
+#                 Chem.SanitizeMol(mol)
+#                 rdkit.Chem.rdmolops.AssignStereochemistry(mol, flagPossibleStereoCenters=True)
+
+                if not check_all_filters(mol):
+                    continue
+                
                 for isomer in enumerate_stereoisomers(mol, stereoisomers):
-                    smiles = Chem.MolToSmiles(mol)
+                    smiles = Chem.MolToSmiles(isomer)
+                    logging.debug(smiles)
                     if smiles not in generated_smiles:
                         generated_smiles += [smiles]
                         

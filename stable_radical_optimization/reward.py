@@ -18,15 +18,15 @@ from preprocess_inputs import preprocessor as bde_preprocessor
 bde_preprocessor.from_json('/projects/rlmolecule/pstjohn/models/20201031_bde/preprocessor.json')
 
 stability_model = tf.keras.models.load_model(
-    '/projects/rlmolecule/pstjohn/models/20210208_radical_stability_model',
+    '/projects/rlmolecule/pstjohn/models/20210214_radical_stability/',
     compile=False)
 
 redox_model = tf.keras.models.load_model(
-    '/projects/rlmolecule/pstjohn/models/20210208_redox_model/',
+    '/projects/rlmolecule/pstjohn/models/20210214_redox_new_data/',
     compile=False)
 
 bde_model = tf.keras.models.load_model(
-    '/projects/rlmolecule/pstjohn/models/20201031_bde/',
+    '/projects/rlmolecule/pstjohn/models/20210216_bde_new_nfp/',
     compile=False)
 
 @tf.function(experimental_relax_shapes=True)                
@@ -60,13 +60,18 @@ def prepare_for_bde(smiles):
         if 'H' in {bond.GetBeginAtom().GetSymbol(), bond.GetEndAtom().GetSymbol()}:
             bond_index = bond.GetIdx()
             break
-    else:
-        bond_index = None
+        
+    h_bond_indices = [bond.GetIdx() for bond in filter(
+        lambda bond: ((bond.GetEndAtom().GetSymbol() == 'H') 
+                      | (bond.GetBeginAtom().GetSymbol() == 'H')), molH.GetBonds())]
+    
+    other_h_bonds = list(set(h_bond_indices) - {bond_index})
             
     return pd.Series({
         'mol_smiles': mol_smiles,
         'radical_index_mol': radical_index_reordered,
-        'bond_index': bond_index
+        'bond_index': bond_index,
+        'other_h_bonds': other_h_bonds
     })
 
 
@@ -77,10 +82,23 @@ def bde_get_inputs(smiles):
 
 
 def calc_bde(node):
+    """calculate the X-H bde, and the difference to the next-weakest X-H bde in kcal/mol"""
+    
     bde_inputs = prepare_for_bde(node.smiles)
     inputs = bde_get_inputs(bde_inputs.mol_smiles)
     
-    return predict(bde_model, inputs)[0][0, bde_inputs.bond_index, 0].numpy()
+    pred_bdes = predict(bde_model, inputs)[0][0, :, 0].numpy()
+    
+    bde_radical = pred_bdes[bde_inputs.bond_index]
+    
+    if len(bde_inputs.other_h_bonds) == 0:
+        bde_diff = 30.  # Just an arbitrary large number
+    
+    else:
+        other_h_bdes = pred_bdes[bde_inputs.other_h_bonds]
+        bde_diff = (other_h_bdes - bde_radical).min()
+    
+    return bde_radical, bde_diff
 
 
 def windowed_loss(target, desired_range):
@@ -149,17 +167,19 @@ def calc_reward_inner(node):
                       for key, val in node.policy_inputs.items()}).numpy().tolist()[0]
 
     v_diff = ionization_energy - electron_affinity
-    bde = calc_bde(node)
+    bde, bde_diff = calc_bde(node)
 
     ea_range = (-.5, 0.2)
     ie_range = (.5, 1.2)
     v_range = (1, 1.7)   
-    bde_range = (60, 80)
+    bde_range = (60, 80)    
     
 
     # This is a bit of a placeholder; but the range for spin is about 1/50th that
     # of buried volume.
-    reward = ((1 - max_spin) * 50 + spin_buried_vol + 100 * (
+    reward = ((1 - max_spin) * 50 + spin_buried_vol 
+              + 25 / (1 + np.exp(-(bde_diff - 10)))
+              + 100 * (
         windowed_loss(electron_affinity, ea_range) +     
         windowed_loss(ionization_energy, ie_range) + 
         windowed_loss(v_diff, v_range) +         

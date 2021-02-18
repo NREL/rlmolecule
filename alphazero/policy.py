@@ -32,10 +32,16 @@ def policy_model():
         [atom_state, bond_state, connectivity])
 
     for _ in range(config.num_messages):  # Do the message passing
-        bond_state = nfp.EdgeUpdate()([atom_state, bond_state, connectivity, global_state])
-        atom_state = nfp.NodeUpdate()([atom_state, bond_state, connectivity, global_state])
-        global_state = nfp.GlobalUpdate(units=units, num_heads=config.num_heads)(
+        new_bond_state = nfp.EdgeUpdate()([atom_state, bond_state, connectivity, global_state])
+        bond_state = layers.Add()([bond_state, new_bond_state])
+        
+        new_atom_state = nfp.NodeUpdate()([atom_state, bond_state, connectivity, global_state])
+        atom_state = layers.Add()([atom_state, new_atom_state])
+        
+        new_global_state = nfp.GlobalUpdate(units=units, num_heads=config.num_heads)(
             [atom_state, bond_state, connectivity, global_state])
+        global_state = layers.Add()([global_state, new_global_state])
+        
         
     value_logit = layers.Dense(1)(global_state)
     pi_logit = layers.Dense(1)(global_state)
