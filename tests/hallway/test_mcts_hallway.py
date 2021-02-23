@@ -15,9 +15,8 @@ def game():
 
 class TestMCTSHallway:
 
-    def test_sample(self, game):
+    def test_run(self, game):
         vertex = game._get_root()
         game.sample(vertex, 10000)
-        game.sample(vertex, 5)
-
-
+        # todo, actually write tests to make sure that this solves the optimal hallway. Also write AZ hallway tests
+        result = game.run(num_mcts_samples=500)

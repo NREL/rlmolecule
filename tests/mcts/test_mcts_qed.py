@@ -75,7 +75,7 @@ class TestMCTSwithMoleculeState:
         child.update(-1.0)
         child.update(0.0)
         if solver is MCTS:
-            assert game._ucb_score(root, child) == pytest.approx(0.6774100225154747)
+            assert game._ucb_score(root, child) == pytest.approx(0.3325546111576978)
 
     def test_get_successors(self, solver, problem):
         game, root = setup_game(solver, problem)

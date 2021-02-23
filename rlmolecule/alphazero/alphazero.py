@@ -8,6 +8,7 @@ from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from rlmolecule.mcts.mcts import MCTS
 from rlmolecule.mcts.mcts_vertex import MCTSVertex
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
+from rlmolecule.tree_search.reward import Reward
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,7 @@ class AlphaZero(MCTS):
     def _evaluate(
             self,
             search_path: [AlphaZeroVertex],
-    ) -> float:
+    ) -> Reward:
         """
         Expansion step of AlphaZero, overrides MCTS evaluate step.
         Estimates the value of a leaf vertex.
