@@ -18,7 +18,7 @@ from preprocess_inputs import preprocessor as bde_preprocessor
 bde_preprocessor.from_json('/projects/rlmolecule/pstjohn/models/20201031_bde/preprocessor.json')
 
 stability_model = tf.keras.models.load_model(
-    '/projects/rlmolecule/pstjohn/models/20210214_radical_stability/',
+    '/projects/rlmolecule/pstjohn/models/20210214_radical_stability_new_data/',
     compile=False)
 
 redox_model = tf.keras.models.load_model(
