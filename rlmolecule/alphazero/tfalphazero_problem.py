@@ -44,28 +44,30 @@ def flatten_batch_and_action_axes(x: tf.Tensor) -> tf.Tensor:
     shape = tf.shape(x)
     return tf.reshape(x, [shape[0] * shape[1], *shape[2:]])
     
-def build_policy_trainer(model: tf.keras.Model) -> tf.keras.Model:
-    """Returns a wrapper policy model."""
-    value_preds, masked_prior_logits = PolicyWrapper(model)(model.inputs)
+def build_policy_trainer(model: tf.keras.Model, input_masks: dict = {}) -> tf.keras.Model:
+    """Returns a wrapper policy model and input masks."""
+    value_preds, masked_prior_logits = PolicyWrapper(model, input_masks)(model.inputs)
     policy_trainer = tf.keras.Model(model.inputs, [value_preds, masked_prior_logits])
     return policy_trainer
+
+def get_typed_input_mask_values(inputs, mask_values: dict = {}, value: float = 0.):
+    """Returns a dictionary of mask values with type cast to that of the 
+    corresponding input layer."""
+    _mask_values = {inp.name: value for inp in inputs}
+    _mask_values.update(mask_values)
+    return {inp.name: tf.constant(_mask_values[inp.name], dtype=inp.dtype) for inp in inputs}
 
 
 class PolicyWrapper(layers.Layer):
 
     def __init__(self,
                  policy_model: tf.keras.Model,
-                 input_masks: dict = {},  # will default to 0 if you don't specify
-                 **kwargs):
+                 mask_values: dict = {},  # will default to 0 if you don't specify
+                 **kwargs):               # **kwargs will go unused currently
 
         super().__init__(**kwargs)
         self._policy_model = policy_model
-
-        # Here we create default 0-values for masks, and then update with any 
-        # user supplied masks keyed on the input layer names.
-        self._input_masks = {inp.name: 0. for inp in self._policy_model.inputs}
-        self._input_masks.update(input_masks)
-
+        self._mask_values = get_typed_input_mask_values(policy_model.inputs, mask_values)
 
     def build(self, input_shape):
         pass
@@ -91,8 +93,9 @@ class PolicyWrapper(layers.Layer):
         # Next we get a mask to see where we have valid actions and replace priors for
         # invalid actions with negative infinity (these get zeroed out after softmax).
         # We also only return prior_logits for the child nodes (not the first entry)
-        mask_values = [self._input_masks[inp.name] for inp in self._policy_model.inputs]
-        action_mask = make_action_mask(inputs, mask_values)
+        action_mask = make_action_mask(
+                        inputs,
+                        [self.mask_values[inp.name] for inp in self._policy_model.inputs])
         prior_logits = tf.reshape(flat_prior_logits, [batch_size, max_actions_per_node])
         masked_prior_logits = tf.where(
             action_mask, 
@@ -116,13 +119,12 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
                  ) -> None:
 
         super(TFAlphaZeroProblem, self).__init__(engine, **kwargs)
-        #self.policy_model = build_policy_trainer(hallway_size, hidden_layers, hidden_dim)
-        self.model_input_masks = model_input_masks
-        self.policy_model = build_policy_trainer(model)
+        self.policy_model, self.input_masks = build_policy_trainer(model, model_input_masks)
         self.policy_checkpoint_dir = policy_checkpoint_dir
         policy_model_layer = self.policy_model.layers[-1].policy_model
         self.policy_evaluator = tf.function(experimental_relax_shapes=True)(policy_model_layer.predict_step)
         self._checkpoint = None
+        self._initial_state = self.get_initial_state()
 
     def initialize_run(self):
         """
@@ -143,28 +145,28 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
                 logger.info('No checkpoint found')
 
     @abstractmethod
-    def _get_network_inputs(self, state: GraphSearchState) -> Dict:
+    def get_policy_inputs(self, state: GraphSearchState) -> Dict:
         pass
 
-    def _get_batched_network_inputs(self, parent: AlphaZeroVertex) -> Dict:
+    def _get_batched_policy_inputs(self, parent: AlphaZeroVertex) -> Dict:
         """
         :return the given nodes policy inputs, concatenated together with the
         inputs of its successor nodes. Used as the inputs for the policy neural
         network
         """
         # Get the list of policy inputs
-        policy_inputs = [self._get_network_inputs(vertex.state)
+        policy_inputs = [self.get_policy_inputs(vertex.state)
                          for vertex in itertools.chain((parent,), parent.children)]
 
         # Return the padded values, using the input_mask dict from the policy wrapper.
         return {key: pad_sequences([elem[key] for elem in policy_inputs], 
                                     padding='post',
-                                    value=self.policy_model.input_mask[key])
+                                    value=self.input_masks[key])
                 for key in policy_inputs[0].keys()}
 
     def get_value_and_policy(self, parent: AlphaZeroVertex) -> Tuple[float, dict]:
 
-        values, prior_logits = self.policy_evaluator(self._get_batched_network_inputs(parent))
+        values, prior_logits = self.policy_evaluator(self._get_batched_policy_inputs(parent))
 
         # Softmax the child priors.  Be careful here that you're slicing all needed
         # dimensions, otherwise you can end up with elementwise softmax (i.e., all 1's).
@@ -176,19 +178,20 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
 
         return value, children_priors
 
-    ## TODO:  Dave, pick up here
 
-    def _get_network_inputs_from_serialized_parent(
+    def _get_policy_inputs_from_serialized_parent(
             self,
             serialized_parent: tf.Tensor) -> Tuple[dict, dict]:
         
-        # How to do this without having to hardcode in the state class?
-        parent = HallwayState.deserialize(serialized_parent.numpy().decode())
+        parent = self._initial_state.deserialize(serialized_parent.numpy().decode())
 
-        policy_inputs = [self._get_network_inputs(parent)
+        policy_inputs = [self.get_policy_inputs(parent)
                          for state in itertools.chain((parent,), parent.get_next_actions())]
 
-        policy_inputs = {key: pad_sequences([elem[key] for elem in policy_inputs], padding='post')
+        policy_inputs = {key: pad_sequences([
+                                elem[key] for elem in policy_inputs], 
+                                padding='post',
+                                value=self.policy_model.input_mask[key])
                          for key in policy_inputs[0].keys()}
 
         return policy_inputs['position'], policy_inputs['steps']
@@ -203,14 +206,14 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
         """
 
         def get_policy_inputs_tf(parent, reward, visit_probabilities,
-                                 problem: HallwayAlphaZeroProblem) -> {}:
-            position, steps = tf.py_function(
-                problem._get_network_inputs_from_serialized_parent, 
+                                 problem: TFAlphaZeroProblem) -> dict:
+            inputs = tf.py_function(
+                problem._get_policy_inputs_from_serialized_parent, 
                 inp=[parent],
-                Tout=[tf.int64, tf.int64])
-            position.set_shape([None, 1])
-            steps.set_shape([None, 1])
-            return {"position": position, "steps": steps}, (reward, visit_probabilities)
+                Tout=[inp.dtype for inp in self.policy_model.inputs])
+            inputs = [tf.expand_dims(t, 0) for t in inputs]  # is this the same as adding None axis?
+            result = {inp.name: value for inp, value in zip(self.policy_model.inputs, inputs)}
+            return result, (reward, visit_probabilities)
 
         dataset = tf.data.Dataset.from_generator(
             self.iter_recent_games,
@@ -222,11 +225,12 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
                  num_parallel_calls=tf.data.experimental.AUTOTUNE) \
             .padded_batch(self.batch_size,
                           padding_values=(
-                              {"position": tf.constant(0, dtype=tf.int64), # Not sure what this should be
-                               "steps": tf.constant(0, dtype=tf.int64)},
+                              self.input_masks,
                               (0., 0.))) \
             .prefetch(tf.data.experimental.AUTOTUNE)
-            
+            # Need to confirm that we can keep the padding values for
+            # (reward, visit_probabilities) as (0., 0.).
+
         return dataset
 
 
