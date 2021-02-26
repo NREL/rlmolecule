@@ -27,15 +27,12 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
                  engine: sqlalchemy.engine.Engine,
                  policy_checkpoint_dir: Optional[str] = None,
                  hallway_size: int = 5,
-                 max_steps: int = 32,
                  hidden_layers: int = 3,
                  hidden_dim: int = 16,
                  **kwargs
                  ) -> None:
 
         super(HallwayAlphaZeroProblem, self).__init__(engine, **kwargs)
-        hallway_size = hallway_size
-        max_steps = max_steps
         self.policy_model = build_policy_trainer(hallway_size, hidden_layers, hidden_dim)
         self.policy_checkpoint_dir = policy_checkpoint_dir
         policy_model_layer = self.policy_model.layers[-1].policy_model
@@ -62,6 +59,7 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
                 logger.info('No checkpoint found')
 
     def _get_network_inputs(self, state: HallwayState) -> Dict:
+        """Returns a dictionary of network input arrays."""
         return {"position": array([state.position]), "steps": array([state.steps])}
 
     def _get_batched_network_inputs(self, parent: AlphaZeroVertex) -> Dict:
