@@ -1,42 +1,54 @@
 import logging
 import time
+from typing import Tuple
 
+import tensorflow as tf
+
+import sqlalchemy
 from sqlalchemy import create_engine
 
-# logging.basicConfig(level=logging.INFO)
-from rlmolecule.tree_search.reward import LinearBoundedRewardFactory, RawRewardFactory
+from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 def construct_problem(ranked_reward=True):
+    
     from rlmolecule.tree_search.reward import RankedRewardFactory
+    from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
+
+    from tf_model import policy_model
     from hallway_config import HallwayConfig
-    from hallway_problem import HallwayAlphaZeroProblem
     from hallway_state import HallwayState
 
-    class HallwayProblem(HallwayAlphaZeroProblem):
+
+    class HallwayProblem(TFAlphaZeroProblem):
         def __init__(self,
-                     engine: 'sqlalchemy.engine.Engine',
-                     config: 'HallwayConfig',
+                     engine: sqlalchemy.engine.Engine,
+                     model: tf.keras.Model,
+                     config: HallwayConfig,
                      **kwargs) -> None:
-            super(HallwayProblem, self).__init__(engine, **kwargs)
+            super(HallwayProblem, self).__init__(engine, model, **kwargs)
             self._config = config
 
-        
         def get_initial_state(self) -> HallwayState:
             return HallwayState(1, 0, self._config)
 
-        def get_reward(self, state: HallwayState) -> (float, {}):
+        def get_reward(self, state: HallwayState) -> Tuple[float, dict]:
             reward = -1.0 * (state.steps + (self._config.size - state.position))
             return reward, {'position': state.position}
+
+        def get_policy_inputs(self, state: HallwayState) -> dict:
+            return {"position": [state.position], "steps": [state.steps]}
 
     config = HallwayConfig(size=16, max_steps=16)
 
     engine = create_engine(f'sqlite:///hallway_data.db',
                            connect_args={'check_same_thread': False},
                            execution_options = {"isolation_level": "AUTOCOMMIT"})
+
+    model = policy_model(hidden_layers=1, hidden_dim=16)
 
     run_id = "hallway_example"
 
@@ -53,12 +65,10 @@ def construct_problem(ranked_reward=True):
 
     problem = HallwayProblem(
         engine,
+        model,
         config,
         run_id=run_id,
         reward_class=reward_factory,
-        hallway_size=config.size,
-        hidden_layers=1,
-        hidden_dim=16,
         min_buffer_size=15,
         policy_checkpoint_dir='policy_checkpoints'
     )
@@ -137,5 +147,5 @@ if __name__ == "__main__":
 
     else:
 
-        run_games(use_az=False, num_mcts_samples=1000)
+        run_games(use_az=True, num_mcts_samples=64)
 
