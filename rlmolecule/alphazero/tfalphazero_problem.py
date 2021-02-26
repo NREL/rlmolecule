@@ -81,19 +81,26 @@ class PolicyWrapper(layers.Layer):
 
     def call(self, inputs, mask=None):
 
+        #print("INPUTS", inputs)
+
         # Get the batch and action dimensions
         shape = tf.shape(inputs[0])
         batch_size = shape[0]
         max_actions_per_node = shape[1]
         flattened_shape = batch_size * max_actions_per_node
+        print(shape, batch_size, max_actions_per_node, flattened_shape)
         
         # Flatten the inputs for running individually through the policy model
         flattened_inputs = []
         for inp in inputs:
-            final_dim = [1] if inp.shape.ndims <= 2 else inp.shape[2:]
-            flattened_inputs.append(tf.reshape(inp, flattened_shape + final_dim))
+            new_shape = [flattened_shape, -1]
+            if inp.shape.ndims > 2:
+                new_shape += tf.shape(inp)[2:]
+                #print("SHAPE, NEW SHAPE", tf.shape(inp), new_shape)
+            flattened_inputs.append(tf.reshape(inp, new_shape))
             
         # Get the flat value and prior_logit predictions
+        #print("FLATTENED_INPUTS", flattened_inputs)
         flat_values_logits, flat_prior_logits = self.policy_model(flattened_inputs)
 
         # We put the parent node first in our batch inputs, so this slices
@@ -133,7 +140,7 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
 
         super(TFAlphaZeroProblem, self).__init__(engine, **kwargs)
         self.mask_dict = get_input_mask_dict(model.inputs, mask_dict, as_tensor=False)
-        self.policy_model = build_policy_trainer(model, mask_dict)
+        self.policy_model = build_policy_trainer(model, self.mask_dict)
         self.policy_checkpoint_dir = policy_checkpoint_dir
         policy_model_layer = self.policy_model.layers[-1].policy_model
         self.policy_evaluator = tf.function(experimental_relax_shapes=True)(policy_model_layer.predict_step)
@@ -240,8 +247,11 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
             .map(partial(get_policy_inputs_tf, problem=self),
                  num_parallel_calls=tf.data.experimental.AUTOTUNE) \
             .padded_batch(self.batch_size,
+                          padded_shapes=(
+                              {inp.name: (None) for inp in self.policy_model.inputs},
+                              (1, 1)),
                           padding_values=(
-                              self.policy_model.mask_dict,
+                              self.mask_dict,
                               (0., 0.))) \
             .prefetch(tf.data.experimental.AUTOTUNE)
             # Need to confirm that we can keep the padding values for
