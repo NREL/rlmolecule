@@ -15,8 +15,19 @@ from sqlalchemy import create_engine
 from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
 #from alphazero_gym import AlphaZeroGymEnv
 
+from alphazero_gym import AlphaZeroGymEnv
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+class CartPoleEnv(AlphaZeroGymEnv):
+    def __init__(self, env=None, name=None):
+        super().__init__(env, name)
+
+    def get_obs(self) -> np.ndarray:
+        return np.array(self.state)
 
 
 def construct_problem(ranked_reward=True):
@@ -33,7 +44,7 @@ def construct_problem(ranked_reward=True):
         def __init__(self,
                      engine: sqlalchemy.engine.Engine,
                      model: tf.keras.Model,
-                     env: gym.Env,
+                     env: AlphaZeroGymEnv,
                      **kwargs) -> None:
             super().__init__(engine, model, **kwargs)
             self._env = deepcopy(env)
@@ -49,7 +60,7 @@ def construct_problem(ranked_reward=True):
             return {"obs": self._env.get_obs()}
 
             
-    env = AlphaZeroGymEnv(name="CartPole-v0")
+    env = CartPoleEnv(name="CartPole-v0")
 
     engine = create_engine(f'sqlite:///env_data.db',
                            connect_args={'check_same_thread': False},
