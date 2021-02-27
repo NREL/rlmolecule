@@ -38,7 +38,7 @@ def construct_problem(ranked_reward=True):
     from alphazero_gym import AlphaZeroGymEnv
     from env_state import GymEnvState
     from tf_model import policy_model
-
+    
 
     class GymEnvProblem(TFAlphaZeroProblem):
         def __init__(self,

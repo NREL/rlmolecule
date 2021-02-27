@@ -185,7 +185,7 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
 
     def _get_policy_inputs_from_serialized_parent(
             self,
-            serialized_parent: tf.Tensor) -> Tuple[dict, dict]:
+            serialized_parent: tf.Tensor) -> Tuple:
         
         parent = self.get_initial_state().deserialize(serialized_parent.numpy().decode())
 
@@ -198,7 +198,7 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
                                 value=self.mask_dict[key])
                          for key in policy_inputs[0]}
 
-        return policy_inputs['position'], policy_inputs['steps']
+        return tuple([policy_inputs[inp.name] for inp in self.policy_model.inputs])
 
 
     def _create_dataset(self) -> tf.data.Dataset:
