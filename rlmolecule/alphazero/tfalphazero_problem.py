@@ -59,14 +59,14 @@ class PolicyWrapper(layers.Layer):
 
     def call(self, inputs, mask=None):
 
-        #print("INPUTS", inputs)
+        # print("INPUTS", inputs)
 
         # Get the batch and action dimensions
         shape = tf.shape(inputs[0])
         batch_size = shape[0]
         max_actions_per_node = shape[1]
         flattened_shape = batch_size * max_actions_per_node
-        print(shape, batch_size, max_actions_per_node, flattened_shape)
+        # print(shape, batch_size, max_actions_per_node, flattened_shape)
         
         # Flatten the inputs for running individually through the policy model
         flattened_inputs = []
@@ -78,7 +78,7 @@ class PolicyWrapper(layers.Layer):
             flattened_inputs.append(tf.reshape(inp, new_shape))
             
         # Get the flat value and prior_logit predictions
-        #print("FLATTENED_INPUTS", flattened_inputs)
+        # print("FLATTENED_INPUTS", flattened_inputs)
         flat_values_logits, flat_prior_logits = self.policy_model(flattened_inputs)
 
         # We put the parent node first in our batch inputs, so this slices
@@ -156,7 +156,7 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
         policy_inputs = [self.get_policy_inputs(vertex.state)
                          for vertex in itertools.chain((parent,), parent.children)]
 
-        print("POLICY INPUTS", policy_inputs)
+        # print("POLICY INPUTS", policy_inputs)
 
         # Return the padded values, using the input_mask dict from the policy wrapper.
         return {key: pad_sequences([elem[key] for elem in policy_inputs], 
@@ -166,7 +166,7 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
 
     def get_value_and_policy(self, parent: AlphaZeroVertex) -> Tuple[float, dict]:
 
-        print("PARENT", parent)
+        # print("PARENT", parent)
         values, prior_logits = self.policy_evaluator(self._get_batched_policy_inputs(parent))
 
         # Softmax the child priors.  Be careful here that you're slicing all needed
@@ -215,10 +215,10 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
                 problem._get_policy_inputs_from_serialized_parent, 
                 inp=[parent],
                 Tout=[inp.dtype for inp in self.policy_model.inputs])
-            print([tf.shape(t) for t in inputs])
+            # print([tf.shape(t) for t in inputs])
             inputs = [tf.expand_dims(t, 0) for t in inputs]  # is this the same as adding None axis?
             result = {inp.name: value for inp, value in zip(self.policy_model.inputs, inputs)}
-            print("RESULT", result)
+            # print("RESULT", result)
             return result, (reward, visit_probabilities)
 
         dataset = tf.data.Dataset.from_generator(
