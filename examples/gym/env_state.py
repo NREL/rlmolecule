@@ -1,7 +1,5 @@
 from typing import Sequence
 from copy import deepcopy
-import base64
-import pickle
 
 import gym
 

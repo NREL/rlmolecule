@@ -13,20 +13,10 @@ import sqlalchemy
 from sqlalchemy import create_engine
 
 from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
+#from alphazero_gym import AlphaZeroGymEnv
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-class GymEnv(gym.Wrapper):
-    """If I put this inside construct_problem it cannot be pickled from 
-    within the GraphSearchState serialize method."""
-
-    def __init__(self, env):
-        super().__init__(env)
-
-    def get_obs(self) -> np.ndarray:
-        return np.array(self.env.state)
 
 
 def construct_problem(ranked_reward=True):
@@ -34,6 +24,7 @@ def construct_problem(ranked_reward=True):
     from rlmolecule.tree_search.reward import RankedRewardFactory
     from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
     
+    from alphazero_gym import AlphaZeroGymEnv
     from env_state import GymEnvState
     from tf_model import policy_model
 
@@ -58,7 +49,7 @@ def construct_problem(ranked_reward=True):
             return {"obs": self._env.get_obs()}
 
             
-    env = GymEnv(gym.envs.make("CartPole-v0"))
+    env = AlphaZeroGymEnv(name="CartPole-v0")
 
     engine = create_engine(f'sqlite:///env_data.db',
                            connect_args={'check_same_thread': False},
