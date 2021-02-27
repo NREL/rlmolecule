@@ -7,13 +7,10 @@ import numpy as np
 
 import tensorflow as tf
 
-import gym
-
 import sqlalchemy
 from sqlalchemy import create_engine
 
 from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
-#from alphazero_gym import AlphaZeroGymEnv
 
 from alphazero_gym import AlphaZeroGymEnv
 
