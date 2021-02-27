@@ -5,11 +5,10 @@ import os
 import time
 from functools import partial
 from pathlib import Path
-from typing import Dict, Optional, Tuple, List
-
-from numpy import array
+from typing import Dict, Optional, Tuple
 
 import sqlalchemy
+
 import tensorflow as tf
 from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 
@@ -23,33 +22,12 @@ from tensorflow.keras import layers
 
 logger = logging.getLogger(__name__)
 
-# @tf.function
-# def make_input_mask(values: tf.Tensor, mask_value: float) -> tf.Tensor:
-#     """Masks a given tensor based on values along all but the batch and action axes."""
-#     shape = tf.shape(values)
-#     values = tf.reshape(values, (shape[0], shape[1], -1))
-#     return tf.reduce_all(tf.not_equal(values, mask_value), axis=-1)
-
-# @tf.function
-# def make_action_mask(inputs: List[tf.Tensor], mask_values: list) -> tf.Tensor:
-#     """Returns an action mask for a given set of input tensors."""
-#     batch_size, max_actions_per_node = tf.shape(inputs[0])[:2]
-#     action_mask = tf.constant(True, shape=[batch_size, max_actions_per_node], dtype=bool)
-#     for i, inp in enumerate(inputs):
-#         new_mask =  make_input_mask(inp, mask_values[i])
-#         action_mask = tf.logical_and(action_mask, new_mask)
-#     return action_mask
-
-# @tf.function
-# def flatten_batch_and_action_axes(x: tf.Tensor) -> tf.Tensor:
-#     """Returns a tensor flattened along the first two axes."""
-#     shape = x.shape
-#     return tf.reshape(x, [shape[0] * shape[1], *shape[2:]])
 
 def build_policy_trainer(model: tf.keras.Model, input_masks: dict = {}) -> tf.keras.Model:
     """Returns a wrapper policy model and input masks."""
     value_preds, masked_prior_logits = PolicyWrapper(model, input_masks)(model.inputs)
     return tf.keras.Model(model.inputs, [value_preds, masked_prior_logits])
+
 
 def get_input_mask_dict(inputs: list, 
                         mask_dict: dict = {},
