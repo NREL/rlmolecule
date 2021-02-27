@@ -2,13 +2,14 @@ from typing import Sequence
 from copy import deepcopy
 
 import gym
+from alphazero_gym import AlphaZeroGymEnv
 
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
 
 class GymEnvState(GraphSearchState):
 
-    def __init__(self, env: gym.Env, reward: float, done: bool) -> None:
+    def __init__(self, env: AlphaZeroGymEnv, reward: float, done: bool) -> None:
         assert isinstance(env.action_space, gym.spaces.Discrete)
         self._env = deepcopy(env)
         self._reward = reward
@@ -19,7 +20,7 @@ class GymEnvState(GraphSearchState):
 
     def equals(self, other: any) -> bool:
         return type(self) == type(other) and \
-               self.get_obs() == other.get_obs()   # legit?
+               self._env.get_obs() == other._env.get_obs()   # legit?
 
     def hash(self) -> int:
         return hash(self.__repr__())

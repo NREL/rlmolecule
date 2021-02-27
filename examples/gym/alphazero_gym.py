@@ -16,4 +16,4 @@ class AlphaZeroGymEnv(gym.Wrapper):
 
     @abstractmethod
     def get_obs(self) -> np.ndarray:
-        pass
+        raise NotImplementedError
