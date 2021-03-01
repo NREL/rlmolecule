@@ -9,10 +9,15 @@ from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
 class GymEnvState(GraphSearchState):
 
-    def __init__(self, env: AlphaZeroGymEnv, reward: float, done: bool) -> None:
+    def __init__(self, 
+                 env: AlphaZeroGymEnv,
+                 step_reward: float, 
+                 cumulative_reward: float,
+                 done: bool) -> None:
         assert isinstance(env.action_space, gym.spaces.Discrete)
         self._env = deepcopy(env)
-        self._reward = reward
+        self._step_reward = step_reward
+        self._cumulative_reward = cumulative_reward
         self._done = done
 
     def __repr__(self) -> str:
@@ -30,17 +35,24 @@ class GymEnvState(GraphSearchState):
         if not self._done:
             for action in range(self.env.action_space.n):
                 env_copy = deepcopy(self._env)
-                _, rew, done, _ = env_copy.step(action)
-                next_actions.append(GymEnvState(env_copy, rew, done))
+                _, step_rew, done, _ = env_copy.step(action)
+                cumulative_rew = self._cumulative_reward + step_rew
+                next_actions.append(
+                    GymEnvState(env_copy, step_rew, cumulative_rew, done))
         return next_actions
 
-    def get_reward(self) -> float:
-        return self._reward
+    def get_reward(self) -> (float, dict):
+        return self.cumulative_reward, {}
 
     @property
     def env(self) -> gym.Env:
         return self._env
 
     @property
-    def reward(self) -> float:
-        return self._reward
+    def step_reward(self) -> float:
+        return self._step_reward
+
+    @property
+    def cumulative_reward(self) -> float:
+        return self._cumulative_reward
+

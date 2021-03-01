@@ -1,30 +1,15 @@
 import logging
 import time
-from typing import Tuple
-from copy import deepcopy
 
 import numpy as np
 
-import tensorflow as tf
-
-import sqlalchemy
 from sqlalchemy import create_engine
 
 from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
 
-from alphazero_gym import AlphaZeroGymEnv
-
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-class CartPoleEnv(AlphaZeroGymEnv):
-    def __init__(self, env=None, name=None):
-        super().__init__(env, name)
-
-    def get_obs(self) -> np.ndarray:
-        return np.array(self.state)
 
 
 def construct_problem(ranked_reward=True):
@@ -32,31 +17,20 @@ def construct_problem(ranked_reward=True):
     from rlmolecule.tree_search.reward import RankedRewardFactory
     from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
     
-    from alphazero_gym import AlphaZeroGymEnv
-    from env_state import GymEnvState
     from tf_model import policy_model
+    from gym_problem import GymEnvProblem
+    from alphazero_gym import AlphaZeroGymEnv
+
     
+    class CartPoleEnv(AlphaZeroGymEnv):
+        def __init__(self, env=None, name=None):
+            super().__init__(env, name)
 
-    class GymEnvProblem(TFAlphaZeroProblem):
-        def __init__(self,
-                     engine: sqlalchemy.engine.Engine,
-                     model: tf.keras.Model,
-                     env: AlphaZeroGymEnv,
-                     **kwargs) -> None:
-            super().__init__(engine, model, **kwargs)
-            self._env = deepcopy(env)
+        def get_obs(self) -> np.ndarray:
+            # this is where the state hides in cartpole, it will be different for different envs
+            return np.array(self.state)   
 
-        def get_initial_state(self) -> GymEnvState:
-            _ = self._env.reset()
-            return GymEnvState(self._env, 0., False)
 
-        def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
-            return state.reward, {}
-
-        def get_policy_inputs(self, state: GymEnvState) -> dict:
-            return {"obs": self._env.get_obs()}
-
-            
     env = CartPoleEnv(name="CartPole-v0")
 
     engine = create_engine(f'sqlite:///env_data.db',

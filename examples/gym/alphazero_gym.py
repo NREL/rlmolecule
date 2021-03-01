@@ -10,8 +10,7 @@ class AlphaZeroGymEnv(gym.Wrapper):
     the standard gym env maker."""
 
     def __init__(self, env: gym.Env = None, name: str = None):
-        if env is None:
-            env = gym.envs.make(name)
+        env = env if env is not None else gym.envs.make(name)
         super().__init__(env)
 
     @abstractmethod
