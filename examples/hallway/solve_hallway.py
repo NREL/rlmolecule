@@ -21,7 +21,8 @@ def construct_problem(ranked_reward=True):
                      engine: 'sqlalchemy.engine.Engine',
                      config: 'HallwayConfig',
                      **kwargs) -> None:
-            super(HallwayProblem, self).__init__(engine, **kwargs)
+            super(HallwayProblem, self).__init__(
+                    engine, reset_db=True, **kwargs)
             self._config = config
 
         
@@ -34,10 +35,30 @@ def construct_problem(ranked_reward=True):
 
     config = HallwayConfig(size=16, max_steps=16)
 
-    engine = create_engine(f'sqlite:///hallway_data.db',
-                           connect_args={'check_same_thread': False},
-                           execution_options = {"isolation_level": "AUTOCOMMIT"})
+    # engine = create_engine(f'sqlite:///hallway_data.db',
+    #                        connect_args={'check_same_thread': False},
+    #                        execution_options = {"isolation_level": "AUTOCOMMIT"})
+    dbname = "bde"
+    port = "5432"
+    host = "yuma.hpc.nrel.gov"
+    user = "rlops"
+    # read the password from a file
+    passwd_file = '/projects/rlmolecule/rlops_pass'
+    with open(passwd_file, 'r') as f:
+        passwd = f.read().strip()
 
+    drivername = "postgresql+psycopg2"
+    connect_args = {}
+    # The 'check_same_thread' option only works for sqlite
+    if drivername == "sqlite":
+       connect_args = {'check_same_thread': False}
+    engine_str = f'{drivername}://{user}:{passwd}@{host}:{port}/{dbname}'
+    print(f'connecting to database using: {engine_str}')
+    engine = create_engine(engine_str,
+                           connect_args=connect_args,
+                           execution_options={"isolation_level": "AUTOCOMMIT"})
+
+    # The run_id is used to distinguish between different runs
     run_id = "hallway_example"
 
     if ranked_reward:

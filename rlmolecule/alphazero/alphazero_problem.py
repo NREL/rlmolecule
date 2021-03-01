@@ -22,9 +22,15 @@ class AlphaZeroProblem(MCTSProblem):
                  max_buffer_size: int = 200,
                  min_buffer_size: int = 50,
                  batch_size: int = 32,
+                 reset_db: bool = False,
                  **kwargs):
 
         super(AlphaZeroProblem, self).__init__(**kwargs)
+        # delete the tables to start over from scratch
+        if reset_db:
+            print(f"Dropping the tables '{RewardStore.__table__}' and '{GameStore.__table__}'")
+            Base.metadata.drop_all(engine, checkfirst=True)
+        # create the tables used to store the necessary game info
         Base.metadata.create_all(engine, checkfirst=True)
         Session.configure(bind=engine)
         self._session = Session()
