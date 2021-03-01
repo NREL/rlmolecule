@@ -9,8 +9,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 
-from rlmolecule.alphazero.tfalphazero_problem import (
-    PolicyWrapper, get_input_mask_dict)
+from rlmolecule.alphazero.tf_keras_policy import PolicyWrapper, get_input_mask_dict
 
 
 # Example function for building a simple model

@@ -8,18 +8,11 @@ from rdkit.Chem.QED import qed
 from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from rlmolecule.molecule.molecule_config import MoleculeConfig
-from rlmolecule.molecule.molecule_problem import MoleculeAlphaZeroProblem
+from rlmolecule.molecule.molecule_problem import MoleculeProblem, MoleculeTFAlphaZeroProblem
 from rlmolecule.molecule.molecule_state import MoleculeState
 
 
-class QEDOptimizationProblem(AlphaZeroProblem):
-
-    def __init__(self, engine: sqlalchemy.engine.Engine, config: MoleculeConfig, **kwargs) -> None:
-        super(QEDOptimizationProblem, self).__init__(engine, **kwargs)
-        self._config = config
-
-    def get_initial_state(self) -> MoleculeState:
-        return MoleculeState(rdkit.Chem.MolFromSmiles('C'), self._config)
+class QEDOptimizationProblem(MoleculeProblem):
 
     @functools.lru_cache(maxsize=None)
     def get_reward(self, state: MoleculeState) -> (float, {}):
@@ -35,5 +28,5 @@ class QEDOptimizationProblem(AlphaZeroProblem):
         return random_state.random(), {vertex: prior for vertex, prior in zip(children, priors)}
 
 
-class QEDWithMoleculePolicy(QEDOptimizationProblem, MoleculeAlphaZeroProblem):
+class QEDWithMoleculePolicy(QEDOptimizationProblem, MoleculeTFAlphaZeroProblem):
     pass

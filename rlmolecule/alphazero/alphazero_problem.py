@@ -32,6 +32,15 @@ class AlphaZeroProblem(MCTSProblem):
         self.max_buffer_size = max_buffer_size
         self.min_buffer_size = min_buffer_size
 
+    @abstractmethod
+    def get_value_and_policy(self, parent: AlphaZeroVertex) -> (float, {AlphaZeroVertex: float}):
+        """
+        A user-provided function to get value and child prior estimates for the given vertex.
+
+        :return: (value_of_current_vertex, {child_vertex: child_prior for child_vertex in children})
+        """
+        pass
+
     @property
     def session(self) -> 'sqlalchemy.orm.session.Session':
         return self._session
@@ -91,12 +100,3 @@ class AlphaZeroProblem(MCTSProblem):
         for game in recent_games:
             parent_state_string, visit_probabilities = random.choice(game.search_statistics)
             yield parent_state_string, game.scaled_reward, visit_probabilities
-
-    @abstractmethod
-    def get_value_and_policy(self, parent: AlphaZeroVertex) -> (float, {AlphaZeroVertex: float}):
-        """
-        A user-provided function to get value and child prior estimates for the given vertex.
-
-        :return: (value_of_current_vertex, {child_vertex: child_prior for child_vertex in children})
-        """
-        pass
