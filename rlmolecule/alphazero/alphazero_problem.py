@@ -5,7 +5,6 @@ from typing import Optional
 
 import sqlalchemy
 
-# from rlmolecule.alphazero.alphazero import AlphaZero
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from rlmolecule.tree_search.reward import Reward
 from rlmolecule.mcts.mcts_problem import MCTSProblem

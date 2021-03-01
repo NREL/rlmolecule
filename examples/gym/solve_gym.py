@@ -1,13 +1,12 @@
 import logging
 import time
-from typing import Tuple
 
-import tensorflow as tf
+import numpy as np
 
-import sqlalchemy
 from sqlalchemy import create_engine
 
 from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -17,61 +16,33 @@ def construct_problem(ranked_reward=True):
     
     from rlmolecule.tree_search.reward import RankedRewardFactory
     from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
-
+    
     from tf_model import policy_model
-    from hallway_config import HallwayConfig
-    from hallway_state import HallwayState
+    from gym_problem import GymEnvProblem
+    from alphazero_gym import AlphaZeroGymEnv
+
+    
+    class CartPoleEnv(AlphaZeroGymEnv):
+        def __init__(self, env=None, name=None):
+            super().__init__(env, name)
+
+        def get_obs(self) -> np.ndarray:
+            # this is where the state hides in cartpole, it will be different for different envs
+            return np.array(self.state)   
 
 
-    class HallwayProblem(TFAlphaZeroProblem):
-        def __init__(self,
-                     engine: sqlalchemy.engine.Engine,
-                     model: tf.keras.Model,
-                     config: HallwayConfig,
-                     **kwargs) -> None:
-            super(HallwayProblem, self).__init__(
-                    engine, model, reset_db=True, **kwargs)
-            self._config = config
+    env = CartPoleEnv(name="CartPole-v0")
 
-        def get_initial_state(self) -> HallwayState:
-            return HallwayState(1, 0, self._config)
+    engine = create_engine(f'sqlite:///env_data.db',
+                           connect_args={'check_same_thread': False},
+                           execution_options = {"isolation_level": "AUTOCOMMIT"})
 
-        def get_reward(self, state: HallwayState) -> Tuple[float, dict]:
-            reward = -1.0 * (state.steps + (self._config.size - state.position))
-            return reward, {'position': state.position}
+    model = policy_model(
+                obs_dim=env.observation_space.shape[0],
+                hidden_layers=3,
+                hidden_dim=16)
 
-        def get_policy_inputs(self, state: HallwayState) -> dict:
-            return {"position": [state.position], "steps": [state.steps]}
-
-    config = HallwayConfig(size=16, max_steps=16)
-
-    # engine = create_engine(f'sqlite:///hallway_data.db',
-    #                        connect_args={'check_same_thread': False},
-    #                        execution_options = {"isolation_level": "AUTOCOMMIT"})
-    dbname = "bde"
-    port = "5432"
-    host = "yuma.hpc.nrel.gov"
-    user = "rlops"
-    # read the password from a file
-    passwd_file = '/projects/rlmolecule/rlops_pass'
-    with open(passwd_file, 'r') as f:
-        passwd = f.read().strip()
-
-    drivername = "postgresql+psycopg2"
-    connect_args = {}
-    # The 'check_same_thread' option only works for sqlite
-    if drivername == "sqlite":
-       connect_args = {'check_same_thread': False}
-    engine_str = f'{drivername}://{user}:{passwd}@{host}:{port}/{dbname}'
-    print(f'connecting to database using: {engine_str}')
-    engine = create_engine(engine_str,
-                           connect_args=connect_args,
-                           execution_options={"isolation_level": "AUTOCOMMIT"})
-
-    model = policy_model(hidden_layers=1, hidden_dim=16)
-
-    # The run_id is used to distinguish between different runs
-    run_id = "hallway_example"
+    run_id = "cartpole_example"
 
     if ranked_reward:
         reward_factory = RankedRewardFactory(
@@ -84,10 +55,10 @@ def construct_problem(ranked_reward=True):
     else:
         reward_factory = LinearBoundedRewardFactory(min_reward=-30, max_reward=-15)
 
-    problem = HallwayProblem(
+    problem = GymEnvProblem(
         engine,
         model,
-        config,
+        env,
         run_id=run_id,
         reward_class=reward_factory,
         min_buffer_size=15,
@@ -150,7 +121,9 @@ def monitor():
 
 if __name__ == "__main__":
 
-    if 0:
+    if 1:
+        import multiprocessing
+
         jobs = [multiprocessing.Process(target=monitor)]
         jobs[0].start()
         time.sleep(1)
@@ -168,5 +141,5 @@ if __name__ == "__main__":
 
     else:
 
-        run_games(use_az=True, num_mcts_samples=64)
+        run_games(use_az=True, num_mcts_samples=16)
 
