@@ -56,8 +56,8 @@ class MCTS(GraphSearch[MCTSVertex]):
             self.canonicalizer.reset()
 
         vertex = self._get_root() if state is None else self.get_vertex_for_state(state)
-        action_selection_function = self.softmax_selection if action_selection_function is None \
-            else self.visit_selection
+        action_selection_function = action_selection_function if action_selection_function is not None \
+            else self.softmax_selection
 
         path: [] = []
         for _ in range(max_depth):
