@@ -2,62 +2,66 @@ import logging
 import time
 
 import numpy as np
-
 from sqlalchemy import create_engine
 
-from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
-
-
-logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def construct_problem(ranked_reward=True):
-    
+def construct_problem():
+
+    import gym
     from rlmolecule.tree_search.reward import RankedRewardFactory
-    from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
-    
+
     from tf_model import policy_model
     from gym_problem import GymEnvProblem
+    from gym_state import GymEnvState
     from alphazero_gym import AlphaZeroGymEnv
 
-    
+
     class CartPoleEnv(AlphaZeroGymEnv):
-        def __init__(self, env=None, name=None):
-            super().__init__(env, name)
 
+        def __init__(self, **kwargs):
+            super().__init__(gym.envs.make("CartPole-v0"), **kwargs)
+        
         def get_obs(self) -> np.ndarray:
-            # this is where the state hides in cartpole, it will be different for different envs
-            return np.array(self.state)   
+            return np.array(self.state)
 
 
-    env = CartPoleEnv(name="CartPole-v0")
+    class CartPoleProblem(GymEnvProblem):
+        def __init__(self, 
+                     engine: "sqlalchemy.engine.Engine",
+                     env: AlphaZeroGymEnv,
+                     **kwargs) -> None:
+            super().__init__(engine, env, **kwargs)
+    
+        def policy_model(self) -> "tf.keras.Model":
+            return policy_model(obs_dim = self._env.observation_space.shape[0],
+                                hidden_layers = 3,
+                                hidden_dim = 16,)
 
-    engine = create_engine(f'sqlite:///env_data.db',
+        def get_policy_inputs(self, state: GymEnvState) -> dict:
+            return {"obs": self._env.get_obs()}
+
+
+    engine = create_engine(f'sqlite:///cartpole_data.db',
                            connect_args={'check_same_thread': False},
                            execution_options = {"isolation_level": "AUTOCOMMIT"})
 
-    model = policy_model(
-                obs_dim=env.observation_space.shape[0],
-                hidden_layers=3,
-                hidden_dim=16)
-
     run_id = "cartpole_example"
 
-    if ranked_reward:
-        reward_factory = RankedRewardFactory(
+    reward_factory = RankedRewardFactory(
             engine=engine,
             run_id=run_id,
             reward_buffer_min_size=10,
             reward_buffer_max_size=50,
             ranked_reward_alpha=0.75
-        )
-    else:
-        reward_factory = LinearBoundedRewardFactory(min_reward=-30, max_reward=-15)
+    )
 
-    problem = GymEnvProblem(
+    env = CartPoleEnv()
+
+    problem = CartPoleProblem(
         engine,
-        model,
         env,
         run_id=run_id,
         reward_class=reward_factory,
@@ -66,7 +70,6 @@ def construct_problem(ranked_reward=True):
     )
 
     return problem
-
 
 
 def run_games(use_az=True, num_mcts_samples=50):
@@ -78,21 +81,15 @@ def run_games(use_az=True, num_mcts_samples=50):
         from rlmolecule.mcts.mcts import MCTS
         game = MCTS(construct_problem(ranked_reward=False))
 
-    rewards_file = "_rewards.csv"
-    #with open(rewards_file, "w") as f:  pass
     while True:
-        path, reward = game.run(
-            num_mcts_samples=num_mcts_samples,
-            action_selection_function=MCTS.visit_selection if not use_az else None)
+        path, reward = game.run(num_mcts_samples=num_mcts_samples)
 
         print(path)
 
         print("REWARD:", reward.__dict__)
         if use_az:
-            # Breaks if you use MCTS:
             logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
-        #with open(rewards_file, "a") as f: 
-        #    f.write(str(reward.raw_reward) + "\n")
+        
 
 def train_model():
     construct_problem().train_policy_model(steps_per_epoch=100,
@@ -121,25 +118,20 @@ def monitor():
 
 if __name__ == "__main__":
 
-    if 1:
-        import multiprocessing
+    import multiprocessing
 
-        jobs = [multiprocessing.Process(target=monitor)]
-        jobs[0].start()
-        time.sleep(1)
+    jobs = [multiprocessing.Process(target=monitor)]
+    jobs[0].start()
+    time.sleep(1)
 
-        for i in range(5):
-            jobs += [multiprocessing.Process(target=run_games)]
+    for i in range(5):
+        jobs += [multiprocessing.Process(target=run_games)]
 
-        jobs += [multiprocessing.Process(target=train_model)]
+    jobs += [multiprocessing.Process(target=train_model)]
 
-        for job in jobs[1:]:
-            job.start()
+    for job in jobs[1:]:
+        job.start()
 
-        for job in jobs:
-            job.join(300)
-
-    else:
-
-        run_games(use_az=True, num_mcts_samples=16)
+    for job in jobs:
+        job.join(300)
 
