@@ -34,20 +34,20 @@ def solver(problem):
 
 
 def test_get_network_inputs(problem, vertex):
-    network_inputs = problem._get_network_inputs(vertex.state)
+    network_inputs = problem.get_policy_inputs(vertex.state)
     assert len(network_inputs['atom']) == vertex.state.num_atoms
     assert len(network_inputs['bond']) == 2 * vertex.state.molecule.GetNumBonds()
 
 
 def test_get_batched_network_inputs(solver, vertex):
     solver._expand(vertex)
-    batched_network_inputs = solver.problem._get_batched_network_inputs(vertex)
+    batched_network_inputs = solver.problem._get_batched_policy_inputs(vertex)
     assert batched_network_inputs['atom'].shape[0] == len(vertex.children) + 1
     assert batched_network_inputs['atom'].ndim == 2
     assert batched_network_inputs['connectivity'].ndim == 3
 
     assert (batched_network_inputs['atom'][5] ==
-            solver.problem._get_network_inputs(vertex.children[4].state)['atom']).all()
+            solver.problem.get_policy_inputs(vertex.children[4].state)['atom']).all()
 
 
 def test_get_value_and_policy(solver, vertex):

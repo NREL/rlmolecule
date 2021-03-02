@@ -5,7 +5,6 @@ from typing import Dict, Optional
 import rdkit
 import sqlalchemy
 
-from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
 from rlmolecule.mcts.mcts_problem import MCTSProblem
 from rlmolecule.molecule.molecule_config import MoleculeConfig
@@ -38,7 +37,6 @@ class MoleculeTFAlphaZeroProblem(MoleculeProblem, TFAlphaZeroProblem, ABC):
                  num_heads: int = 4,
                  num_messages: int = 3,
                  **kwargs) -> None:
-
         self.num_messages = num_messages
         self.num_heads = num_heads
         self.features = features

@@ -1,4 +1,6 @@
 from datetime import datetime
+from functools import reduce
+from typing import Optional
 
 import tensorflow as tf
 from tensorflow.keras import layers
@@ -10,12 +12,11 @@ class PolicyWrapper(layers.Layer):
 
     def __init__(self,
                  single_position_policy: tf.keras.Model,
-                 mask_dict: {str: 'numpy.ndarray'},
                  **kwargs):
 
         super().__init__(**kwargs)
         self.single_position_policy = single_position_policy
-        self.mask_dict = mask_dict
+        self.supports_masking = False  # todo: find out why keras doesn't like passing masks to the losses?
 
     def call(self, inputs, mask=None):
 
@@ -41,33 +42,49 @@ class PolicyWrapper(layers.Layer):
 
         # We put the parent node first in our batch inputs, so this slices
         # the value prediction for the parent
-        value_preds = tf.reshape(flat_values_logits, [batch_size, max_actions_per_node, -1])[:, 0, 0]
-        prior_logits = tf.reshape(flat_prior_logits, [batch_size, max_actions_per_node])
+        value_preds = tf.reshape(flat_values_logits, [batch_size, max_actions_per_node])[:, 0]
+        prior_logits = tf.reshape(flat_prior_logits, [batch_size, max_actions_per_node])[:, 1:]
 
         # Next we get a mask to see where we have valid actions and replace priors for
         # invalid actions with negative infinity (these get zeroed out after softmax).
         # We also only return prior_logits for the child nodes (not the first entry).
-        # todo: use the input mask instead of making our own masking layer
-        action_mask = tf.cast(tf.ones_like(prior_logits), tf.bool)
-        for i, inp in enumerate(inputs):
-            inp = tf.reshape(inp, [batch_size, max_actions_per_node, -1])
-            new_mask = tf.reduce_all(
-                tf.not_equal(inp, self.mask_dict[self.single_position_policy.inputs[i].name]),
-                axis=-1)
-            action_mask = tf.logical_and(action_mask, new_mask)
+        value_mask, prior_mask = self.compute_mask(inputs, mask)
 
         # Apply the mask
         masked_prior_logits = tf.where(
-            action_mask,
+            prior_mask,
             prior_logits,
-            tf.ones_like(prior_logits) * prior_logits.dtype.min)[:, 1:]
+            tf.ones_like(prior_logits) * prior_logits.dtype.min)
 
         return value_preds, masked_prior_logits
+
+    def compute_mask(self, inputs, mask=None):
+
+        shape = tf.shape(inputs[0])
+        batch_size = shape[0]
+        max_actions_per_node = shape[1]
+
+        if mask is not None:
+            # input is masked if every input is masked for a given action
+            reduced_masks = []
+            for input_mask in mask:
+                flat_input_mask = tf.reshape(input_mask, [batch_size, max_actions_per_node, -1])
+                reduced_masks += [tf.reduce_any(flat_input_mask, axis=-1)]  # True if any item is not masked
+
+            reduced_mask = reduce(tf.logical_or, reduced_masks)
+
+            value_mask = reduced_mask[:, 0]  # There shouldn't be any masked values...
+            prior_mask = reduced_mask[:, 1:]
+
+            return [value_mask, prior_mask]
+
+        else:
+            return None
 
     @classmethod
     def build_policy_model(cls,
                            single_position_policy: tf.keras.Model,
-                           mask_dict: {str: 'numpy.ndarray'}
+                           mask_dict: {str: Optional[float]}
                            ) -> tf.keras.Model:
         """ Main entry point for initializing the wrapped policy model. Expands the input dimensions of the single
         position policy model in order to account for batches of positions.
@@ -79,28 +96,39 @@ class PolicyWrapper(layers.Layer):
         """
 
         inputs = single_position_policy.inputs
-        input_names = list(mask_dict.keys())
-        assert len(inputs) == len(input_names), \
-            "Mismatch in number of inputs between policy model and policy inputs mask"
 
         batched_inputs = []
         batched_inputs_with_mask = []
 
-        for single_input in inputs:
-            for input_name in input_names:
-                if single_input.name.startswith(input_name):
-                    break
-            else:
-                raise RuntimeError(f"Input with name {single_input.name} not found in policy inputs")
-
+        for single_input, input_name in zip(inputs, align_input_names(inputs, mask_dict)):
             batched_input = tf.keras.Input(shape=single_input.shape,
                                            name=input_name,
                                            dtype=single_input.dtype)
             batched_inputs += [batched_input]
             batched_inputs_with_mask += [layers.Masking(mask_dict[input_name])(batched_input)]
 
-        value_preds, masked_prior_logits = cls(single_position_policy, mask_dict)(batched_inputs_with_mask)
+        value_preds, masked_prior_logits = cls(single_position_policy)(batched_inputs_with_mask)
         return tf.keras.Model(batched_inputs, [value_preds, masked_prior_logits])
+
+
+def align_input_names(keras_inputs, mask_dict):
+    """Get the keys from mask_dict as a list matching the ordering of keras_inputs"""
+
+    input_names = list(mask_dict.keys())
+    assert len(keras_inputs) == len(input_names), \
+        "Mismatch in number of inputs between policy model and policy inputs mask"
+
+    sorted_input_names = []
+    for single_input in keras_inputs:
+        for input_name in input_names:
+            if single_input.name.startswith(input_name):
+                break
+        else:
+            raise RuntimeError(f"Input with name {single_input.name} not found in policy inputs")
+
+        sorted_input_names += [input_name]
+
+    return sorted_input_names
 
 
 class TimeCsvLogger(tf.keras.callbacks.CSVLogger):
@@ -136,16 +164,15 @@ class KLWithLogits(LossFunctionWrapper):
             name=name,
             reduction=reduction)
 
-
-def get_input_mask_dict(inputs: list,
-                        mask_dict: dict = {},
-                        as_tensor: bool = False,
-                        value: float = 0.) -> dict:
-    """Returns a dictionary of mask values with type cast to that of the
-    corresponding input layer."""
-    _mask_dict = {inp.name: value for inp in inputs}
-    _mask_dict.update(mask_dict)
-    if as_tensor:
-        return {inp.name: tf.constant(_mask_dict[inp.name], dtype=inp.dtype) for inp in inputs}
-    else:
-        return {inp.name: _mask_dict[inp.name] for inp in inputs}
+# def get_input_mask_dict(inputs: list,
+#                         mask_dict: dict = {},
+#                         as_tensor: bool = False,
+#                         value: float = 0.) -> dict:
+#     """Returns a dictionary of mask values with type cast to that of the
+#     corresponding input layer."""
+#     _mask_dict = {inp.name: value for inp in inputs}
+#     _mask_dict.update(mask_dict)
+#     if as_tensor:
+#         return {inp.name: tf.constant(_mask_dict[inp.name], dtype=inp.dtype) for inp in inputs}
+#     else:
+#         return {inp.name: _mask_dict[inp.name] for inp in inputs}

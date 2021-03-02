@@ -3,8 +3,7 @@ import random
 from rlmolecule.mcts.mcts import MCTS
 from rlmolecule.mcts.mcts_vertex import MCTSVertex
 from rlmolecule.molecule.molecule_config import MoleculeConfig
-# class MCTSHashCanonicalizationTest(unittest.TestCase):
-from tests.qed_optimization_problem import QEDOptimizationProblem
+from tests.qed_optimization_problem import QEDWithRandomPolicy
 
 
 def test_get_successors(engine):
@@ -13,7 +12,7 @@ def test_get_successors(engine):
                             tryEmbedding=False,
                             sa_score_threshold=None,
                             stereoisomers=False)
-    problem = QEDOptimizationProblem(engine, config)
+    problem = QEDWithRandomPolicy(config=config, engine=engine)
     game = MCTS(problem)
     root: MCTSVertex = game._get_root()
     game._expand(root)

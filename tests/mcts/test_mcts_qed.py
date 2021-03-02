@@ -7,7 +7,7 @@ import pytest
 from rlmolecule.alphazero.alphazero import AlphaZero
 from rlmolecule.mcts.mcts import MCTS
 from rlmolecule.molecule.molecule_config import MoleculeConfig
-from tests.qed_optimization_problem import QEDOptimizationProblem, QEDWithMoleculePolicy
+from tests.qed_optimization_problem import QEDWithMoleculePolicy, QEDWithRandomPolicy
 
 
 @pytest.fixture
@@ -20,9 +20,9 @@ def problem(request, engine):
                             stereoisomers=False)
 
     if name == 'random':
-        return QEDOptimizationProblem(engine, config)
+        return QEDWithRandomPolicy(config=config, engine=engine)
     if name == 'MoleculePolicy':
-        return QEDWithMoleculePolicy(engine, config, features=8, num_heads=2, num_messages=1)
+        return QEDWithMoleculePolicy(config=config, engine=engine, features=8, num_heads=2, num_messages=1)
 
 
 @pytest.fixture

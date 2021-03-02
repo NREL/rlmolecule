@@ -1,23 +1,14 @@
 import os
-import tempfile
 from unittest.mock import MagicMock
 
-import pytest
 import numpy as np
+import pytest
+import tensorflow as tf
 
 from rlmolecule.alphazero.alphazero import AlphaZero
-from rlmolecule.tree_search.reward import RankedRewardFactory, RawRewardFactory
 from rlmolecule.molecule.molecule_config import MoleculeConfig
+from rlmolecule.tree_search.reward import RankedRewardFactory, RawRewardFactory
 from tests.qed_optimization_problem import QEDWithMoleculePolicy
-
-
-@pytest.fixture(scope='class')
-def tmpdirname():
-    """
-    A directory for the checkpoint files.
-    """
-    with tempfile.TemporaryDirectory() as tmpdir:
-        yield tmpdir
 
 
 @pytest.fixture()
@@ -28,6 +19,7 @@ def config():
                           sa_score_threshold=None,
                           stereoisomers=False)
 
+
 @pytest.fixture(scope='function')
 def game(request, engine, tmpdirname, config):
     """
@@ -36,7 +28,6 @@ def game(request, engine, tmpdirname, config):
     """
 
     name = request.param
-
 
     if name == 'raw':
         reward_class = RawRewardFactory()
@@ -58,7 +49,6 @@ def game(request, engine, tmpdirname, config):
     else:
         raise RuntimeError(f"{name} not found")
 
-
     problem = QEDWithMoleculePolicy(engine,
                                     config,
                                     features=8,
@@ -70,6 +60,7 @@ def game(request, engine, tmpdirname, config):
                                     policy_checkpoint_dir=tmpdirname)
 
     return AlphaZero(problem, dirichlet_noise=noise)
+
 
 @pytest.mark.parametrize('game', ['raw', 'ranked', 'nonoise'], indirect=True)
 class TestPolicyTraining:
@@ -86,7 +77,6 @@ class TestPolicyTraining:
         assert game.problem.get_reward.call_count == 1
 
     def test_create_games(self, game):
-
         final_mols = []
         rewards = []
 
@@ -118,19 +108,44 @@ class TestPolicyTraining:
         assert inputs['atom'].shape[1] == visit_probs.shape[1] + 1
         assert inputs['atom'].shape[0] == problem.batch_size
 
+        outputs = problem.batched_policy_model(inputs)
+        assert outputs[0].shape.as_list() == rewards.shape.as_list()
+        assert outputs[1].shape.as_list() == visit_probs.shape.as_list()
+
+    def test_policy_model_masking(self, game):
+        problem = game.problem
+        data = problem._create_dataset()
+        inputs, (rewards, visit_probs) = list(data.take(1))[0]
+
+        inputs_for_batch_layer = tf.keras.Model(problem.batched_policy_model.inputs,
+                                                problem.batched_policy_model.layers[-1].input)(inputs)
+
+        input_mask = [inp._keras_mask for inp in inputs_for_batch_layer]
+
+        outputs = problem.batched_policy_model(inputs)
+        output_mask = problem.batched_policy_model.layers[-1].compute_mask(inputs_for_batch_layer, input_mask)
+
+
+        assert output_mask[0].numpy().all(), 'no values should be masked'
+
+        # make sure that the final output masks matches where there's no atoms.
+        assert (output_mask[1].numpy() == ~(inputs['atom'] == 0).numpy().all(-1)[:, 1:]).all()
+
+        # make sure the number of actions is consistent
+        assert (input_mask[0].numpy().sum(1) - 1 == output_mask[1].numpy().sum(1)).all()
+
     def test_train_policy_model(self, game):
         problem = game.problem
 
-        weights_before = problem.policy_model.get_weights()[1]
+        weights_before = problem.batched_policy_model.get_weights()[1]
 
         history = problem.train_policy_model(steps_per_epoch=10, epochs=1)
         assert np.isfinite(history.history['loss'][0])
         assert 'policy.01.index' in os.listdir(problem.policy_checkpoint_dir)
 
-        weights_after = problem.policy_model.get_weights()[1]
+        weights_after = problem.batched_policy_model.get_weights()[1]
 
         assert not np.isclose(weights_before, weights_after).all()
-
 
     def test_load_new_policy(self, engine, game):
         problem = game.problem
@@ -140,7 +155,7 @@ class TestPolicyTraining:
             root = game.get_vertex_for_state(problem.get_initial_state())
             game._evaluate([root])
             value, prior_logits = problem.policy_evaluator(
-                problem._get_batched_network_inputs(root))
+                problem._get_batched_policy_inputs(root))
 
             return float(value[0]), prior_logits.numpy()[1:]
 
