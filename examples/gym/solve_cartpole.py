@@ -16,7 +16,12 @@ from alphazero_gym import AlphaZeroGymEnv
 logger = logging.getLogger(__name__)
 
 
+# NOTE: These class definitions need to stay outside of construct_problem
+# or you will error out on not being able to pickle/serialize them.
+
 class CartPoleEnv(AlphaZeroGymEnv):
+    """Lightweight wrapper around the gym env that makes the user implement
+    the get_obs method."""
 
     def __init__(self, **kwargs):
         super().__init__(gym.envs.make("CartPole-v0"), **kwargs)
@@ -26,6 +31,9 @@ class CartPoleEnv(AlphaZeroGymEnv):
 
 
 class CartPoleProblem(GymEnvProblem):
+    """Cartpole TF AZ problem.  For now we will ask the user to implement
+    any obs preprocessing directly in the get_policy_inputs method."""
+
     def __init__(self, 
                     engine: "sqlalchemy.engine.Engine",
                     **kwargs) -> None:
@@ -42,7 +50,6 @@ class CartPoleProblem(GymEnvProblem):
 
 
 def construct_problem():
-
 
     from rlmolecule.tree_search.reward import RankedRewardFactory
 

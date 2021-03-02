@@ -10,6 +10,8 @@ from gym_state import GymEnvState
 
 
 class GymEnvProblem(TFAlphaZeroProblem):
+    """Gym env TF AZ problem that automates the parent class abstractmethods 
+    via the gym interface and gym state."""
     
     def __init__(self,
                  engine: sqlalchemy.engine.Engine,

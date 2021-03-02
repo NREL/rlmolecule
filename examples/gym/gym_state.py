@@ -9,6 +9,8 @@ from alphazero_gym import AlphaZeroGymEnv
 
 
 class GymEnvState(GraphSearchState):
+    """Gyn env state implementation that maps the gym API to the GraphSearchState
+    interface.  Should work generically for any gym env."""
 
     def __init__(self, 
                  env: AlphaZeroGymEnv,
