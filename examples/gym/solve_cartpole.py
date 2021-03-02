@@ -35,8 +35,8 @@ class CartPoleProblem(GymEnvProblem):
     any obs preprocessing directly in the get_policy_inputs method."""
 
     def __init__(self, 
-                    engine: "sqlalchemy.engine.Engine",
-                    **kwargs) -> None:
+                 engine: "sqlalchemy.engine.Engine",
+                 **kwargs) -> None:
         env = CartPoleEnv()
         super().__init__(engine, env, **kwargs)
 
