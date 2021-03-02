@@ -17,15 +17,15 @@ def construct_problem():
     # the workers. Might require upstream changes to nfp as well.
     from rlmolecule.tree_search.reward import RankedRewardFactory
     from rlmolecule.molecule.molecule_config import MoleculeConfig
-    from rlmolecule.molecule.molecule_problem import MoleculeAlphaZeroProblem
+    from rlmolecule.molecule.molecule_problem import MoleculeTFAlphaZeroProblem
     from rlmolecule.molecule.molecule_state import MoleculeState
 
-    class QEDOptimizationProblem(MoleculeAlphaZeroProblem):
+    class QEDOptimizationProblem(MoleculeTFAlphaZeroProblem):
 
         def __init__(self,
                      engine: 'sqlalchemy.engine.Engine',
                      config: 'MoleculeConfig', **kwargs) -> None:
-            super(QEDOptimizationProblem, self).__init__(engine, **kwargs)
+            super(QEDOptimizationProblem, self).__init__(engine, config, **kwargs)
             self._config = config
 
         def get_initial_state(self) -> MoleculeState:
