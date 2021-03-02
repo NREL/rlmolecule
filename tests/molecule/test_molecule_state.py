@@ -43,8 +43,8 @@ def test_serialize_deserialize(molecule):
 
     config = MoleculeConfig(max_atoms=5)
     mol_state = MoleculeState(molecule, config)
-    next_actions = set(mol_state.get_next_actions())
+    next_actions = list(mol_state.get_next_actions())
     string_molecule = mol_state.serialize()
     assert type(string_molecule) == str
     new_mol = MoleculeState.deserialize(string_molecule)
-    assert set(mol_state.get_next_actions()) == next_actions
+    assert list(new_mol.get_next_actions()) == next_actions

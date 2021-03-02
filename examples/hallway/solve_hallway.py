@@ -18,7 +18,7 @@ def construct_problem(ranked_reward=True):
     from rlmolecule.tree_search.reward import RankedRewardFactory
     from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
 
-    from tf_model import policy_model
+    from tf_model import policy_model  #todo: this looks broken? (psj)
     from hallway_config import HallwayConfig
     from hallway_state import HallwayState
 

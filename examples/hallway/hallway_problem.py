@@ -14,7 +14,7 @@ from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 
 from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
-from rlmolecule.alphazero.keras_utils import KLWithLogits, TimeCsvLogger
+from rlmolecule.alphazero.tf_keras_policy import KLWithLogits, TimeCsvLogger
 
 from hallway_state import HallwayState
 from model import build_policy_trainer
