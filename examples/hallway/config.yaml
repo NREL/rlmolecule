@@ -1,0 +1,60 @@
+# The "Hallway problem" is where a walker starts on the left side of the hallway
+# and needs to move all the way to the right.
+#   - actions: move left or right one square
+#   - state: current position in the hallway, and # steps taken
+#   - reward: -1 for each step taken so far + distance from the end
+
+
+run_config:
+    # If running locally, specify the script here:
+    start_script: "solve_hallway.py"
+    # Settings for a high performance computing (HPC) environment
+    # where the policy is trained on GPUs and the rollout is done on CPUs
+    # hpc_settings: 
+    # 	start_policy_script: ""
+    # 	start_rollout_script: ""
+    # 	working_dir: ""
+    # 	time: "4:00:00"
+    # 	account: "rlmolecule"
+    # 	job_name: "hallway_example"
+    # 	rollout_nodes: 2
+    #   rollout_ntasks_per_node: 6
+    # 	policy_nodes: 1
+    # 	policy_gpus: 2
+    #   policy_env: "source /nopt/nrel/apps/anaconda/5.3/etc/profile.d/conda.sh; conda activate /projects/rlmolecule/pstjohn/envs/tf2_gpu"
+    #   rollout_env: "source /nopt/nrel/apps/anaconda/5.3/etc/profile.d/conda.sh; conda activate /projects/rlmolecule/pstjohn/envs/tf2_cpu"
+
+# Parameters for setting up the problem
+problem_config:
+    # size of the hallway
+    size: 5
+    # max # steps the walker is allowed to take
+    max_steps: 32
+
+# TensorFlow Parameters for training the model
+tfalphazero_config:
+    # TODO add the rest of the parameters
+    ranked_reward_alpha: 0.75
+    reward_buffer_max_size: 250
+    reward_buffer_min_size: 50
+    policy_buffer_max_size: 256
+    policy_buffer_min_size: 128
+    
+
+# Database settings for the Object Relational Model (ORM)
+# Used to store games and communicate between the policy model (run on GPUs) and rollout (run on CPUs)
+sql_database:
+    # settings to connect to NREL's yuma database
+    drivername: "postgresql+psycopg2"
+    dbname: "bde"
+    port: "5432"
+    host: "yuma.hpc.nrel.gov"
+    user: "rlops"
+    # read the password from a file
+    passwd_file: '/projects/rlmolecule/rlops_pass'
+    # drop all of the tables in the database
+    reset_db: True
+
+#    # default database settings:
+#    drivername: "sqlite"
+#    db_file: "hallway_data.db"
