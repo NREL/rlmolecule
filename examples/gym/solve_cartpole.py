@@ -4,45 +4,47 @@ import time
 import numpy as np
 from sqlalchemy import create_engine
 
+import gym
+
+from tf_model import policy_model
+from gym_problem import GymEnvProblem
+from gym_state import GymEnvState
+from alphazero_gym import AlphaZeroGymEnv
+
+
 #logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+class CartPoleEnv(AlphaZeroGymEnv):
+
+    def __init__(self, **kwargs):
+        super().__init__(gym.envs.make("CartPole-v0"), **kwargs)
+    
+    def get_obs(self) -> np.ndarray:
+        return np.array(self.state)
+
+
+class CartPoleProblem(GymEnvProblem):
+    def __init__(self, 
+                    engine: "sqlalchemy.engine.Engine",
+                    **kwargs) -> None:
+        env = CartPoleEnv()
+        super().__init__(engine, env, **kwargs)
+
+    def policy_model(self) -> "tf.keras.Model":
+        return policy_model(obs_dim = self._env.observation_space.shape[0],
+                            hidden_layers = 3,
+                            hidden_dim = 16,)
+
+    def get_policy_inputs(self, state: GymEnvState) -> dict:
+        return {"obs": self._env.get_obs()}
+
+
 def construct_problem():
 
-    import gym
+
     from rlmolecule.tree_search.reward import RankedRewardFactory
-
-    from tf_model import policy_model
-    from gym_problem import GymEnvProblem
-    from gym_state import GymEnvState
-    from alphazero_gym import AlphaZeroGymEnv
-
-
-    class CartPoleEnv(AlphaZeroGymEnv):
-
-        def __init__(self, **kwargs):
-            super().__init__(gym.envs.make("CartPole-v0"), **kwargs)
-        
-        def get_obs(self) -> np.ndarray:
-            return np.array(self.state)
-
-
-    class CartPoleProblem(GymEnvProblem):
-        def __init__(self, 
-                     engine: "sqlalchemy.engine.Engine",
-                     env: AlphaZeroGymEnv,
-                     **kwargs) -> None:
-            super().__init__(engine, env, **kwargs)
-    
-        def policy_model(self) -> "tf.keras.Model":
-            return policy_model(obs_dim = self._env.observation_space.shape[0],
-                                hidden_layers = 3,
-                                hidden_dim = 16,)
-
-        def get_policy_inputs(self, state: GymEnvState) -> dict:
-            return {"obs": self._env.get_obs()}
-
 
     engine = create_engine(f'sqlite:///cartpole_data.db',
                            connect_args={'check_same_thread': False},
@@ -58,11 +60,8 @@ def construct_problem():
             ranked_reward_alpha=0.75
     )
 
-    env = CartPoleEnv()
-
     problem = CartPoleProblem(
         engine,
-        env,
         run_id=run_id,
         reward_class=reward_factory,
         min_buffer_size=15,

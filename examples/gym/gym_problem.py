@@ -23,5 +23,5 @@ class GymEnvProblem(TFAlphaZeroProblem):
         return GymEnvState(self._env, 0., 0., False)
 
     def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
-        return state._env.cumulative_reward, {}
+        return state.cumulative_reward, {}
 
