@@ -6,6 +6,8 @@ from sqlalchemy import create_engine
 
 import gym
 
+from gym_minigrid.wrappers import *
+
 from examples.gym.tf_model import policy_model_cnn
 from examples.gym.gym_problem import GymEnvProblem
 from examples.gym.gym_state import GymEnvState
@@ -26,10 +28,11 @@ class AtariEnv(AlphaZeroGymEnv):
     the get_obs method."""
 
     def __init__(self, **kwargs):
-        super().__init__(gym.envs.make("Breakout-v0"), **kwargs)
+        super().__init__(gym.make("MiniGrid-Empty-5x5-v0"), **kwargs)
     
     def get_obs(self) -> np.ndarray:
-        return np.array(process_frame(self.ale.getScreenRGB2()))
+        obs = self.gen_obs()
+        return np.array(obs["image"])
 
 
 class AtariProblem(GymEnvProblem):
@@ -43,14 +46,15 @@ class AtariProblem(GymEnvProblem):
         super().__init__(engine, env, **kwargs)
 
     def policy_model(self) -> "tf.keras.Model":
-        return policy_model_cnn(obs_type = "RGB",
-                                obs_dim = process_frame(self._env.ale.getScreenRGB2()).shape,
+        obs = self._env.gen_obs()
+        return policy_model_cnn(obs_type = "GRID",
+                                obs_dim = obs["image"].shape,
                                 action_dim = self._env.action_space.n,
                                 hidden_layers = 1,
                                 conv_layers = 3,
-                                filters_dim = [32, 64, 64],
-                                kernel_dim = [8, 4, 3],
-                                strides_dim = [4, 2, 1],
+                                filters_dim = [4, 8, 8],
+                                kernel_dim = [2, 2, 2],
+                                strides_dim = [1, 1, 1],
                                 hidden_dim = 512,)
 
     def get_policy_inputs(self, state: GymEnvState) -> dict:

@@ -21,7 +21,8 @@ def policy_model(obs_dim: int,
 
     return tf.keras.Model([obs], [value_logit, pi_logit], name="policy_model")
 
-def policy_model_cnn(obs_dim: tuple = (84, 84, 4),
+def policy_model_cnn(obs_type: str = "RGB",
+                     obs_dim: tuple = (84, 84, 4),
                      action_dim: int = 1,
                      hidden_layers: int = 1,
                      conv_layers: int = 2,
@@ -32,10 +33,11 @@ def policy_model_cnn(obs_dim: tuple = (84, 84, 4),
                      activation: str = "relu") -> tf.keras.Model:
 
     obs = layers.Input(shape=(obs_dim[0], obs_dim[1], obs_dim[2]), dtype=tf.float32, name="obs")
-    x = layers.Lambda(lambda layer: layer / 255)(obs) # normalize by 255, if necessary
+    if obs_type == "RGB":
+        obs = layers.Lambda(lambda layer: layer / 255)(obs) # normalize by 255, if necessary
 
     # Convolutions on the frames on the screen
-    x = layers.Conv2D(filters_dim[0], (kernel_dim[0],kernel_dim[0]), strides_dim[0], activation=activation)(x)
+    x = layers.Conv2D(filters_dim[0], (kernel_dim[0],kernel_dim[0]), strides_dim[0], activation=activation)(obs)
     for i in range(conv_layers-1):
         x = layers.Conv2D(filters_dim[i], (kernel_dim[i],kernel_dim[i]), strides_dim[i], activation=activation)(x)
     x = layers.Flatten()(x)
