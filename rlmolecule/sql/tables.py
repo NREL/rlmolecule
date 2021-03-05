@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Float, Integer, JSON, String, func
+from sqlalchemy import Column, DateTime, Float, Integer, BigInteger, JSON, String, func
 
 from rlmolecule.sql import Base
 
@@ -6,7 +6,7 @@ from rlmolecule.sql import Base
 class RewardStore(Base):
     __tablename__ = 'Reward'
 
-    hash = Column(Integer, primary_key=True)
+    hash = Column(BigInteger, primary_key=True)
     run_id = Column(String, primary_key=True)
     state = Column(String, primary_key=True)
     time = Column(DateTime, server_default=func.now())
