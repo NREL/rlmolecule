@@ -1,13 +1,16 @@
-from typing import Sequence
 from copy import deepcopy
+from typing import Sequence, Tuple
 
 import gym
-from alphazero_gym import AlphaZeroGymEnv
 
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
+from alphazero_gym import AlphaZeroGymEnv
+
 
 class GymEnvState(GraphSearchState):
+    """Gyn env state implementation that maps the gym API to the GraphSearchState
+    interface.  Should work generically for any gym env."""
 
     def __init__(self, 
                  env: AlphaZeroGymEnv,
@@ -25,7 +28,7 @@ class GymEnvState(GraphSearchState):
 
     def equals(self, other: any) -> bool:
         return type(self) == type(other) and \
-               self._env.get_obs() == other._env.get_obs()   # legit?
+               np.all(self._env.get_obs() == other._env.get_obs())   # legit?
 
     def hash(self) -> int:
         return hash(self.__repr__())
@@ -41,7 +44,7 @@ class GymEnvState(GraphSearchState):
                     GymEnvState(env_copy, step_rew, cumulative_rew, done))
         return next_actions
 
-    def get_reward(self) -> (float, dict):
+    def get_reward(self) -> Tuple[float, dict]:
         return self.cumulative_reward, {}
 
     @property
