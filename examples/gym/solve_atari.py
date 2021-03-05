@@ -9,7 +9,9 @@ import gym
 from examples.gym.tf_model import policy_model_cnn
 from examples.gym.gym_problem import GymEnvProblem
 from examples.gym.gym_state import GymEnvState
-from examples.gym.alphazero_gym_atari import AlphaZeroAtariGymEnv
+from examples.gym.alphazero_gym import AlphaZeroGymEnv
+#from examples.gym.alphazero_gym_atari import AlphaZeroAtariGymEnv
+from examples.gym.frame_preprocessing import process_frame
 
 
 #logging.basicConfig(level=logging.INFO)
@@ -19,7 +21,7 @@ logger = logging.getLogger(__name__)
 # NOTE: These class definitions need to stay outside of construct_problem
 # or you will error out on not being able to pickle/serialize them.
 
-class AtariEnv(AlphaZeroAtariGymEnv):
+class AtariEnv(AlphaZeroGymEnv):
     """Lightweight wrapper around the gym env that makes the user implement
     the get_obs method."""
 
@@ -27,7 +29,7 @@ class AtariEnv(AlphaZeroAtariGymEnv):
         super().__init__(gym.envs.make("Breakout-v0"), **kwargs)
     
     def get_obs(self) -> np.ndarray:
-        return np.array(self.state)
+        return np.array(process_frame(self.ale.getScreenRGB2()))
 
 
 class AtariProblem(GymEnvProblem):
@@ -41,7 +43,7 @@ class AtariProblem(GymEnvProblem):
         super().__init__(engine, env, **kwargs)
 
     def policy_model(self) -> "tf.keras.Model":
-        return policy_model_cnn(obs_dim = (84, 84, 4),
+        return policy_model_cnn(obs_dim = process_frame(self._env.ale.getScreenRGB2()).shape,
                                 action_dim = self._env.action_space.n,
                                 hidden_layers = 1,
                                 conv_layers = 3,
