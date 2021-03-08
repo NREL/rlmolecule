@@ -10,18 +10,22 @@ from examples.gym.tf_model import policy_model_cnn
 from examples.gym.gym_problem import GymEnvProblem
 from examples.gym.gym_state import GymEnvState
 from examples.gym.alphazero_gym import AlphaZeroGymEnv
-#from examples.gym.alphazero_gym_atari import AlphaZeroAtariGymEnv
 from examples.gym.frame_preprocessing import process_frame
 
 
 #logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# NOTE: Global binary variable PROCESS has to be defined by the user,
+# whether they want the image observation to be converted to greyscale
+# and reduced in size (PROCESS=True), or stay in RGB format (PROCESS=False)
+PROCESSED = False
+
 
 # NOTE: These class definitions need to stay outside of construct_problem
 # or you will error out on not being able to pickle/serialize them.
 
-class AtariEnv(AlphaZeroGymEnv):
+class BreakOutEnv(AlphaZeroGymEnv):
     """Lightweight wrapper around the gym env that makes the user implement
     the get_obs method."""
 
@@ -29,22 +33,27 @@ class AtariEnv(AlphaZeroGymEnv):
         super().__init__(gym.envs.make("Breakout-v0"), **kwargs)
     
     def get_obs(self) -> np.ndarray:
-        return np.array(process_frame(self.ale.getScreenRGB2()))
+        if PROCESSED:
+            return np.array(process_frame(self.ale.getScreenRGB2()))
+        return np.array(self.ale.getScreenRGB2())
 
 
-class AtariProblem(GymEnvProblem):
+class BreakOutProblem(GymEnvProblem):
     """Atari TF AZ problem.  For now we will ask the user to implement
     any obs preprocessing directly in the get_policy_inputs method."""
 
     def __init__(self, 
                  engine: "sqlalchemy.engine.Engine",
                  **kwargs) -> None:
-        env = AtariEnv()
+        env = BreakOutEnv()
         super().__init__(engine, env, **kwargs)
 
     def policy_model(self) -> "tf.keras.Model":
+        if PROCESSED:
+            obs_dim = process_frame(self._env.ale.getScreenRGB2()).shape
+        obs_dim = self._env.ale.getScreenRGB2().shape
         return policy_model_cnn(obs_type = "RGB",
-                                obs_dim = process_frame(self._env.ale.getScreenRGB2()).shape,
+                                obs_dim = obs_dim,
                                 action_dim = self._env.action_space.n,
                                 hidden_layers = 1,
                                 conv_layers = 3,
@@ -61,7 +70,7 @@ def construct_problem():
 
     from rlmolecule.tree_search.reward import RankedRewardFactory
 
-    engine = create_engine(f'sqlite:///cartpole_data.db',
+    engine = create_engine(f'sqlite:///breakout_data.db',
                            connect_args={'check_same_thread': False},
                            execution_options = {"isolation_level": "AUTOCOMMIT"})
 
@@ -75,7 +84,7 @@ def construct_problem():
             ranked_reward_alpha=0.75
     )
 
-    problem = AtariProblem(
+    problem = BreakOutProblem(
         engine,
         run_id=run_id,
         reward_class=reward_factory,
