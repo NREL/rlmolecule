@@ -9,6 +9,7 @@ from sqlalchemy import exc
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from rlmolecule.mcts.mcts_problem import MCTSProblem
 from rlmolecule.sql import Base, Session
+from rlmolecule.sql.query import get_existing_reward
 from rlmolecule.sql.tables import GameStore, RewardStore
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 from rlmolecule.tree_search.reward import Reward
@@ -52,7 +53,7 @@ class AlphaZeroProblem(MCTSProblem):
         :param state: The state for which rewards are cached
         :return: the scaled reward
         """
-        existing_record = self.session.query(RewardStore).get((hash(state), self.run_id, state.serialize()))
+        existing_record = get_existing_reward(self.session, self.run_id, state)
         if existing_record is not None:
             reward = existing_record.reward
 
