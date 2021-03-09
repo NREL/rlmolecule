@@ -17,13 +17,12 @@ class GymEnvProblem(TFAlphaZeroProblem):
                  engine: sqlalchemy.engine.Engine,
                  env: AlphaZeroGymEnv,
                  **kwargs) -> None:
-        self._env = deepcopy(env)
+        self.env = deepcopy(env)
         super().__init__(engine, **kwargs)
 
     def get_initial_state(self) -> GymEnvState:
-        _ = self._env.reset()
-        return GymEnvState(self._env, 0., 0., False)
+        _ = self.env.reset()
+        return GymEnvState(self.env, 0., 0., False)
 
-    def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
-        return state.cumulative_reward, {}
+
 

@@ -11,6 +11,7 @@ from tf_model import policy_model
 from gym_problem import GymEnvProblem
 from gym_state import GymEnvState
 from alphazero_gym import AlphaZeroGymEnv
+from hallway_env import HallwayEnv
 
 
 #logging.basicConfig(level=logging.INFO)
@@ -20,48 +21,49 @@ logger = logging.getLogger(__name__)
 # NOTE: These class definitions need to stay outside of construct_problem
 # or you will error out on not being able to pickle/serialize them.
 
-class CartPoleEnv(AlphaZeroGymEnv):
+class HallwayAlphaZeroEnv(AlphaZeroGymEnv):
     """Lightweight wrapper around the gym env that makes the user implement
     the get_obs method."""
 
-    def __init__(self, **kwargs):
-        super().__init__(gym.envs.make("CartPole-v0"), **kwargs)
-    
+    def __init__(self, size=16, max_steps=16):
+        env = HallwayEnv(size=size, max_steps=max_steps)
+        super().__init__(env)
+
     def get_obs(self) -> np.ndarray:
-        return np.array(self.state)
+        return self.env.get_obs()
 
 
-class CartPoleProblem(GymEnvProblem):
+class HallwayProblem(GymEnvProblem):
     """Cartpole TF AZ problem.  For now we will ask the user to implement
     any obs preprocessing directly in the get_policy_inputs method."""
 
     def __init__(self, 
                  engine: "sqlalchemy.engine.Engine",
                  **kwargs) -> None:
-        env = CartPoleEnv()
+        env = HallwayAlphaZeroEnv()
         super().__init__(engine, env, **kwargs)
 
     def policy_model(self) -> "tf.keras.Model":
         return policy_model(obs_dim = self.env.observation_space.shape[0],
                             hidden_layers = 3,
-                            hidden_dim = 16,)
+                            hidden_dim = 16)
 
     def get_policy_inputs(self, state: GymEnvState) -> dict:
         return {"obs": self.env.get_obs()}
 
     def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
-        return state.cumulative_reward, {}
+        return state.env.get_reward(), {}
 
 
 def construct_problem():
 
     from rlmolecule.tree_search.reward import RankedRewardFactory
 
-    engine = create_engine(f'sqlite:///cartpole_data.db',
+    engine = create_engine(f'sqlite:///hallway_data.db',
                            connect_args={'check_same_thread': False},
                            execution_options = {"isolation_level": "AUTOCOMMIT"})
 
-    run_id = "cartpole_example"
+    run_id = "hallway_example"
 
     reward_factory = RankedRewardFactory(
             engine=engine,
@@ -71,7 +73,7 @@ def construct_problem():
             ranked_reward_alpha=0.75
     )
 
-    problem = CartPoleProblem(
+    problem = HallwayProblem(
         engine,
         run_id=run_id,
         reward_class=reward_factory,
