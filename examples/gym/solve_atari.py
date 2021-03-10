@@ -5,6 +5,7 @@ import numpy as np
 from sqlalchemy import create_engine
 
 import gym
+from gym.wrappers import FrameStack, GrayScaleObservation, ResizeObservation, LazyFrames
 
 from examples.gym.tf_model import policy_model_cnn
 from examples.gym.gym_problem import GymEnvProblem
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 # NOTE: Global binary variable PROCESS has to be defined by the user,
 # whether they want the image observation to be converted to greyscale
 # and reduced in size (PROCESS=True), or stay in RGB format (PROCESS=False)
-PROCESSED = False
+PROCESSED = True
 
 
 # NOTE: These class definitions need to stay outside of construct_problem
@@ -30,12 +31,17 @@ class BreakOutEnv(AlphaZeroGymEnv):
     the get_obs method."""
 
     def __init__(self, **kwargs):
-        super().__init__(gym.envs.make("Breakout-v0"), **kwargs)
+        env_ = gym.envs.make("Breakout-v0")
+        if PROCESSED:
+            gray_env_ = GrayScaleObservation(env_)
+            resized_env_ = ResizeObservation(gray_env_, shape=84)
+            env = FrameStack(resized_env_, 4)
+        else:
+            env = FrameStack(env_, 4)
+        super().__init__(env, **kwargs)
     
     def get_obs(self) -> np.ndarray:
-        if PROCESSED:
-            return np.array(process_frame(self.ale.getScreenRGB2()))
-        return np.array(self.ale.getScreenRGB2())
+        return np.array(LazyFrames(list(self.frames), self.lz4_compress))
 
 
 class BreakOutProblem(GymEnvProblem):
@@ -49,9 +55,7 @@ class BreakOutProblem(GymEnvProblem):
         super().__init__(engine, env, **kwargs)
 
     def policy_model(self) -> "tf.keras.Model":
-        if PROCESSED:
-            obs_dim = process_frame(self._env.ale.getScreenRGB2()).shape
-        obs_dim = self._env.ale.getScreenRGB2().shape
+        obs_dim = np.array(LazyFrames(list(self._env.frames), self._env.lz4_compress)).shape
         return policy_model_cnn(obs_type = "RGB",
                                 obs_dim = obs_dim,
                                 action_dim = self._env.action_space.n,
