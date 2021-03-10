@@ -28,7 +28,9 @@ PROCESSED = True
 
 class BreakOutEnv(AlphaZeroGymEnv):
     """Lightweight wrapper around the gym env that makes the user implement
-    the get_obs method."""
+    the get_obs method. The user can also set the PROCESSED global variable
+    to True if they want the images preprocessed (grayscale and resized).
+    Default value is set to False."""
 
     def __init__(self, **kwargs):
         env_ = gym.envs.make("Breakout-v0")
