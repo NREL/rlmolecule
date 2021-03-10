@@ -33,9 +33,9 @@ class BreakOutEnv(AlphaZeroGymEnv):
     def __init__(self, **kwargs):
         env_ = gym.envs.make("Breakout-v0")
         if PROCESSED:
-            gray_env_ = GrayScaleObservation(env_)
-            resized_env_ = ResizeObservation(gray_env_, shape=84)
-            env = FrameStack(resized_env_, 4)
+            gray_env_ = GrayScaleObservation(env_) # Turns RGB image to gray scale
+            resized_env_ = ResizeObservation(gray_env_, shape=84) # resizes image on a square with side length == shape
+            env = FrameStack(resized_env_, num_stack=4) # collect num_stack number of frames and feed them to policy network
         else:
             env = FrameStack(env_, 4)
         super().__init__(env, **kwargs)
