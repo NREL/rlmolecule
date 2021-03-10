@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # NOTE: Global binary variable PROCESS has to be defined by the user,
 # whether they want the image observation to be converted to greyscale
 # and reduced in size (PROCESS=True), or stay in RGB format (PROCESS=False)
-PROCESSED = True
+PROCESSED = False
 
 
 # NOTE: These class definitions need to stay outside of construct_problem
