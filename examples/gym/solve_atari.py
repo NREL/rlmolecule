@@ -37,7 +37,7 @@ class BreakOutEnv(AlphaZeroGymEnv):
             resized_env_ = ResizeObservation(gray_env_, shape=84) # resizes image on a square with side length == shape
             env = FrameStack(resized_env_, num_stack=4) # collect num_stack number of frames and feed them to policy network
         else:
-            env = FrameStack(env_, 4)
+            env = FrameStack(env_, num_stack=4)
         super().__init__(env, **kwargs)
     
     def get_obs(self) -> np.ndarray:
