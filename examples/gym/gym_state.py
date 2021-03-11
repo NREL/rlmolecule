@@ -29,7 +29,7 @@ class GymEnvState(GraphSearchState):
 
     def equals(self, other: any) -> bool:
         return type(self) == type(other) and \
-               np.isclose(self._env.get_obs(), other._env.get_obs())   # legit?
+               np.isclose(self.env.get_obs(), other.env.get_obs())   # legit?
 
     def hash(self) -> int:
         return hash(self.__repr__())
