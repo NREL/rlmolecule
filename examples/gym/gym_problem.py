@@ -5,8 +5,8 @@ import sqlalchemy
 
 from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
 
-from alphazero_gym import AlphaZeroGymEnv
-from gym_state import GymEnvState
+from examples.gym.alphazero_gym import AlphaZeroGymEnv
+from examples.gym.gym_state import GymEnvState
 
 
 class GymEnvProblem(TFAlphaZeroProblem):
@@ -19,7 +19,7 @@ class GymEnvProblem(TFAlphaZeroProblem):
                  **kwargs) -> None:
         self.env = deepcopy(env)
         super().__init__(engine, **kwargs)
-
+        
     def get_initial_state(self) -> GymEnvState:
         _ = self.env.reset()
         return GymEnvState(self.env, 0., 0., False)

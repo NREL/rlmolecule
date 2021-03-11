@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Sequence, Tuple
+from typing import Sequence
 
 import numpy as np
 import gym
@@ -29,7 +29,7 @@ class GymEnvState(GraphSearchState):
 
     def equals(self, other: any) -> bool:
         return type(self) == type(other) and \
-               np.all(self.env.get_obs() == other.env.get_obs())   # legit?
+               np.isclose(self._env.get_obs(), other._env.get_obs())   # legit?
 
     def hash(self) -> int:
         return hash(self.__repr__())
