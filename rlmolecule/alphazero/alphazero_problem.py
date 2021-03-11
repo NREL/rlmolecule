@@ -4,13 +4,15 @@ from abc import abstractmethod
 from typing import Optional
 
 import sqlalchemy
+from sqlalchemy import exc
 
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
-from rlmolecule.tree_search.reward import Reward
 from rlmolecule.mcts.mcts_problem import MCTSProblem
 from rlmolecule.sql import Base, Session
+from rlmolecule.sql.query import get_existing_reward
 from rlmolecule.sql.tables import GameStore, RewardStore
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
+from rlmolecule.tree_search.reward import Reward
 
 
 class AlphaZeroProblem(MCTSProblem):
@@ -51,7 +53,7 @@ class AlphaZeroProblem(MCTSProblem):
         :param state: The state for which rewards are cached
         :return: the scaled reward
         """
-        existing_record = self.session.query(RewardStore).get((hash(state), self.run_id, state.serialize()))
+        existing_record = get_existing_reward(self.session, self.run_id, state)
         if existing_record is not None:
             reward = existing_record.reward
 
@@ -62,8 +64,14 @@ class AlphaZeroProblem(MCTSProblem):
                                  state=state.serialize(),
                                  reward=reward,
                                  data=data)
-            self.session.merge(record)
-            self.session.commit()
+
+            try:
+                # Here we handle the possibility of a race condition where another thread has already added the
+                # current state's reward to the database before this thread has completed.
+                self.session.merge(record)
+                self.session.commit()
+            except exc.IntegrityError:
+                self.session.rollback()
 
         return self.reward_class(reward)
 
