@@ -5,10 +5,12 @@ from tensorflow.keras import layers
 def policy_model(obs_dim: int,
                  hidden_layers: int = 1,
                  hidden_dim: int = 16,
-                 activation: str = "relu") -> tf.keras.Model:
+                 activation: str = "relu",
+                 input_dtype: str = "float64") -> tf.keras.Model:
 
     # Position input
-    obs = layers.Input(shape=[obs_dim, ], dtype=tf.float32, name="obs")
+    input_dtype = tf.dtypes.as_dtype(input_dtype)
+    obs = layers.Input(shape=[obs_dim, ], dtype=input_dtype, name="obs")
 
     # Dense layers and concatenation
     x = layers.Dense(hidden_dim, activation=activation)(obs)

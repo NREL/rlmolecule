@@ -46,7 +46,8 @@ class HallwayProblem(GymEnvProblem):
     def policy_model(self) -> "tf.keras.Model":
         return policy_model(obs_dim = self.env.observation_space.shape[0],
                             hidden_layers = 3,
-                            hidden_dim = 16)
+                            hidden_dim = 16,
+                            input_dtype="int64")
 
     def get_policy_inputs(self, state: GymEnvState) -> dict:
         return {"obs": self.env.get_obs()}
