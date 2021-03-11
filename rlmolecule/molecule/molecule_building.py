@@ -4,6 +4,7 @@ import sys
 
 import numpy as np
 import rdkit
+from rlmolecule.molecule.molecule_filters import check_all_filters
 from rdkit import Chem
 from rdkit.Chem import RDConfig
 from rdkit.Chem.EnumerateStereoisomers import (
@@ -119,7 +120,13 @@ def build_molecules(starting_mol,
             for bond_order in get_valid_bonds(i, partner):
                 mol = add_bond(i, partner, bond_order)
 
-                Chem.SanitizeMol(mol)
+                # Not ideal to roundtrip SMILES here, but there's cleaning steps that often get
+                # missed if we just santize
+                mol = Chem.MolFromSmiles(Chem.MolToSmiles(mol))
+
+                if not check_all_filters(mol):
+                    continue
+
                 for isomer in enumerate_stereoisomers(mol, stereoisomers):
                     smiles = Chem.MolToSmiles(mol)
                     if smiles not in generated_smiles:

@@ -1,5 +1,6 @@
 import logging
 import time
+from typing import Tuple
 
 import numpy as np
 from sqlalchemy import create_engine
@@ -41,12 +42,15 @@ class CartPoleProblem(GymEnvProblem):
         super().__init__(engine, env, **kwargs)
 
     def policy_model(self) -> "tf.keras.Model":
-        return policy_model(obs_dim = self._env.observation_space.shape[0],
+        return policy_model(obs_dim = self.env.observation_space.shape[0],
                             hidden_layers = 3,
                             hidden_dim = 16,)
 
     def get_policy_inputs(self, state: GymEnvState) -> dict:
-        return {"obs": self._env.get_obs()}
+        return {"obs": self.env.get_obs()}
+
+    def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
+        return state.cumulative_reward, {}
 
 
 def construct_problem():

@@ -1,3 +1,13 @@
+""" Optimize the Quantitative Estimate of Drug-likeness (QED)
+See https://www.rdkit.org/docs/source/rdkit.Chem.QED.html
+Starting point: a single carbon (C)
+  - actions: add a bond or an atom
+  - state: molecule state
+  - reward: 0, unless a terminal state is reached, then the qed estimate of the molecule
+"""
+
+import argparse
+import pathlib
 import logging
 import multiprocessing
 import time
@@ -42,11 +52,23 @@ def construct_problem():
                             sa_score_threshold=4.,
                             stereoisomers=False)
 
-    engine = create_engine(f'sqlite:///qed_data.db',
-                           connect_args={'check_same_thread': False},
-                           execution_options = {"isolation_level": "AUTOCOMMIT"})
+    #engine = create_engine(f'sqlite:///qed_data.db',
+    #                       connect_args={'check_same_thread': False},
+    #                       execution_options = {"isolation_level": "AUTOCOMMIT"})
+    dbname = "bde"
+    port = "5432"
+    host = "yuma.hpc.nrel.gov"
+    user = "rlops"
+    # read the password from a file
+    passwd_file = '/projects/rlmolecule/rlops_pass'
+    with open(passwd_file, 'r') as f:
+        passwd = f.read().strip()
 
-    run_id = 'qed_example'
+    drivername = "postgresql+psycopg2"
+    engine_str = f'{drivername}://{user}:{passwd}@{host}:{port}/{dbname}'
+    engine = create_engine(engine_str, execution_options={"isolation_level": "AUTOCOMMIT"})
+
+    run_id = 'qed_example_test'
 
     reward_factory = RankedRewardFactory(
         engine=engine,
@@ -104,19 +126,38 @@ def monitor():
         time.sleep(5)
 
 
+def setup_argparser():
+    parser = argparse.ArgumentParser(
+        description='Run the QED optimization. Default is to run the script locally')
+
+    parser.add_argument('--train-policy', action="store_true", default=False,
+                        help='Train the policy model only (on GPUs)')
+    parser.add_argument('--rollout', action="store_true", default=False,
+                        help='Run the game simulations only (on CPUs)')
+
+    return parser
+
+
 if __name__ == "__main__":
+    parser = setup_argparser()
+    args = parser.parse_args()
 
-    jobs = [multiprocessing.Process(target=monitor)]
-    jobs[0].start()
-    time.sleep(1)
+    if args.train_policy:
+        train_model()
+    elif args.rollout:
+        run_games()
+    else:
+        jobs = [multiprocessing.Process(target=monitor)]
+        jobs[0].start()
+        time.sleep(1)
 
-    for i in range(5):
-        jobs += [multiprocessing.Process(target=run_games)]
+        for i in range(5):
+            jobs += [multiprocessing.Process(target=run_games)]
 
-    jobs += [multiprocessing.Process(target=train_model)]
+        jobs += [multiprocessing.Process(target=train_model)]
 
-    for job in jobs[1:]:
-        job.start()
+        for job in jobs[1:]:
+            job.start()
 
-    for job in jobs:
-        job.join(300)
+        for job in jobs:
+            job.join(300)

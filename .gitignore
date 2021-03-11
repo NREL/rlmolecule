@@ -143,3 +143,5 @@ Untitled*.ipynb
 # can ignore the file anywhere it appears by simply using its name?
 rlops_pass     
 .idea/
+
+.vscode

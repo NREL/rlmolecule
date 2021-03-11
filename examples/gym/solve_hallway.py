@@ -6,85 +6,64 @@ import numpy as np
 from sqlalchemy import create_engine
 
 import gym
-from gym.wrappers import FrameStack, GrayScaleObservation, ResizeObservation, LazyFrames
 
-from examples.gym.tf_model import policy_model_cnn
-from examples.gym.gym_problem import GymEnvProblem
-from examples.gym.gym_state import GymEnvState
-from examples.gym.alphazero_gym import AlphaZeroGymEnv
-from examples.gym.frame_preprocessing import process_frame
+from tf_model import policy_model
+from gym_problem import GymEnvProblem
+from gym_state import GymEnvState
+from alphazero_gym import AlphaZeroGymEnv
+from hallway_env import HallwayEnv
 
 
 #logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# NOTE: Global binary variable PROCESS has to be defined by the user,
-# whether they want the image observation to be converted to greyscale
-# and reduced in size (PROCESS=True), or stay in RGB format (PROCESS=False)
-PROCESSED = False
-
 
 # NOTE: These class definitions need to stay outside of construct_problem
 # or you will error out on not being able to pickle/serialize them.
 
-class BreakOutEnv(AlphaZeroGymEnv):
+class HallwayAlphaZeroEnv(AlphaZeroGymEnv):
     """Lightweight wrapper around the gym env that makes the user implement
-    the get_obs method. The user can also set the PROCESSED global variable
-    to True if they want the images preprocessed (grayscale and resized).
-    Default value is set to False."""
+    the get_obs method."""
 
-    def __init__(self, **kwargs):
-        env_ = gym.envs.make("Breakout-v0")
-        if PROCESSED:
-            gray_env_ = GrayScaleObservation(env_) # Turns RGB image to gray scale
-            resized_env_ = ResizeObservation(gray_env_, shape=84) # resizes image on a square with side length == shape
-            env = FrameStack(resized_env_, num_stack=4) # collect num_stack number of frames and feed them to policy network
-        else:
-            env = FrameStack(env_, num_stack=4)
-        super().__init__(env, **kwargs)
-    
+    def __init__(self, size=16, max_steps=16):
+        env = HallwayEnv(size=size, max_steps=max_steps)
+        super().__init__(env)
+
     def get_obs(self) -> np.ndarray:
-        return np.array(LazyFrames(list(self.frames), self.lz4_compress))
+        return self.env.get_obs()
 
 
-class BreakOutProblem(GymEnvProblem):
-    """Atari TF AZ problem.  For now we will ask the user to implement
+class HallwayProblem(GymEnvProblem):
+    """Cartpole TF AZ problem.  For now we will ask the user to implement
     any obs preprocessing directly in the get_policy_inputs method."""
 
     def __init__(self, 
                  engine: "sqlalchemy.engine.Engine",
                  **kwargs) -> None:
-        env = BreakOutEnv()
+        env = HallwayAlphaZeroEnv()
         super().__init__(engine, env, **kwargs)
 
     def policy_model(self) -> "tf.keras.Model":
-        obs_dim = np.array(LazyFrames(list(self.env.frames), self.env.lz4_compress)).shape
-        return policy_model_cnn(obs_type = "RGB",
-                                obs_dim = obs_dim,
-                                action_dim = self.env.action_space.n,
-                                hidden_layers = 1,
-                                conv_layers = 3,
-                                filters_dim = [32, 64, 64],
-                                kernel_dim = [8, 4, 3],
-                                strides_dim = [4, 2, 1],
-                                hidden_dim = 512,)
+        return policy_model(obs_dim = self.env.observation_space.shape[0],
+                            hidden_layers = 3,
+                            hidden_dim = 16)
 
     def get_policy_inputs(self, state: GymEnvState) -> dict:
         return {"obs": self.env.get_obs()}
 
     def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
-        return state.env.cumulative_reward, {}
+        return state.env.get_reward(), {}
 
 
 def construct_problem():
 
     from rlmolecule.tree_search.reward import RankedRewardFactory
 
-    engine = create_engine(f'sqlite:///breakout_data.db',
+    engine = create_engine(f'sqlite:///hallway_data.db',
                            connect_args={'check_same_thread': False},
                            execution_options = {"isolation_level": "AUTOCOMMIT"})
 
-    run_id = "Breakout_example"
+    run_id = "hallway_example"
 
     reward_factory = RankedRewardFactory(
             engine=engine,
@@ -94,7 +73,7 @@ def construct_problem():
             ranked_reward_alpha=0.75
     )
 
-    problem = BreakOutProblem(
+    problem = HallwayProblem(
         engine,
         run_id=run_id,
         reward_class=reward_factory,
