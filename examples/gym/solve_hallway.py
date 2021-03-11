@@ -37,7 +37,7 @@ class HallwayProblem(GymEnvProblem):
     """Cartpole TF AZ problem.  For now we will ask the user to implement
     any obs preprocessing directly in the get_policy_inputs method."""
 
-    def __init__(self, 
+    def __init__(self,
                  engine: "sqlalchemy.engine.Engine",
                  **kwargs) -> None:
         env = HallwayAlphaZeroEnv()
@@ -47,7 +47,7 @@ class HallwayProblem(GymEnvProblem):
         return policy_model(obs_dim = self.env.observation_space.shape[0],
                             hidden_layers = 3,
                             hidden_dim = 16,
-                            input_dtype="int64")
+                            input_dtype="int64")  # make sure your input dtypes match!
 
     def get_policy_inputs(self, state: GymEnvState) -> dict:
         return {"obs": self.env.get_obs()}

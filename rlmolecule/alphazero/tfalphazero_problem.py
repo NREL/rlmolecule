@@ -45,7 +45,12 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
         pass
 
     def get_policy_mask(self) -> {str: Optional[float]}:
-        initial_inputs = self.get_policy_inputs(self.get_initial_state())
+        initial_inputs = self.get_policy_inputs(self.get_initial_state()) # numpy
+        model_inputs = self.policy_model().inputs  # keras
+        for (x, y) in zip(initial_inputs.values(), model_inputs):
+            types = (x.dtype, y.dtype.as_numpy_dtype)
+            if not np.issubdtype(*types):
+                raise TypeError("State and policy input types must match, got", types)
         return {key: np.array(0, dtype=val.dtype) for key, val in initial_inputs.items()}
 
     def initialize_run(self):
