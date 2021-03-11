@@ -49,7 +49,7 @@ class GymEnvState(GraphSearchState):
         return next_actions
 
 
-class AtariGymEnvState(GymEnvState, GraphSearchState):
+class AtariGymEnvState(GymEnvState):
     def __init__(self, 
                  env: AlphaZeroGymEnv,
                  step_reward: float,
@@ -75,40 +75,56 @@ class AtariGymEnvState(GymEnvState, GraphSearchState):
         return AtariGymEnvState(self.env, step_reward, cumulative_reward, done)
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    import gym
-    from gym.wrappers import FrameStack, GrayScaleObservation, ResizeObservation, LazyFrames
+#     import time
+#     import gym
+#     from gym.wrappers import FrameStack, GrayScaleObservation, ResizeObservation, LazyFrames
 
-    class PongEnv(AlphaZeroGymEnv, gym.ObservationWrapper):
-        def __init__(self, **kwargs):
-            env = gym.envs.make("PongNoFrameskip-v4")
-            env = GrayScaleObservation(env) # Turns RGB image to gray scale
-            env = ResizeObservation(env, shape=84) # resizes image on a square with side length == shape
-            env = FrameStack(env, num_stack=4) # collect num_stack number of frames and feed them to policy network
-            super().__init__(env, **kwargs)
+#     class PongEnv(AlphaZeroGymEnv, gym.ObservationWrapper):
+#         def __init__(self, shape=84, num_stack=4, **kwargs):
+#             env = gym.envs.make("PongNoFrameskip-v4")
+#             env = GrayScaleObservation(env) # Turns RGB image to gray scale
+#             env = ResizeObservation(env, shape=shape) # resizes image on a square with side length == shape
+#             env = FrameStack(env, num_stack=num_stack) # collect num_stack number of frames and feed them to policy network
+#             super().__init__(env, **kwargs)
         
-        def observation(self, obs) -> np.ndarray:
-            return 2 * (np.array(LazyFrames(list(obs), self.lz4_compress))/255 - 0.5)
+#         def observation(self, obs) -> np.ndarray:
+#             return 2 * (np.array(LazyFrames(list(obs)))/255 - 0.5)
 
-        def get_obs(self) -> np.ndarray:
-            return self.observation(self.frames)
-    
-    env = PongEnv()
-    env.reset()
-    cum_rew = 0.
-    for _ in range(100):
-        _, rew, _, _ = env.step(env.action_space.sample())
-        cum_rew += rew
-        s = AtariGymEnvState(env, rew, cum_rew, False)
-    print(s.step_reward, s.cumulative_reward, s.done)
-    data = s.serialize()
-    print(data)
+#         def get_obs(self) -> np.ndarray:
+#             return self.observation(self.frames)
 
-    env2 = PongEnv()
-    env2.reset()
-    s2 = AtariGymEnvState(env2, 0, 0, False)
-    env2 = s2.deserialize(data)
+#     def time_env(env, steps=150):
+#         starttime = time.time()
+#         _ = env.reset()
+#         for _ in range(steps):
+#             _ = env.step(env.action_space.sample())
+#         elapsed = time.time() - starttime
+#         print(elapsed)
+#         return elapsed, env
 
-    # print(env2.__dict__)
-    # print(env.__dict__)
+#     env = gym.make("PongNoFrameskip-v4")
+#     time_env(env)
+
+#     env = PongEnv(num_stack=1)
+#     time_env(env)
+
+
+    # env = PongEnv()
+    # env.reset()
+    # cum_rew = 0.
+    # for _ in range(50):
+    #     _, rew, _, _ = env.step(env.action_space.sample())
+    #     cum_rew += rew
+    #     s = AtariGymEnvState(env, rew, cum_rew, False)
+    # print(s.step_reward, s.cumulative_reward, s.done)
+    # data = s.serialize()
+    # print(data)
+
+    # env2 = PongEnv()
+    # env2.reset()
+    # s2 = AtariGymEnvState(env2, 0, 0, False)
+    # env2 = s2.deserialize(data)
+
+    # print("env state", np.all(np.isclose(env.env.clone_full_state(), env2.env.clone_full_state())))

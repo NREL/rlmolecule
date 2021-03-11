@@ -1,5 +1,6 @@
 import logging
 import time
+import sys
 from typing import Tuple
 
 import numpy as np
@@ -9,11 +10,11 @@ import gym
 from gym.wrappers import FrameStack, GrayScaleObservation, ResizeObservation, LazyFrames
 
 from examples.gym.tf_model import policy_model_2
-from examples.gym.gym_problem import GymEnvProblem
-from examples.gym.gym_state import GymEnvState
+from examples.gym.gym_problem import AtariGymEnvProblem
+from examples.gym.gym_state import AtariGymEnvState
 from examples.gym.alphazero_gym import AlphaZeroGymEnv
 
-#logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -25,16 +26,24 @@ class PongEnv(AlphaZeroGymEnv, gym.ObservationWrapper):
         env = GrayScaleObservation(env) # Turns RGB image to gray scale
         env = ResizeObservation(env, shape=84) # resizes image on a square with side length == shape
         env = FrameStack(env, num_stack=4) # collect num_stack number of frames and feed them to policy network
+        self._obs_calls_since_reset = None
         super().__init__(env, **kwargs)
-    
+
+    def reset(self):
+        self._obs_calls_since_reset = 0
+        return self.env.reset()
+
     def observation(self, obs) -> np.ndarray:
         return 2 * (np.array(LazyFrames(list(obs), self.lz4_compress))/255 - 0.5)
 
     def get_obs(self) -> np.ndarray:
+        self._obs_calls_since_reset += 1
+        if self._obs_calls_since_reset % 100 == 0:
+            logging.debug(f"Obs calls since reset: {self._obs_calls_since_reset}")
         return self.observation(self.frames)
 
 
-class PongProblem(GymEnvProblem):
+class PongProblem(AtariGymEnvProblem):
     def __init__(self, 
                  engine: "sqlalchemy.engine.Engine",
                  **kwargs) -> None:
@@ -43,18 +52,18 @@ class PongProblem(GymEnvProblem):
 
     def policy_model(self) -> "tf.keras.Model":
         obs_shape = self.env.reset().shape
-        return policy_model_2(obs_dim = obs_shape,
-                              hidden_layers = 1,
-                              conv_layers = 3,
-                              filters_dim = [32, 64, 64],
-                              kernel_dim = [8, 4, 3],
-                              strides_dim = [4, 2, 1],
-                              hidden_dim = 512,)
+        return policy_model_2(obs_dim=obs_shape,
+                              hidden_layers=1,
+                              conv_layers=3,
+                              filters_dim=[32, 64, 64],
+                              kernel_dim=[8, 4, 3],
+                              strides_dim=[4, 2, 1],
+                              hidden_dim=512)
 
-    def get_policy_inputs(self, state: GymEnvState) -> dict:
+    def get_policy_inputs(self, state: AtariGymEnvState) -> dict:
         return {"obs": state.env.get_obs()}
 
-    def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
+    def get_reward(self, state: AtariGymEnvState) -> Tuple[float, dict]:
         return state.env.cumulative_reward, {}
 
 
@@ -87,7 +96,7 @@ def construct_problem():
     return problem
 
 
-def run_games(use_az=True, num_mcts_samples=50):
+def run_games(use_az=True, num_mcts_samples=50, num_games=None):
 
     if use_az:
         from rlmolecule.alphazero.alphazero import AlphaZero
@@ -96,14 +105,19 @@ def run_games(use_az=True, num_mcts_samples=50):
         from rlmolecule.mcts.mcts import MCTS
         game = MCTS(construct_problem(ranked_reward=False))
 
-    while True:
+    # TODO: here, allow max games
+    num_games = num_games if num_games is not None else sys.maxsize
+    for _ in range(num_games):
+        start_time = time.time()
         path, reward = game.run(num_mcts_samples=num_mcts_samples)
-
+        elapsed = time.time() - start_time
         print(path)
 
         print("REWARD:", reward.__dict__)
         if use_az:
-            logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
+            logger.info((f'Game Finished -- Reward {reward.raw_reward:.3f}' \
+                          ' -- Final state {path[-1][0]}' \
+                          ' -- CPU time {elapsed} (s)'))
         
 
 def train_model():
@@ -131,22 +145,51 @@ def monitor():
         time.sleep(5)
 
 
+def setup_argparser():
+    
+
+    return parser
+
+
 if __name__ == "__main__":
 
-    import multiprocessing
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='Solve the Hallway problem (move from one side of the hallway to the other). ' +
+                'Default is to run multiple games and training using multiprocessing')
 
-    jobs = [multiprocessing.Process(target=monitor)]
-    jobs[0].start()
-    time.sleep(1)
+    parser.add_argument('--train-policy', action="store_true", default=False,
+                        help='Train the policy model only (on GPUs)')
+    parser.add_argument('--rollout', action="store_true", default=False,
+                        help='Run the game simulations only (on CPUs)')
+    parser.add_argument('--num-workers', type=int, default=7,
+                        help='Number of multiprocessing workers when running local rollout')
+    parser.add_argument("--num-games", type=int, default=None)
+    parser.add_argument("--num-mcts-samples", type=int, default=50)
 
-    for i in range(5):
-        jobs += [multiprocessing.Process(target=run_games)]
+    args = parser.parse_args()
 
-    jobs += [multiprocessing.Process(target=train_model)]
+    if args.train_policy:
+        train_model()
+    elif args.rollout:
+        run_games(num_mcts_samples=args.num_mcts_samples, num_games=args.num_games)
+    else:
+        assert args.num_workers >= 3  # need at least 3 workers here...
 
-    for job in jobs[1:]:
-        job.start()
+        import multiprocessing
 
-    for job in jobs:
-        job.join(300)
+        jobs = [multiprocessing.Process(target=monitor)]
+        jobs[0].start()
+        time.sleep(1)
+
+        for i in range(args.num_workers - 2):
+            jobs += [multiprocessing.Process(target=run_games)]
+
+        jobs += [multiprocessing.Process(target=train_model)]
+
+        for job in jobs[1:]:
+            job.start()
+
+        for job in jobs:
+            job.join(300)
 
