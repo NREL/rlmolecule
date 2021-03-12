@@ -1,5 +1,6 @@
 import base64
 from copy import deepcopy
+import logging
 import pickle
 from typing import Sequence
 
@@ -10,6 +11,8 @@ import gym
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
 from alphazero_gym import AlphaZeroGymEnv
+
+logger = logging.getLogger(__name__)
 
 
 class GymEnvState(GraphSearchState):
@@ -46,6 +49,8 @@ class GymEnvState(GraphSearchState):
                 cumulative_rew = self.cumulative_reward + step_rew
                 next_actions.append(
                     GymEnvState(env_copy, step_rew, cumulative_rew, done))
+        else:
+            logger.debug("terminal state, {}".format(self.env.get_obs()))
         return next_actions
 
 
@@ -65,13 +70,13 @@ class AtariGymEnvState(GymEnvState):
             self.env.clone_full_state())
         return base64.b64encode(pickle.dumps(self_data)).decode('utf-8')
 
-    def deserialize(self, data: str) -> GraphSearchState:
+    def deserialize(self, data: str) -> 'AtariGymEnvState':     # how to return self class?
         data = pickle.loads(base64.b64decode(data))
         step_reward = data[0]
         cumulative_reward = data[1]
         done = data[2]
         self.env.restore_full_state(data[3])
-        print(step_reward, cumulative_reward, done)
+        logger.debug("DESERIALIZING", step_reward, cumulative_reward, done)
         return AtariGymEnvState(self.env, step_reward, cumulative_reward, done)
 
 
