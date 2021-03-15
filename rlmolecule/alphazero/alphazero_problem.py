@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 from abc import abstractmethod
@@ -13,6 +14,8 @@ from rlmolecule.sql.query import get_existing_reward
 from rlmolecule.sql.tables import GameStore, RewardStore
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 from rlmolecule.tree_search.reward import Reward
+
+logger = logging.getLogger(__name__)
 
 
 class AlphaZeroProblem(MCTSProblem):
@@ -71,6 +74,7 @@ class AlphaZeroProblem(MCTSProblem):
                 self.session.merge(record)
                 self.session.commit()
             except exc.IntegrityError:
+                logger.debug(f"Duplicate reward entry encountered with {state}")
                 self.session.rollback()
 
         return self.reward_class(reward)
