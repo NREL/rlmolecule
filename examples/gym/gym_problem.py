@@ -18,15 +18,14 @@ class GymEnvProblem(TFAlphaZeroProblem):
                  **kwargs) -> None:
         self.env = deepcopy(env)
         super().__init__(engine, **kwargs)
-        
+
     def get_initial_state(self) -> GymEnvState:
         _ = self.env.reset()
-        return GymEnvState(self.env, 0., 0., False)
+        return GymEnvState(self.env, 0, 0., 0., False)
 
 
 class AtariGymEnvProblem(TFAlphaZeroProblem):
-    """Gym env TF AZ problem that automates the parent class abstractmethods 
-    via the gym interface and gym state."""
+    """TODO: Still needs testing."""
     
     def __init__(self,
                  engine: sqlalchemy.engine.Engine,
@@ -37,4 +36,4 @@ class AtariGymEnvProblem(TFAlphaZeroProblem):
         
     def get_initial_state(self) -> AtariGymEnvState:
         _ = self.env.reset()
-        return AtariGymEnvState(self.env, 0., 0., False)
+        return AtariGymEnvState(self.env, 0, 0., 0., False)

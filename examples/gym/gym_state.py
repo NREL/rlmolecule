@@ -21,21 +21,26 @@ class GymEnvState(GraphSearchState):
 
     def __init__(self, 
                  env: AlphaZeroGymEnv,
+                 step_count: int,
                  step_reward: float,
                  cumulative_reward: float,
-                 done: bool) -> None:
+                 done: bool,
+                 meta: dict = {}) -> None:
         assert isinstance(env.action_space, gym.spaces.Discrete)
         self.env = deepcopy(env)
+        self.step_count = step_count
         self.step_reward = step_reward
         self.cumulative_reward = cumulative_reward
         self.done = done
+        self.meta = meta
 
     def __repr__(self) -> str:
-        return self.env.get_obs().__repr__()
+        return (self.env.get_obs(), self.step_count).__repr__()
 
     def equals(self, other: any) -> bool:
-        return type(self) == type(other) and \
-               np.all(np.isclose(self.env.get_obs(), other.env.get_obs()))   # legit?
+        are_close = np.all(np.isclose(self.env.get_obs(), other.env.get_obs()))
+        same_time = (self.step_count == other.step_count)
+        return are_close and same_time
 
     def hash(self) -> int:
         return hash(self.__repr__())
@@ -45,16 +50,15 @@ class GymEnvState(GraphSearchState):
         if not self.done:
             for action in range(self.env.action_space.n):
                 env_copy = deepcopy(self.env)
-                _, step_rew, done, _ = env_copy.step(action)
+                _, step_rew, done, meta = env_copy.step(action)
                 cumulative_rew = self.cumulative_reward + step_rew
                 next_actions.append(
-                    GymEnvState(env_copy, step_rew, cumulative_rew, done))
-        else:
-            logger.debug("terminal state, {}".format(self.env.get_obs()))
+                    GymEnvState(env_copy, self.step_count+1, step_rew, cumulative_rew, done, meta))
         return next_actions
 
 
 class AtariGymEnvState(GymEnvState):
+    """TODO: Still needs testing."""
     def __init__(self, 
                  env: AlphaZeroGymEnv,
                  step_reward: float,
@@ -78,58 +82,3 @@ class AtariGymEnvState(GymEnvState):
         self.env.restore_full_state(data[3])
         logger.debug("DESERIALIZING", step_reward, cumulative_reward, done)
         return AtariGymEnvState(self.env, step_reward, cumulative_reward, done)
-
-
-# if __name__ == "__main__":
-
-#     import time
-#     import gym
-#     from gym.wrappers import FrameStack, GrayScaleObservation, ResizeObservation, LazyFrames
-
-#     class PongEnv(AlphaZeroGymEnv, gym.ObservationWrapper):
-#         def __init__(self, shape=84, num_stack=4, **kwargs):
-#             env = gym.envs.make("PongNoFrameskip-v4")
-#             env = GrayScaleObservation(env) # Turns RGB image to gray scale
-#             env = ResizeObservation(env, shape=shape) # resizes image on a square with side length == shape
-#             env = FrameStack(env, num_stack=num_stack) # collect num_stack number of frames and feed them to policy network
-#             super().__init__(env, **kwargs)
-        
-#         def observation(self, obs) -> np.ndarray:
-#             return 2 * (np.array(LazyFrames(list(obs)))/255 - 0.5)
-
-#         def get_obs(self) -> np.ndarray:
-#             return self.observation(self.frames)
-
-#     def time_env(env, steps=150):
-#         starttime = time.time()
-#         _ = env.reset()
-#         for _ in range(steps):
-#             _ = env.step(env.action_space.sample())
-#         elapsed = time.time() - starttime
-#         print(elapsed)
-#         return elapsed, env
-
-#     env = gym.make("PongNoFrameskip-v4")
-#     time_env(env)
-
-#     env = PongEnv(num_stack=1)
-#     time_env(env)
-
-
-    # env = PongEnv()
-    # env.reset()
-    # cum_rew = 0.
-    # for _ in range(50):
-    #     _, rew, _, _ = env.step(env.action_space.sample())
-    #     cum_rew += rew
-    #     s = AtariGymEnvState(env, rew, cum_rew, False)
-    # print(s.step_reward, s.cumulative_reward, s.done)
-    # data = s.serialize()
-    # print(data)
-
-    # env2 = PongEnv()
-    # env2.reset()
-    # s2 = AtariGymEnvState(env2, 0, 0, False)
-    # env2 = s2.deserialize(data)
-
-    # print("env state", np.all(np.isclose(env.env.clone_full_state(), env2.env.clone_full_state())))
