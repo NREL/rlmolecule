@@ -27,7 +27,6 @@ def policy_model(obs_dim: int,
 
 def policy_model_cnn(obs_type: str = "RGB",
                      obs_dim: tuple = (84, 84, 4),
-                     action_dim: int = 1,
                      hidden_layers: int = 1,
                      conv_layers: int = 2,
                      filters_dim: list = [32, 64],
@@ -50,7 +49,7 @@ def policy_model_cnn(obs_type: str = "RGB",
         x = layers.Dense(hidden_dim, activation=activation)(x)
     
     value_logit = layers.Dense(1, name="value")(x)
-    pi_logit = layers.Dense(action_dim, name="prior")(x)
+    pi_logit = layers.Dense(1, name="prior")(x)
 
     return tf.keras.Model([obs], [value_logit, pi_logit], name="policy_model_cnn")
 
