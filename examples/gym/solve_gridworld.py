@@ -6,51 +6,42 @@ from typing import Tuple
 import numpy as np
 from sqlalchemy import create_engine
 
-import gym
-
 from examples.gym.tf_model import policy_model_2
 from examples.gym.gym_problem import GymEnvProblem
 from examples.gym.gym_state import GymEnvState
 from examples.gym.alphazero_gym import AlphaZeroGymEnv
-import gridworld_env as gw
+import examples.gym.gridworld_env as gw
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 # NOTE: These class definitions need to stay outside of construct_problem
 # or you will error out on not being able to pickle/serialize them.
-class GridWorldEnv(AlphaZeroGymEnv, gym.ObservationWrapper):
+class GridWorldEnv(AlphaZeroGymEnv):
     def __init__(self,
-                 grid: np.ndarray,
-                 max_episode_steps: int = 20,
-                 goal_reward: float = 100.,
+                 configured_env: gw.GridEnv,
                  **kwargs):
-        env = gw.GridEnv(grid, max_episode_steps=max_episode_steps, goal_reward=goal_reward)
-        super().__init__(env, **kwargs)
+        super().__init__(configured_env, **kwargs)
 
     def reset(self):
         return self.env.reset()
 
-    def observation(self, obs) -> np.ndarray:
-        return obs / 255.
-
-    def get_obs(self) -> np.ndarray:
-        return self.observation(self.env.get_obs())
+    def get_env_obs(self) -> np.ndarray:
+        return self.env.get_obs()
 
 
 class GridWorldProblem(GymEnvProblem):
     def __init__(self, 
-                 grid: np.ndarray,
+                 env: gw.GridEnv,
                  engine: "sqlalchemy.engine.Engine",
                  **kwargs) -> None:
-        env = GridWorldEnv(grid)
         super().__init__(engine, env, **kwargs)
 
     def policy_model(self) -> "tf.keras.Model":
         obs_shape = self.env.reset().shape
         return policy_model_2(obs_dim=obs_shape,
-                              hidden_layers=1,
+                              hidden_layers=2,
                               conv_layers=1,
                               filters_dim=[16],
                               kernel_dim=[2],
@@ -58,7 +49,10 @@ class GridWorldProblem(GymEnvProblem):
                               hidden_dim=64)
 
     def get_policy_inputs(self, state: GymEnvState) -> dict:
-        return {"obs": np.expand_dims(state.env.get_obs(), axis=-1)}
+        return {
+            "obs": state.env.get_obs(),
+            "steps": 0.*np.array([np.float64(self.env.episode_steps)])
+        }
 
     def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
         return state.cumulative_reward, {}
@@ -77,35 +71,38 @@ def construct_problem():
     reward_factory = RankedRewardFactory(
             engine=engine,
             run_id=run_id,
-            reward_buffer_min_size=10,
-            reward_buffer_max_size=50,
+            reward_buffer_min_size=20,
+            reward_buffer_max_size=20,
             ranked_reward_alpha=0.75
     )
 
-    grid = np.zeros((3, 4, 4), dtype=int)
+    grid = np.zeros((3, 5, 5), dtype=np.float64)
     grid[gw.PLAYER_CHANNEL, 0, 0] = 1
     grid[gw.GOAL_CHANNEL, -1, -1] = 1
+    env = gw.GridEnv(grid, max_episode_steps=12)
 
     problem = GridWorldProblem(
-        grid,
+        env,
         engine,
         run_id=run_id,
         reward_class=reward_factory,
-        min_buffer_size=15,
+        min_buffer_size=10,
+        max_buffer_size=10,
+        batch_size=32,
         policy_checkpoint_dir='gridworld_policy_checkpoints'
     )
 
     return problem
 
 
-def run_games(use_az=False, num_mcts_samples=50, num_games=None):
+def run_games(use_mcts=False, num_mcts_samples=64, num_games=None):
 
-    if use_az:
-        from rlmolecule.alphazero.alphazero import AlphaZero
-        game = AlphaZero(construct_problem(), dirichlet_noise=False)
-    else:
+    if use_mcts:
         from rlmolecule.mcts.mcts import MCTS
         game = MCTS(construct_problem())
+    else:
+        from rlmolecule.alphazero.alphazero import AlphaZero
+        game = AlphaZero(construct_problem(), dirichlet_noise=False)
 
     # TODO: here, allow max games
     num_games = num_games if num_games is not None else sys.maxsize
@@ -113,18 +110,14 @@ def run_games(use_az=False, num_mcts_samples=50, num_games=None):
         start_time = time.time()
         path, reward = game.run(num_mcts_samples=num_mcts_samples)
         elapsed = time.time() - start_time
-        print(path)
-
         print("REWARD:", reward.__dict__)
-        if use_az:
-            logger.info((f'Game Finished -- Reward {reward.raw_reward:.3f}' \
-                          ' -- Final state {path[-1][0]}' \
-                          ' -- CPU time {elapsed} (s)'))
-        
+        logger.info(('Game Finished -- Reward {:.3f}'.format(reward.raw_reward) +
+                      ' -- Final state {}'.format(path[-1]) +
+                      ' -- CPU time {:1.3f} (s)'.format(elapsed)))
 
 def train_model():
-    construct_problem().train_policy_model(steps_per_epoch=100,
-                                           game_count_delay=20,
+    construct_problem().train_policy_model(steps_per_epoch=8,
+                                           game_count_delay=10,
                                            verbose=2)
 
 
@@ -168,13 +161,17 @@ if __name__ == "__main__":
                         help='Number of multiprocessing workers when running local rollout')
     parser.add_argument("--num-games", type=int, default=None)
     parser.add_argument("--num-mcts-samples", type=int, default=50)
+    parser.add_argument("--use-mcts", action="store_true")
 
     args = parser.parse_args()
 
     if args.train_policy:
         train_model()
     elif args.rollout:
-        run_games(num_mcts_samples=args.num_mcts_samples, num_games=args.num_games)
+        run_games(
+            use_mcts=args.use_mcts,
+            num_mcts_samples=args.num_mcts_samples,
+            num_games=args.num_games)
     else:
         assert args.num_workers >= 3  # need at least 3 workers here...
 

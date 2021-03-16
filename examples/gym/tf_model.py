@@ -66,6 +66,7 @@ def policy_model_2(obs_dim: Tuple[int],
                    activation: str = "relu") -> tf.keras.Model:
 
     obs = layers.Input(shape=obs_dim, dtype=tf.float64, name="obs")
+    steps = layers.Input(shape=(1,), dtype=tf.float64, name="steps")
     
     # Convolutions on the frames on the screen
     x = layers.Conv2D(filters_dim[0], (kernel_dim[0],kernel_dim[0]), strides_dim[0], activation=activation)(obs)
@@ -73,10 +74,13 @@ def policy_model_2(obs_dim: Tuple[int],
         x = layers.Conv2D(filters_dim[i], (kernel_dim[i],kernel_dim[i]), strides_dim[i], activation=activation)(x)
     x = layers.Flatten()(x)
 
+    x = layers.Concatenate()((x, steps))
+
     for _ in range(hidden_layers):
         x = layers.Dense(hidden_dim, activation=activation)(x)
+    x = layers.BatchNormalization()(x)
     
     value_logit = layers.Dense(1, name="value")(x)
     pi_logit = layers.Dense(1, name="prior")(x)
 
-    return tf.keras.Model([obs], [value_logit, pi_logit], name="policy_model")
+    return tf.keras.Model([obs, steps], [value_logit, pi_logit], name="policy_model")
