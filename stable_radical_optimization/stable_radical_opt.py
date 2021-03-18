@@ -169,16 +169,17 @@ def construct_problem(
     # TODO what values should we set for these options?
     #:param max_atoms: Maximum number of heavy atoms
     #:param min_atoms: minimum number of heavy atoms
-    # looks like atom_additions just used this default as well
     #:param atom_additions: potential atom types to consider. Defaults to ('C', 'H', 'O')
     #:param stereoisomers: whether to consider stereoisomers different molecules
     #:param sa_score_threshold: If set, don't construct molecules greater than a given sa_score.
     #:param tryEmbedding: Try to get a 3D embedding of the molecule, and if this fails, remote it.
-    config = MoleculeConfig(max_atoms=25,
-                            min_atoms=1,
+    config = MoleculeConfig(max_atoms=15,
+                            min_atoms=4,
                             tryEmbedding=True,
-                            sa_score_threshold=4.,
-                            stereoisomers=True)
+                            sa_score_threshold=3.,
+                            stereoisomers=True,
+                            atom_additions=('C', 'N', 'O', 'S'),
+                            )
 
     #engine = create_engine(f'sqlite:///stable_radical.db',
     #                       connect_args={'check_same_thread': False},
@@ -201,9 +202,9 @@ def construct_problem(
     reward_factory = RankedRewardFactory(
         engine=engine,
         run_id=run_id,
-        reward_buffer_min_size=50,
         reward_buffer_max_size=250,
-        ranked_reward_alpha=0.9
+        reward_buffer_min_size=50,
+        ranked_reward_alpha=0.75
     )
 
     problem = StableRadOptProblem(
@@ -218,7 +219,7 @@ def construct_problem(
         features=8,
         num_heads=2,
         num_messages=1,
-        min_buffer_size=15,
+        min_buffer_size=128,  # Don't start training the model until this many games have occurred
         policy_checkpoint_dir='policy_checkpoints'
     )
 
