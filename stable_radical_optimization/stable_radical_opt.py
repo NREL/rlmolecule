@@ -41,9 +41,7 @@ def construct_problem(
     from rlmolecule.molecule.molecule_config import MoleculeConfig
     from rlmolecule.molecule.molecule_problem import MoleculeTFAlphaZeroProblem
     from rlmolecule.molecule.molecule_state import MoleculeState
-
-    from tf_model import policy_model  #todo: this looks broken? (psj)
-    import tf
+    import tensorflow as tf
 
 
     class StableRadOptProblem(MoleculeTFAlphaZeroProblem):
