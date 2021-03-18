@@ -9,13 +9,11 @@ from sqlalchemy import create_engine
 
 import numpy as np
 import pandas as pd
-import nfp
 
 import rdkit
 from rdkit import Chem
 from rdkit.Chem import Mol, MolToSmiles
 
-from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
 from rlmolecule.molecule.policy import preprocessor
 
 
