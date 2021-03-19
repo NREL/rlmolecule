@@ -29,49 +29,21 @@ class StableRadMoleculeState(MoleculeState):
         result = []
         if not self._forced_terminal:
             if self.num_atoms < self.config.max_atoms:
-                # result.extend((StableRadMoleculeState(molecule, self.config) for molecule in
-                #             build_molecules(
-                #                 self.molecule,
-                #                 atom_additions=self.config.atom_additions,
-                #                 stereoisomers=self.config.stereoisomers,
-                #                 sa_score_threshold=self.config.sa_score_threshold,
-                #                 tryEmbedding=self.config.tryEmbedding
-                #             )))
-                for molecule in build_molecules(
-                        self.molecule,
-                        atom_additions=self.config.atom_additions,
-                        stereoisomers=self.config.stereoisomers,
-                        sa_score_threshold=self.config.sa_score_threshold,
-                        tryEmbedding=self.config.tryEmbedding):
-                    yield StableRadMoleculeState(molecule, self.config)
+                result.extend((StableRadMoleculeState(molecule, self.config) for molecule in
+                            build_molecules(
+                                self.molecule,
+                                atom_additions=self.config.atom_additions,
+                                stereoisomers=self.config.stereoisomers,
+                                sa_score_threshold=self.config.sa_score_threshold,
+                                tryEmbedding=self.config.tryEmbedding
+                            )))
 
             if self.num_atoms >= self.config.min_atoms:
-                # TODO is this the right approach?
-                # Throw away the build_molecules() results once we've reached the radicals step
-                # result = list(
-                #     StableRadMoleculeState(radical, self.config, force_terminal=True) \
-                #     for radical in build_radicals(self.molecule))
-                for radical in build_radicals(self.molecule):
-                    yield StableRadMoleculeState(radical, self.config, force_terminal=True)
+                result.extend((StableRadMoleculeState(radical, self.config, force_terminal=True)
+                    for radical in build_radicals(self.molecule)
+                               ))
 
         return result
-
-    # Original code to get the next actions
-    # def build_children(self):
-    #     if self.terminal:
-    #         raise RuntimeError("Attemping to get children of terminal node")
-
-    #     if self.GetNumAtoms() < config.max_atoms:
-    #         for mol in build_molecules(self, **config.build_kwargs):
-    #             if self.G.has_node(mol):
-    #                 # Check if the graph already has the current mol
-    #                 yield self.G.nodes[mol]
-    #             else:
-    #                 yield self.__class__(mol, graph=self.G)
-
-    #     if self.GetNumAtoms() >= config.min_atoms:
-    #         for radical in build_radicals(self):
-    #             yield self.__class__(radical, graph=self.G, terminal=True)
 
 
 def build_radicals(starting_mol):

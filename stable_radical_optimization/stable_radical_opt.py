@@ -84,7 +84,6 @@ def construct_problem(
         def calc_reward_inner(self, state: StableRadMoleculeState) -> float:
             """
             """
-            print(state.smiles)
             model_inputs = {key: tf.constant(np.expand_dims(val, 0))
                 for key, val in self.get_policy_inputs(state).items()}
             spins, buried_vol = predict(
