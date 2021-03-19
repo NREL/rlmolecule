@@ -13,10 +13,7 @@ class RewardStore(Base):
     time = Column(DateTime, server_default=func.now())
     reward = Column(Float)
     data = Column(JSON)
-    __table_args__ = (UniqueConstraint('state', 'run_id', name='_state_runid_uc'),
-                      Index('hash', 'run_id'),
-                      )
-
+    
 
 class StateStore(Base):
     __tablename__ = 'State'
