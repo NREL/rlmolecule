@@ -7,7 +7,7 @@ import tensorflow as tf
 
 from rlmolecule.alphazero.alphazero import AlphaZero
 from rlmolecule.molecule.molecule_config import MoleculeConfig
-from rlmolecule.tree_search.reward import RankedRewardFactory, RawRewardFactory
+from rlmolecule.tree_search.reward import LinearBoundedRewardFactory, RankedRewardFactory, RawRewardFactory
 from tests.qed_optimization_problem import QEDWithMoleculePolicy
 
 
@@ -30,7 +30,7 @@ def game(request, engine, tmpdirname, config):
     name = request.param
 
     if name == 'raw':
-        reward_class = RawRewardFactory()
+        reward_class = LinearBoundedRewardFactory(min_reward=0., max_reward=1.)
         noise = True
 
     elif name == 'ranked':
@@ -43,7 +43,7 @@ def game(request, engine, tmpdirname, config):
         noise = True
 
     elif name == 'nonoise':
-        reward_class = RawRewardFactory()
+        reward_class = LinearBoundedRewardFactory(min_reward=0., max_reward=1.)
         noise = False
 
     else:
@@ -70,8 +70,8 @@ class TestPolicyTraining:
 
         game.problem.get_reward = MagicMock(return_value=(1, {}))
 
-        reward1 = game.problem.reward_wrapper(root.state).raw_reward
-        reward2 = game.problem.reward_wrapper(root.state).raw_reward
+        reward1 = game.problem.reward_wrapper(root).raw_reward
+        reward2 = game.problem.reward_wrapper(root).raw_reward
 
         assert reward1 == reward2
         assert game.problem.get_reward.call_count == 1

@@ -55,10 +55,8 @@ class AlphaZero(MCTS):
     def _accumulate_path_data(self, vertex: MCTSVertex, path: []):
         children = vertex.children
         visit_sum = sum(child.visit_count for child in children)
-        child_visits = [
-            child.visit_count / visit_sum
-            for child in children
-        ]
+        child_visits = [(child, child.visit_count / visit_sum)
+                        for child in children]
         path.append((vertex, child_visits))
 
     def _evaluate(
@@ -75,7 +73,7 @@ class AlphaZero(MCTS):
 
         children = leaf.children
         if len(children) == 0:
-            return self.problem.reward_wrapper(leaf.state)
+            return self.problem.reward_wrapper(leaf)
 
         # get value estimate and child priors
         value, child_priors = self.problem.get_value_and_policy(leaf)
@@ -93,11 +91,11 @@ class AlphaZero(MCTS):
         normalization_factor = sum(child_priors)
         leaf.child_priors = {child: prior / normalization_factor for child, prior in zip(children, child_priors)}
 
-        return self.problem.reward_class(value)
+        return self.problem.reward_class(scaled_reward=value)
 
     def run(self, *args, **kwargs) -> ([], float):
         path, reward = MCTS.run(self, *args, **kwargs)
-        self.problem._store_search_statistics(path, reward)
+        self.problem.store_search_statistics(path, reward)
         return path, reward
 
     def _ucb_score(self, parent: AlphaZeroVertex, child: AlphaZeroVertex) -> float:
