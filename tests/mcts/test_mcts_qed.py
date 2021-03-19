@@ -7,6 +7,7 @@ import pytest
 from rlmolecule.alphazero.alphazero import AlphaZero
 from rlmolecule.mcts.mcts import MCTS
 from rlmolecule.molecule.molecule_config import MoleculeConfig
+from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
 from tests.qed_optimization_problem import QEDWithMoleculePolicy, QEDWithRandomPolicy
 
 
@@ -20,9 +21,16 @@ def problem(request, engine):
                             stereoisomers=False)
 
     if name == 'random':
-        return QEDWithRandomPolicy(config=config, engine=engine)
+        return QEDWithRandomPolicy(reward_class=LinearBoundedRewardFactory(),
+                                   config=config,
+                                   engine=engine)
     if name == 'MoleculePolicy':
-        return QEDWithMoleculePolicy(config=config, engine=engine, features=8, num_heads=2, num_messages=1)
+        return QEDWithMoleculePolicy(reward_class=LinearBoundedRewardFactory(),
+                                     config=config,
+                                     engine=engine,
+                                     features=8,
+                                     num_heads=2,
+                                     num_messages=1)
 
 
 @pytest.fixture
@@ -91,13 +99,8 @@ class TestMCTSwithMoleculeState:
 
     def test_reward(self, solver, problem):
         game, root = setup_game(solver, problem)
-        assert problem.reward_wrapper(root.state).raw_reward == 0.0
-
         game._expand(root)
-
-        assert problem.reward_wrapper(root.state).raw_reward == 0.0
-        assert problem.reward_wrapper(root.children[-1].state).raw_reward > 0.01
-        assert problem.reward_wrapper(root.state).raw_reward == 0.0
+        assert problem.reward_wrapper(root.children[-1]).raw_reward > 0.01
 
     def test_get_successors(self, solver, problem):
         game, root = setup_game(solver, problem)
@@ -135,7 +138,9 @@ class TestMCTSwithMoleculeState:
     def test_evaluate(self, solver, problem):
         game, root = setup_game(solver, problem)
         reward = game._evaluate([root])
-        assert reward.raw_reward > 0.
+
+        if solver == MCTS:
+            assert reward.raw_reward > 0.
 
     def test_mcts_sample(self, solver, problem):
         random.seed(42)
@@ -156,6 +161,6 @@ class TestMCTSwithMoleculeState:
         assert np.isfinite(reward.raw_reward)
 
         try:
-            assert reward.raw_reward == problem.reward_wrapper(history[-1].state).raw_reward
+            assert reward.raw_reward == problem.reward_wrapper(history[-1]).raw_reward
         except AttributeError:  # Handle alphazero's history object
-            assert reward.raw_reward == problem.reward_wrapper(history[-1][0].state).raw_reward
+            assert reward.raw_reward == problem.reward_wrapper(history[-1][0]).raw_reward

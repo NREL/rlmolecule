@@ -30,6 +30,10 @@ class QEDWithRandomPolicy(QEDOptimizationProblem):
 
         return random_state.random(), {vertex: prior for vertex, prior in zip(children, priors)}
 
+    def get_policy_inputs(self, state: 'GraphSearchState') -> {str: np.ndarray}:
+        # these will get stored and used to index reward values
+        return {'test': np.random.randn(5, 3)}
+
 
 class QEDWithMoleculePolicy(MoleculeTFAlphaZeroProblem, QEDOptimizationProblem):
     pass
