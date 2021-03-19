@@ -2,6 +2,7 @@ from sqlalchemy import (BigInteger, Column, DateTime, Float, JSON, LargeBinary, 
                         func)
 
 from rlmolecule.sql import Base
+from rlmolecule.sql.guid import GUID
 
 
 class RewardStore(Base):
@@ -28,7 +29,7 @@ class StateStore(Base):
 class GameStore(Base):
     __tablename__ = 'Game'
 
-    id = Column(String(64), primary_key=True)  # UUID
+    id = Column(GUID(), primary_key=True)  # UUID
     run_id = Column(String(255))
     time = Column(DateTime, server_default=func.now())
     raw_reward = Column(Float)
