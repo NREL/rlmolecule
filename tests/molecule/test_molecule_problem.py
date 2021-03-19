@@ -6,6 +6,7 @@ from rlmolecule.alphazero.alphazero import AlphaZero
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from rlmolecule.molecule.molecule_config import MoleculeConfig
 from rlmolecule.molecule.molecule_state import MoleculeState
+from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
 from tests.qed_optimization_problem import QEDWithMoleculePolicy
 
 
@@ -20,7 +21,9 @@ def config():
 
 @pytest.fixture
 def problem(engine, config):
-    return QEDWithMoleculePolicy(engine, config)
+    return QEDWithMoleculePolicy(reward_class=LinearBoundedRewardFactory(),
+                                 engine=engine,
+                                 config=config)
 
 
 @pytest.fixture
