@@ -69,8 +69,8 @@ def construct_problem():
     reward_factory = RankedRewardFactory(
             engine=engine,
             run_id=run_id,
-            reward_buffer_min_size=10,
-            reward_buffer_max_size=50,
+            reward_buffer_min_size=20,
+            reward_buffer_max_size=20,
             ranked_reward_alpha=0.75
     )
 
@@ -78,8 +78,10 @@ def construct_problem():
         engine,
         run_id=run_id,
         reward_class=reward_factory,
-        min_buffer_size=15,
-        policy_checkpoint_dir='policy_checkpoints'
+        min_buffer_size=20,
+        max_buffer_size=20,
+        batch_size=32,
+        policy_checkpoint_dir='hallway_policy_checkpoints'
     )
 
     return problem

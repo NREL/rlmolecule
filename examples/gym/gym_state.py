@@ -55,30 +55,3 @@ class GymEnvState(GraphSearchState):
                 next_actions.append(
                     GymEnvState(env_copy, self.step_count+1, step_rew, cumulative_rew, done, meta))
         return next_actions
-
-
-class AtariGymEnvState(GymEnvState):
-    """TODO: Still needs testing."""
-    def __init__(self, 
-                 env: AlphaZeroGymEnv,
-                 step_reward: float,
-                 cumulative_reward: float,
-                 done: bool) -> None:
-        super().__init__(env, step_reward, cumulative_reward, done)
-
-    def serialize(self) -> str:
-        self_data = (
-            self.step_reward,
-            self.cumulative_reward,
-            self.done,
-            self.env.clone_full_state())
-        return base64.b64encode(pickle.dumps(self_data)).decode('utf-8')
-
-    def deserialize(self, data: str) -> 'AtariGymEnvState':     # how to return self class?
-        data = pickle.loads(base64.b64decode(data))
-        step_reward = data[0]
-        cumulative_reward = data[1]
-        done = data[2]
-        self.env.restore_full_state(data[3])
-        logger.debug("DESERIALIZING", step_reward, cumulative_reward, done)
-        return AtariGymEnvState(self.env, step_reward, cumulative_reward, done)

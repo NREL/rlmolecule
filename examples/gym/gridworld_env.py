@@ -1,11 +1,9 @@
-from abc import abstractmethod
 import logging
 from typing import Tuple
 
 import numpy as np
 import gym
 
-logger = logging.getLogger(__name__)
 
 ACTION_MAP = {0: (0, 1), 1: (1, 0), 2: (0, -1), 3: (-1, 0)}
 OBSTACLE_CHANNEL = 0
@@ -85,4 +83,5 @@ if __name__ == "__main__":
         print("\nstep {}, reward {}, done {}".format(step, r, done))
         print("action", action)
         print("obs\n", obs[PLAYER_CHANNEL, :, :].squeeze())
+        
     print("final reward", rew)

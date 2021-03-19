@@ -1,3 +1,2 @@
-rm hallway*.db
+rm hallway_policy_checkpoints hallway_data.db
 python solve_hallway.py
-
