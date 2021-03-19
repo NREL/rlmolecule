@@ -142,7 +142,7 @@ class AlphaZeroProblem(MCTSProblem):
                 self.session.add(record)
                 self.session.commit()
             except:
-                logger.debug(f"Duplicate reward entry encountered with {vertex.state}")
+                logger.debug(f"Duplicate state entry encountered with {vertex.state}")
                 self.session.rollback()
 
         return policy_digest
