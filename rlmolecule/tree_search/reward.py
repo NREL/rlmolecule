@@ -13,9 +13,34 @@ logger = logging.getLogger(__name__)
 
 
 class Reward:
-    def __init__(self, raw_reward: float, scaled_reward: float):
-        self.raw_reward = raw_reward
-        self.scaled_reward = scaled_reward
+    def __init__(self, *,
+                 raw_reward: Optional[float] = None,
+                 scaled_reward: Optional[float] = None):
+        """ Class to coordinate between rewards that are raw (provided by the user) and scaled (between zero and one
+        using some type of reward scaling)
+
+        :param raw_reward: Reward as calculated by the defined `get_reward` function.
+        :param scaled_reward: Rewards after applying some type of scaling function
+        """
+        self._raw_reward = raw_reward
+        self._scaled_reward = scaled_reward
+
+        if scaled_reward is not None:
+            assert 0 <= scaled_reward <= 1, "scaled reward should likely be between zero and one, was this intended?"
+
+    @property
+    def raw_reward(self) -> float:
+        if self._raw_reward is not None:
+            return self._raw_reward
+        else:
+            raise RuntimeError("Attempting to access non-provided raw reward")
+
+    @property
+    def scaled_reward(self) -> float:
+        if self._scaled_reward is not None:
+            return self._scaled_reward
+        else:
+            raise RuntimeError("Attempting to access non-provided scaled reward")
 
 
 class RewardFactory(ABC):
@@ -23,12 +48,25 @@ class RewardFactory(ABC):
     def _scale(self, reward: float) -> float:
         pass
 
-    def __call__(self, reward):
-        return Reward(reward, self._scale(reward))
+    def __call__(self, *,
+                 raw_reward: Optional[float] = None,
+                 scaled_reward: Optional[float] = None) -> Reward:
+        """ Initialize a Reward class with raw and scaled rewards, scaling the raw reward if a scaled reward is not
+        provided. Allows a pass-through of a scaled reward if scaled_reward is provided
+
+        :param raw_reward: A reward on the same scale as the user-defined reward function
+        :param scaled_reward: A reward that has been pre-scaled between zero and one according to some scaling scheme
+        :return: An initialized Reward class
+        """
+        if scaled_reward is None:
+            scaled_reward = self._scale(raw_reward)
+
+        return Reward(raw_reward=raw_reward, scaled_reward=scaled_reward)
 
 
 class RawRewardFactory(RewardFactory):
     """Just passes the raw reward through as the scaled reward"""
+
     def _scale(self, reward: float) -> float:
         return reward
 
@@ -36,6 +74,7 @@ class RawRewardFactory(RewardFactory):
 class LinearBoundedRewardFactory(RewardFactory):
     """Maps rewards to the 0->1 range, where the minimum reward maps to zero and the maximum reward maps to 1. Values
     above and below the max / min reward are capped at 0 or 1 respectively. """
+
     def __init__(self,
                  min_reward: float = 0.,
                  max_reward: float = 1.) -> None:
@@ -43,7 +82,6 @@ class LinearBoundedRewardFactory(RewardFactory):
         self.max_reward = max_reward
 
     def _scale(self, reward: float) -> float:
-
         scaled_reward = (reward - self.min_reward) / (self.max_reward - self.min_reward)
         return float(np.clip(scaled_reward, 0, 1))
 
@@ -88,7 +126,7 @@ class RankedRewardFactory(RewardFactory):
             else:
                 self._has_enough_games = True  # todo: write tests?
 
-        buffer_games = all_games.order_by(GameStore.index.desc()).limit(self._reward_buffer_max_size)
+        buffer_games = all_games.order_by(GameStore.time.desc()).limit(self._reward_buffer_max_size)
         buffer_raw_rewards = self._session.query(buffer_games.subquery().c.raw_reward).all()
 
         r_alpha = np.percentile(np.array(buffer_raw_rewards),
