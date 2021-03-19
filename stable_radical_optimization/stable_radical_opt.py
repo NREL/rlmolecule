@@ -1,3 +1,4 @@
+import sys
 import argparse
 import pathlib
 import logging
@@ -20,12 +21,13 @@ from rlmolecule.molecule.policy import preprocessor
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-#sys.path.append('/projects/rlmolecule/pstjohn/models/20201031_bde/')
-#from preprocess_inputs import preprocessor as bde_preprocessor
-#bde_preprocessor.from_json('/projects/rlmolecule/pstjohn/models/20201031_bde/preprocessor.json')
-# TODO would we need a different preprocessor.json file here
-# than we have in rlmolecule.molecule.policy.preprocessor.json?
-bde_preprocessor = preprocessor.load_preprocessor()
+# TODO update/incorporate this code
+sys.path.append('/projects/rlmolecule/pstjohn/models/20201031_bde/')
+from preprocess_inputs import preprocessor as bde_preprocessor
+bde_preprocessor.from_json('/projects/rlmolecule/pstjohn/models/20201031_bde/preprocessor.json')
+# TODO make this into a command-line argument(?)
+# or just store it in this directory
+#bde_preprocessor = preprocessor.load_preprocessor(saved_preprocessor_file="/projects/rlmolecule/pstjohn/models/20201031_bde/preprocessor.json")
 
 
 def construct_problem(
@@ -40,9 +42,13 @@ def construct_problem(
     from rlmolecule.tree_search.reward import RankedRewardFactory
     from rlmolecule.molecule.molecule_config import MoleculeConfig
     from rlmolecule.molecule.molecule_problem import MoleculeTFAlphaZeroProblem
-    from rlmolecule.molecule.molecule_state import MoleculeState
+    #from rlmolecule.molecule.molecule_state import MoleculeState
+    from stable_radical_optimization.stable_radical_molecule_state import StableRadMoleculeState
     import tensorflow as tf
 
+    @tf.function(experimental_relax_shapes=True)                
+    def predict(model: 'tf.keras.Model', inputs):
+        return model.predict_step(inputs)
 
     class StableRadOptProblem(MoleculeTFAlphaZeroProblem):
 
@@ -60,31 +66,29 @@ def construct_problem(
             self.redox_model = redox_model
             self.bde_model = bde_model
 
-        def get_initial_state(self) -> MoleculeState:
-            return MoleculeState(rdkit.Chem.MolFromSmiles('C'), self._config)
+        def get_initial_state(self) -> StableRadMoleculeState:
+            return StableRadMoleculeState(rdkit.Chem.MolFromSmiles('C'), self._config)
 
-        def get_reward(self, state: MoleculeState) -> Tuple[float, dict]:
-            # TODO what does this do? Is it needed?
-            ## Node is outside the domain of validity
-            #elif ((node.policy_inputs['atom'] == 1).any() | 
-            #    (node.policy_inputs['bond'] == 1).any()):
-            #    return config.min_reward
+        def get_reward(self, state: StableRadMoleculeState) -> Tuple[float, dict]:
+            # Node is outside the domain of validity
+            policy_inputs = self.get_policy_inputs(state)
+            if ((policy_inputs['atom'] == 1).any() | 
+                (policy_inputs['bond'] == 1).any()):
+                return 0.0, {'forced_terminal': False, 'smiles': state.smiles}
 
             # TODO what data should be stored here?
             if state.forced_terminal:
                 return self.calc_reward_inner(state), {'forced_terminal': True, 'smiles': state.smiles}
             return 0.0, {'forced_terminal': False, 'smiles': state.smiles}
 
-        @tf.function(experimental_relax_shapes=True)                
-        def predict(self, model: 'tf.keras.Model', inputs):
-            return model.predict_step(inputs)
-
-        def calc_reward_inner(self, state: MoleculeState) -> float:
+        def calc_reward_inner(self, state: StableRadMoleculeState) -> float:
             """
             """
-            spins, buried_vol = self.predict(self.stability_model,
-                {key: tf.constant(np.expand_dims(val, 0))
-                for key, val in self.get_policy_inputs(state).items()})
+            print(state.smiles)
+            model_inputs = {key: tf.constant(np.expand_dims(val, 0))
+                for key, val in self.get_policy_inputs(state).items()}
+            spins, buried_vol = predict(
+                self.stability_model, model_inputs)
 
             spins = spins.numpy().flatten()
             buried_vol = buried_vol.numpy().flatten()
@@ -95,10 +99,8 @@ def construct_problem(
 
             atom_type = state.molecule.GetAtomWithIdx(atom_index).GetSymbol()
 
-            ionization_energy, electron_affinity = self.predict(
-                self.redox_model, {key: tf.constant(np.expand_dims(val, 0))
-                            for key, val in self.get_policy_inputs(state).items()})\
-                                                       .numpy().tolist()[0]
+            ionization_energy, electron_affinity = predict(
+                self.redox_model, model_inputs).numpy().tolist()[0]
 
             v_diff = ionization_energy - electron_affinity
             bde, bde_diff = self.calc_bde(state)
@@ -120,13 +122,15 @@ def construct_problem(
 
             return reward
 
-        def calc_bde(self, state: MoleculeState):
+        def calc_bde(self, state: StableRadMoleculeState):
             """calculate the X-H bde, and the difference to the next-weakest X-H bde in kcal/mol"""
 
-            bde_inputs = prepare_for_bde(state.smiles)
-            inputs = bde_get_inputs(bde_inputs.mol_smiles)
+            bde_inputs = self.prepare_for_bde(state.molecule)
+            #model_inputs = self.bde_get_inputs(state.molecule)
+            model_inputs = self.bde_get_inputs(bde_inputs.mol_smiles)
 
-            pred_bdes = self.predict(self.bde_model, inputs)[0][0, :, 0].numpy()
+            pred_bdes = predict(self.bde_model, model_inputs)
+            pred_bdes = pred_bdes[0][0, :, 0].numpy()
 
             bde_radical = pred_bdes[bde_inputs.bond_index]
 
@@ -138,6 +142,55 @@ def construct_problem(
                 bde_diff = (other_h_bdes - bde_radical).min()
 
             return bde_radical, bde_diff
+
+        def prepare_for_bde(self, mol: rdkit.Chem.Mol):
+
+            radical_index = None
+            for i, atom in enumerate(mol.GetAtoms()):
+                if atom.GetNumRadicalElectrons() != 0:
+                    assert radical_index == None
+                    is_radical = True
+                    radical_index = i
+
+                    atom.SetNumExplicitHs(atom.GetNumExplicitHs() + 1)
+                    atom.SetNumRadicalElectrons(0)
+                    break
+
+            radical_rank = Chem.CanonicalRankAtoms(mol, includeChirality=True)[radical_index]
+
+            mol_smiles = Chem.MolToSmiles(mol)
+            # TODO this line seems redundant
+            mol = Chem.MolFromSmiles(mol_smiles)
+
+            radical_index_reordered = list(Chem.CanonicalRankAtoms(
+                mol, includeChirality=True)).index(radical_rank)
+
+            molH = Chem.AddHs(mol)
+            for bond in molH.GetAtomWithIdx(radical_index_reordered).GetBonds():
+                if 'H' in {bond.GetBeginAtom().GetSymbol(), bond.GetEndAtom().GetSymbol()}:
+                    bond_index = bond.GetIdx()
+                    break
+
+            h_bond_indices = [bond.GetIdx() for bond in filter(
+                lambda bond: ((bond.GetEndAtom().GetSymbol() == 'H') 
+                            | (bond.GetBeginAtom().GetSymbol() == 'H')), molH.GetBonds())]
+
+            other_h_bonds = list(set(h_bond_indices) - {bond_index})
+
+            return pd.Series({
+                'mol_smiles': mol_smiles,
+                'radical_index_mol': radical_index_reordered,
+                'bond_index': bond_index,
+                'other_h_bonds': other_h_bonds
+            })
+
+        def bde_get_inputs(self, mol_smiles):
+            """ The BDE model was trained on a different set of data 
+            so we need to use corresponding preprocessor here
+            """
+            inputs = bde_preprocessor.construct_feature_matrices(mol_smiles, train=False)
+            assert not (inputs['atom'] == 1).any() | (inputs['bond'] == 1).any()
+            return {key: tf.constant(np.expand_dims(val, 0)) for key, val in inputs.items()}
 
         def windowed_loss(
                 self, target: float,
@@ -162,17 +215,10 @@ def construct_problem(
     redox_model = tf.keras.models.load_model(redox_model, compile=False)
     bde_model = tf.keras.models.load_model(bde_model, compile=False)
 
-    # TODO what values should we set for these options?
-    #:param max_atoms: Maximum number of heavy atoms
-    #:param min_atoms: minimum number of heavy atoms
-    #:param atom_additions: potential atom types to consider. Defaults to ('C', 'H', 'O')
-    #:param stereoisomers: whether to consider stereoisomers different molecules
-    #:param sa_score_threshold: If set, don't construct molecules greater than a given sa_score.
-    #:param tryEmbedding: Try to get a 3D embedding of the molecule, and if this fails, remote it.
     config = MoleculeConfig(max_atoms=15,
                             min_atoms=4,
                             tryEmbedding=True,
-                            sa_score_threshold=3.,
+                            sa_score_threshold=3.5,
                             stereoisomers=True,
                             atom_additions=('C', 'N', 'O', 'S'),
                             )
@@ -211,63 +257,16 @@ def construct_problem(
         bde_model,
         run_id=run_id,
         reward_class=reward_factory,
-        # TODO what values should we set for these options?
-        features=8,
-        num_heads=2,
-        num_messages=1,
+        features=64,
+        num_heads=4,  # Number of attention heads
+        num_messages=3,
+        batch_size=32,
+        max_buffer_size=256,
         min_buffer_size=128,  # Don't start training the model until this many games have occurred
         policy_checkpoint_dir='policy_checkpoints'
     )
 
     return problem
-
-
-def prepare_for_bde(smiles):
-
-    mol = Chem.MolFromSmiles(smiles)
-    radical_index = None
-    for i, atom in enumerate(mol.GetAtoms()):
-        if atom.GetNumRadicalElectrons() != 0:
-            assert radical_index == None
-            is_radical = True
-            radical_index = i
-
-            atom.SetNumExplicitHs(atom.GetNumExplicitHs() + 1)
-            atom.SetNumRadicalElectrons(0)
-            break
-
-    radical_rank = Chem.CanonicalRankAtoms(mol, includeChirality=True)[radical_index]
-
-    mol_smiles = Chem.MolToSmiles(mol)
-    mol = Chem.MolFromSmiles(mol_smiles)
-
-    radical_index_reordered = list(Chem.CanonicalRankAtoms(
-        mol, includeChirality=True)).index(radical_rank)
-
-    molH = Chem.AddHs(mol)
-    for bond in molH.GetAtomWithIdx(radical_index_reordered).GetBonds():
-        if 'H' in {bond.GetBeginAtom().GetSymbol(), bond.GetEndAtom().GetSymbol()}:
-            bond_index = bond.GetIdx()
-            break
-        
-    h_bond_indices = [bond.GetIdx() for bond in filter(
-        lambda bond: ((bond.GetEndAtom().GetSymbol() == 'H') 
-                      | (bond.GetBeginAtom().GetSymbol() == 'H')), molH.GetBonds())]
-    
-    other_h_bonds = list(set(h_bond_indices) - {bond_index})
-            
-    return pd.Series({
-        'mol_smiles': mol_smiles,
-        'radical_index_mol': radical_index_reordered,
-        'bond_index': bond_index,
-        'other_h_bonds': other_h_bonds
-    })
-
-
-def bde_get_inputs(mol_smiles):
-    inputs = bde_preprocessor.construct_feature_matrices(mol_smiles, train=False)
-    assert not (inputs['atom'] == 1).any() | (inputs['bond'] == 1).any()
-    return {key: np.expand_dims(val, 0) for key, val in inputs.items()}
 
 
 def run_games(**kwargs):
