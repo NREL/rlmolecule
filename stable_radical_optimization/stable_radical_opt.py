@@ -76,12 +76,13 @@ def construct_problem(
                 (policy_inputs['bond'] == 1).any()):
                 return 0.0, {'forced_terminal': False, 'smiles': state.smiles}
 
-            # TODO what data should be stored here?
             if state.forced_terminal:
-                return self.calc_reward_inner(state), {'forced_terminal': True, 'smiles': state.smiles}
+                reward, stats = self.calc_reward(state)
+                stats.update({'forced_terminal': True, 'smiles': state.smiles})
+                return reward, stats
             return 0.0, {'forced_terminal': False, 'smiles': state.smiles}
 
-        def calc_reward_inner(self, state: StableRadMoleculeState) -> float:
+        def calc_reward(self, state: StableRadMoleculeState) -> float:
             """
             """
             model_inputs = {key: tf.constant(np.expand_dims(val, 0))
@@ -119,7 +120,15 @@ def construct_problem(
                 self.windowed_loss(v_diff, v_range) +         
                 self.windowed_loss(bde, bde_range)) / 4)
 
-            return reward
+            stats = {
+                'max_spin': max_spin,
+                'spin_buried_vol', spin_buried_vol,
+                'ionization_energy', ionization_energy, 
+                'electron_affinity', electron_affinity,
+                'bde', bde, 'bde_diff', bde_diff,
+            }
+
+            return reward, stats
 
         def calc_bde(self, state: StableRadMoleculeState):
             """calculate the X-H bde, and the difference to the next-weakest X-H bde in kcal/mol"""
