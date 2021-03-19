@@ -141,7 +141,7 @@ class AlphaZeroProblem(MCTSProblem):
             try:
                 self.session.add(record)
                 self.session.commit()
-            except:
+            except exc.IntegrityError:
                 logger.debug(f"Duplicate state entry encountered with {vertex.state}")
                 self.session.rollback()
 
