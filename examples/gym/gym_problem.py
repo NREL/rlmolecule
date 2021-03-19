@@ -17,7 +17,7 @@ class GymEnvProblem(TFAlphaZeroProblem):
                  env: AlphaZeroGymEnv,
                  **kwargs) -> None:
         self.env = deepcopy(env)
-        super().__init__(engine, **kwargs)
+        super().__init__(engine=engine, **kwargs)
 
     def get_initial_state(self) -> GymEnvState:
         _ = self.env.reset()
@@ -32,7 +32,7 @@ class AtariGymEnvProblem(TFAlphaZeroProblem):
                  env: AlphaZeroGymEnv,
                  **kwargs) -> None:
         self.env = deepcopy(env)
-        super().__init__(engine, **kwargs)
+        super().__init__(engine=engine, **kwargs)
         
     def get_initial_state(self) -> AtariGymEnvState:
         _ = self.env.reset()

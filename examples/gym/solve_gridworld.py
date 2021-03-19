@@ -116,7 +116,7 @@ def run_games(use_mcts=False, num_mcts_samples=64, num_games=None):
                       ' -- CPU time {:1.3f} (s)'.format(elapsed)))
 
 def train_model():
-    construct_problem().train_policy_model(steps_per_epoch=8,
+    construct_problem().train_policy_model(steps_per_epoch=100,
                                            game_count_delay=10,
                                            verbose=2)
 
