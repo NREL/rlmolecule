@@ -28,7 +28,7 @@ class StateStore(Base):
 class GameStore(Base):
     __tablename__ = 'Game'
 
-    id = Column(String(32), primary_key=True)  # UUID
+    id = Column(String(64), primary_key=True)  # UUID
     run_id = Column(String(255))
     time = Column(DateTime, server_default=func.now())
     raw_reward = Column(Float)
