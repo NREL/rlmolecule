@@ -138,8 +138,12 @@ class AlphaZeroProblem(MCTSProblem):
                                 run_id=self.run_id,
                                 state=vertex.state.serialize(),
                                 policy_inputs=serialize_ordered_numpy_dict(policy_inputs))
-            self.session.add(record)
-            self.session.commit()
+            try:
+                self.session.add(record)
+                self.session.commit()
+            except:
+                logger.debug(f"Duplicate reward entry encountered with {vertex.state}")
+                self.session.rollback()
 
         return policy_digest
 

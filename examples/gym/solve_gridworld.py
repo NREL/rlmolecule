@@ -162,8 +162,11 @@ if __name__ == "__main__":
     parser.add_argument("--num-games", type=int, default=None)
     parser.add_argument("--num-mcts-samples", type=int, default=50)
     parser.add_argument("--use-mcts", action="store_true")
+    parser.add_argument("--log-level", default="INFO", type=str)
 
     args = parser.parse_args()
+
+    logger.setLevel(level=getattr(logging, args.log_level.upper()))
 
     if args.train_policy:
         train_model()
