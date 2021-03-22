@@ -6,10 +6,11 @@ from typing import Tuple
 import numpy as np
 from sqlalchemy import create_engine
 
+from rlmolecule.gym.gym_problem import GymEnvProblem
+from rlmolecule.gym.gym_state import GymEnvState
+from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
+
 from examples.gym.tf_model import policy_model_2
-from examples.gym.gym_problem import GymEnvProblem
-from examples.gym.gym_state import GymEnvState
-from examples.gym.alphazero_gym import AlphaZeroGymEnv
 import examples.gym.gridworld_env as gw
 
 logging.basicConfig(level=logging.INFO)
@@ -27,7 +28,7 @@ class GridWorldEnv(AlphaZeroGymEnv):
     def reset(self):
         return self.env.reset()
 
-    def get_env_obs(self) -> np.ndarray:
+    def get_obs(self) -> np.ndarray:
         return self.env.get_obs()
 
 

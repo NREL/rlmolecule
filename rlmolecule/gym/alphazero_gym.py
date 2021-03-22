@@ -14,7 +14,7 @@ class AlphaZeroGymEnv(gym.Wrapper):
         super().__init__(env)
 
     @abstractmethod
-    def get_env_obs(self) -> np.ndarray:
+    def get_obs(self) -> np.ndarray:
         """Returns an observation from the environment, similar to env.reset but
         returning the observation of the current state."""
         pass

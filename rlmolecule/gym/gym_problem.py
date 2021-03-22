@@ -3,9 +3,8 @@ from copy import deepcopy
 import sqlalchemy
 
 from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
-
-from examples.gym.alphazero_gym import AlphaZeroGymEnv
-from examples.gym.gym_state import GymEnvState
+from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
+from rlmolecule.gym.gym_state import GymEnvState
 
 
 class GymEnvProblem(TFAlphaZeroProblem):

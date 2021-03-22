@@ -5,13 +5,12 @@ from typing import Tuple
 import numpy as np
 from sqlalchemy import create_engine
 
-import gym
+from rlmolecule.gym.gym_problem import GymEnvProblem
+from rlmolecule.gym.gym_state import GymEnvState
+from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
 
-from tf_model import policy_model
-from gym_problem import GymEnvProblem
-from gym_state import GymEnvState
-from alphazero_gym import AlphaZeroGymEnv
-from hallway_env import HallwayEnv
+from examples.gym.hallway_env import HallwayEnv
+from examples.gym.tf_model import policy_model
 
 
 #logging.basicConfig(level=logging.INFO)

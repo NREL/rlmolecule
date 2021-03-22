@@ -9,8 +9,7 @@ import numpy as np
 import gym
 
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
-
-from alphazero_gym import AlphaZeroGymEnv
+from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
 
 logger = logging.getLogger(__name__)
 
