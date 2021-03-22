@@ -43,7 +43,7 @@ def construct_problem(
     from rlmolecule.molecule.molecule_config import MoleculeConfig
     from rlmolecule.molecule.molecule_problem import MoleculeTFAlphaZeroProblem
     #from rlmolecule.molecule.molecule_state import MoleculeState
-    from stable_radical_optimization.stable_radical_molecule_state import StableRadMoleculeState
+    from examples.stable_radical_optimization.stable_radical_molecule_state import StableRadMoleculeState
     import tensorflow as tf
 
     @tf.function(experimental_relax_shapes=True)                
@@ -122,11 +122,12 @@ def construct_problem(
 
             stats = {
                 'max_spin': max_spin,
-                'spin_buried_vol', spin_buried_vol,
-                'ionization_energy', ionization_energy, 
-                'electron_affinity', electron_affinity,
-                'bde', bde, 'bde_diff', bde_diff,
+                'spin_buried_vol': spin_buried_vol,
+                'ionization_energy': ionization_energy, 
+                'electron_affinity': electron_affinity,
+                'bde': bde, 'bde_diff': bde_diff,
             }
+            stats = {key: str(val) for key, val in stats.items()}
 
             return reward, stats
 
