@@ -34,7 +34,7 @@ class GymEnvState(GraphSearchState):
         self.meta = meta
 
     def __repr__(self) -> str:
-        return hash((self.env.get_obs().tobytes(), self.step_count))
+        return (self.env.get_obs(), self.step_count).__repr__()
 
     def equals(self, other: any) -> bool:
         are_close = np.all(np.isclose(self.env.get_obs(), other.env.get_obs()))
@@ -42,7 +42,7 @@ class GymEnvState(GraphSearchState):
         return are_close and same_time
 
     def hash(self) -> int:
-        return hash(self.__repr__())
+        return hash((self.env.get_obs().tobytes(), self.step_count))
 
     def get_next_actions(self) -> Sequence[GraphSearchState]:
         next_actions = []
