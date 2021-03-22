@@ -5,7 +5,9 @@ from typing import Tuple
 import numpy as np
 from sqlalchemy import create_engine
 
-from rlmolecule.gym.gym_problem import TFAlphaZeroGymProblem
+from rlmolecule.tree_search.reward import Reward
+from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
+from rlmolecule.gym.gym_problem import GymProblem
 from rlmolecule.gym.gym_state import GymEnvState
 from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
 
@@ -13,7 +15,7 @@ from examples.gym.hallway_env import HallwayEnv
 from examples.gym.tf_model import policy_model
 
 
-#logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -32,15 +34,16 @@ class HallwayAlphaZeroEnv(AlphaZeroGymEnv):
         return self.env.get_obs()
 
 
-class HallwayProblem(TFAlphaZeroGymProblem):
+class HallwayProblem(GymProblem, TFAlphaZeroProblem):
     """Cartpole TF AZ problem.  For now we will ask the user to implement
     any obs preprocessing directly in the get_policy_inputs method."""
 
-    def __init__(self,
+    def __init__(self, *,
+                 env: HallwayAlphaZeroEnv,
                  engine: "sqlalchemy.engine.Engine",
+                 reward_class: Reward,
                  **kwargs) -> None:
-        env = HallwayAlphaZeroEnv()
-        super().__init__(engine, env, **kwargs)
+        super().__init__(reward_class=reward_class, engine=engine, env=env, **kwargs)
 
     def policy_model(self) -> "tf.keras.Model":
         return policy_model(obs_dim = self.env.observation_space.shape[0],
@@ -73,10 +76,13 @@ def construct_problem():
             ranked_reward_alpha=0.75
     )
 
+    env = HallwayAlphaZeroEnv()
+
     problem = HallwayProblem(
-        engine,
-        run_id=run_id,
+        env=env,
+        engine=engine,
         reward_class=reward_factory,
+        run_id=run_id,
         min_buffer_size=20,
         max_buffer_size=20,
         batch_size=32,

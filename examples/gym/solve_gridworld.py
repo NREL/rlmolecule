@@ -6,7 +6,9 @@ from typing import Tuple
 import numpy as np
 from sqlalchemy import create_engine
 
-from rlmolecule.gym.gym_problem import TFAlphaZeroGymProblem
+from rlmolecule.tree_search.reward import Reward
+from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
+from rlmolecule.gym.gym_problem import GymProblem
 from rlmolecule.gym.gym_state import GymEnvState
 from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
 
@@ -21,7 +23,7 @@ logger = logging.getLogger(__name__)
 # or you will error out on not being able to pickle/serialize them.
 class GridWorldEnv(AlphaZeroGymEnv):
     def __init__(self,
-                 configured_env: gw.GridEnv,
+                 configured_env: AlphaZeroGymEnv,
                  **kwargs):
         super().__init__(configured_env, **kwargs)
 
@@ -32,12 +34,13 @@ class GridWorldEnv(AlphaZeroGymEnv):
         return self.env.get_obs()
 
 
-class GridWorldProblem(TFAlphaZeroGymProblem):
-    def __init__(self, 
+class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
+    def __init__(self, *,
                  env: gw.GridEnv,
                  engine: "sqlalchemy.engine.Engine",
+                 reward_class: Reward,
                  **kwargs) -> None:
-        super().__init__(engine, env, **kwargs)
+        super().__init__(reward_class=reward_class, engine=engine, env=env, **kwargs)
 
     def policy_model(self) -> "tf.keras.Model":
         obs_shape = self.env.reset().shape
@@ -83,10 +86,10 @@ def construct_problem():
     env = gw.GridEnv(grid, max_episode_steps=12)
 
     problem = GridWorldProblem(
-        env,
-        engine,
-        run_id=run_id,
+        env=env,
+        engine=engine,
         reward_class=reward_factory,
+        run_id=run_id,
         min_buffer_size=10,
         max_buffer_size=10,
         batch_size=32,
