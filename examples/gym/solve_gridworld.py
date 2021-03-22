@@ -6,7 +6,7 @@ from typing import Tuple
 import numpy as np
 from sqlalchemy import create_engine
 
-from rlmolecule.gym.gym_problem import GymEnvProblem
+from rlmolecule.gym.gym_problem import TFAlphaZeroGymProblem
 from rlmolecule.gym.gym_state import GymEnvState
 from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
 
@@ -32,7 +32,7 @@ class GridWorldEnv(AlphaZeroGymEnv):
         return self.env.get_obs()
 
 
-class GridWorldProblem(GymEnvProblem):
+class GridWorldProblem(TFAlphaZeroGymProblem):
     def __init__(self, 
                  env: gw.GridEnv,
                  engine: "sqlalchemy.engine.Engine",

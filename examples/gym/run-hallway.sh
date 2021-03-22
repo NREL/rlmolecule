@@ -1,2 +1,2 @@
 rm hallway_policy_checkpoints hallway_data.db
-python solve_hallway.py
+clear; python solve_hallway.py

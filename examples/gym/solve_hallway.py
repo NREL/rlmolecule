@@ -5,7 +5,7 @@ from typing import Tuple
 import numpy as np
 from sqlalchemy import create_engine
 
-from rlmolecule.gym.gym_problem import GymEnvProblem
+from rlmolecule.gym.gym_problem import TFAlphaZeroGymProblem
 from rlmolecule.gym.gym_state import GymEnvState
 from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
 
@@ -32,7 +32,7 @@ class HallwayAlphaZeroEnv(AlphaZeroGymEnv):
         return self.env.get_obs()
 
 
-class HallwayProblem(GymEnvProblem):
+class HallwayProblem(TFAlphaZeroGymProblem):
     """Cartpole TF AZ problem.  For now we will ask the user to implement
     any obs preprocessing directly in the get_policy_inputs method."""
 
