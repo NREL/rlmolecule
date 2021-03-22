@@ -38,13 +38,6 @@ class HallwayProblem(GymProblem, TFAlphaZeroProblem):
     """Cartpole TF AZ problem.  For now we will ask the user to implement
     any obs preprocessing directly in the get_policy_inputs method."""
 
-    def __init__(self, *,
-                 env: HallwayAlphaZeroEnv,
-                 engine: "sqlalchemy.engine.Engine",
-                 reward_class: Reward,
-                 **kwargs) -> None:
-        super().__init__(reward_class=reward_class, engine=engine, env=env, **kwargs)
-
     def policy_model(self) -> "tf.keras.Model":
         return policy_model(obs_dim = self.env.observation_space.shape[0],
                             hidden_layers = 3,
@@ -53,9 +46,6 @@ class HallwayProblem(GymProblem, TFAlphaZeroProblem):
 
     def get_policy_inputs(self, state: GymEnvState) -> dict:
         return {"obs": self.env.get_obs()}
-
-    def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
-        return state.env.get_reward(), {}
 
 
 def construct_problem():

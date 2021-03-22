@@ -1,4 +1,5 @@
 from copy import deepcopy
+from typing import Tuple
 
 from rlmolecule.tree_search.reward import Reward
 from rlmolecule.mcts.mcts_problem import MCTSProblem
@@ -15,4 +16,6 @@ class GymProblem(MCTSProblem):
         _ = self.env.reset()
         return GymEnvState(self.env, 0, 0., 0., False)
 
+    def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
+        return state.cumulative_reward, {}
         

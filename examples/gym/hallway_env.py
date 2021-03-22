@@ -32,11 +32,13 @@ class HallwayEnv(gym.Env):
         else:
             self.position += 1
         self.episode_steps += 1
-        done = (self.position == self.size) or (self.episode_steps == self.max_steps)
-        return self.get_obs(), self.get_reward(), done, {}
+        return self.get_obs(), self.get_reward(), self.is_terminal(), {}
+
+    def is_terminal(self) -> bool:
+        return (self.position == self.size) or (self.episode_steps == self.max_steps)
 
     def get_reward(self) -> float:
-        return -(self.episode_steps + (self.size - self.position))
+        return self.position - self.size if self.is_terminal() else -1
 
     def get_obs(self) -> np.ndarray:
         return np.array([self.position, self.episode_steps], dtype=int)

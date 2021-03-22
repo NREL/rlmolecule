@@ -35,12 +35,6 @@ class GridWorldEnv(AlphaZeroGymEnv):
 
 
 class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
-    def __init__(self, *,
-                 env: gw.GridEnv,
-                 engine: "sqlalchemy.engine.Engine",
-                 reward_class: Reward,
-                 **kwargs) -> None:
-        super().__init__(reward_class=reward_class, engine=engine, env=env, **kwargs)
 
     def policy_model(self) -> "tf.keras.Model":
         obs_shape = self.env.reset().shape
@@ -58,8 +52,6 @@ class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
             "steps": 0.*np.array([np.float64(self.env.episode_steps)])
         }
 
-    def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
-        return state.cumulative_reward, {}
 
 
 def construct_problem():
