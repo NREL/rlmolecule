@@ -34,7 +34,7 @@ class GymEnvState(GraphSearchState):
         self.meta = meta
 
     def __repr__(self) -> str:
-        return (self.env.get_obs(), self.step_count).__repr__()
+        return hash(self.env.get_obs().to_bytes()) ^ (13 * self.step_count)
 
     def equals(self, other: any) -> bool:
         are_close = np.all(np.isclose(self.env.get_obs(), other.env.get_obs()))
