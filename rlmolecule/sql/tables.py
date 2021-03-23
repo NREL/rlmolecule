@@ -15,7 +15,6 @@ class RewardStore(Base):
     reward = Column(Float)
     data = Column(JSON)
 
-
 class StateStore(Base):
     __tablename__ = 'State'
 
