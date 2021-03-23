@@ -8,6 +8,8 @@ def dfs(visited: set, node: 'GraphSearchState', parent: 'GraphSearchState') -> N
     :param visited: initialized with an empty set, this builds recursively.
     :param node: The child node from which to search
     :param parent: The parent node which should not be included in child's reachable states.
+
+    :raises GraphCycleError: If the parent node is found in the descendants of node.
     """
     if node not in visited:
 
