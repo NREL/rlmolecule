@@ -122,6 +122,8 @@ class MCTS(GraphSearch[MCTSVertex]):
             leaf.children = [self.get_vertex_for_state(state) for state in leaf.state.get_next_actions()]
 
             for child in leaf.children:
+                # child.children is initialized to None, so this only checks nodes where a transposition pointed
+                # to an already existing node in the MCTS graph.
                 if child.children is not None:
                     dfs(set(), child, leaf)
 
