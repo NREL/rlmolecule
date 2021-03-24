@@ -1,9 +1,10 @@
 import textwrap
 
 
-def dfs(visited: set, node: 'GraphSearchState', parent: 'GraphSearchState') -> None:
+def dfs(visited: set, node: 'MCTSVertex', parent: 'MCTSVertex') -> None:
     """ A depth-first search recursion of the node's children, yielding a GraphCycleError if the parent is found
-    within the descendants of node.
+    within the descendants of node. This function only searches the cached `children` property of the vertex,
+    so if cycles are present they will only be found after they are added to the MCTS graph.
 
     :param visited: initialized with an empty set, this builds recursively.
     :param node: The child node from which to search
@@ -12,7 +13,6 @@ def dfs(visited: set, node: 'GraphSearchState', parent: 'GraphSearchState') -> N
     :raises GraphCycleError: If the parent node is found in the descendants of node.
     """
     if node not in visited:
-
         visited.add(node)
 
         if node == parent:
@@ -31,9 +31,10 @@ class GraphCycleError(Exception):
     def __str__(self):
         return (f'Cyclic edge encountered at state:\n{self.parent_node}.\n' +
                 textwrap.dedent("""
-                This library is currently only equipped to search spaces defined as handle
+                This library is currently only equipped to search spaces defined as 
                 directional acyclic graphs. Cycles inside the search graph give rise to a
-                graph history interaction problem. For more information, see:
+                graph history interaction problem, which require careful handling. For more
+                information, see:
                 
                 Childs, B. E., Brodeur, J. H., & Kocsis, L. (2008). Transpositions and move
                 groups in Monte Carlo tree search. 2008 IEEE Symposium On Computational 
