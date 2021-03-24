@@ -91,7 +91,7 @@ class AlphaZeroProblem(MCTSProblem):
                 self.session.merge(record)
                 self.session.commit()
             except exc.IntegrityError:
-                logger.debug(f"Duplicate reward entry encountered with {state}")
+                logger.debug(f"Duplicate reward entry encountered with {vertex.state}")
                 self.session.rollback()
 
         return self.reward_class(raw_reward=reward)

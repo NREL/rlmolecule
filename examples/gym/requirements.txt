@@ -1,0 +1,4 @@
+gym[atari]
+opencv-python
+scikit-image
+
