@@ -113,12 +113,14 @@ def construct_problem(
             # This is a bit of a placeholder; but the range for spin is about 1/50th that
             # of buried volume.
             reward = ((1 - max_spin) * 50 + spin_buried_vol 
-                    + 25 / (1 + np.exp(-(bde_diff - 10)))
                     + 100 * (
                 self.windowed_loss(electron_affinity, ea_range) +     
                 self.windowed_loss(ionization_energy, ie_range) + 
                 self.windowed_loss(v_diff, v_range) +         
                 self.windowed_loss(bde, bde_range)) / 4)
+                    # the addition of bde_diff was to help ensure that
+                    # the stable radical had the lowest bde in the molecule
+                    #+ 25 / (1 + np.exp(-(bde_diff - 10)))
 
             stats = {
                 'max_spin': max_spin,
