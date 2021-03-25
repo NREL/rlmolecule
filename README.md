@@ -42,8 +42,9 @@ dependencies:
 ```
 
 
-With the above file as `environment.yml`, you can install with 
+With the above file as `environment.yml`, you can install on Eagle with 
 ```bash
+module purge
 conda env create -f environment.yml --prefix /projects/rlmolecule/<USER>/envs/tf2_gpu
 ```
 
