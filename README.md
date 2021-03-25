@@ -33,6 +33,7 @@ dependencies:
   - tqdm
   - psycopg2
   - cudnn=7.6
+  - sqlalchemy
   - pip
   - pip:
     - nfp
