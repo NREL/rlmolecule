@@ -42,6 +42,11 @@ dependencies:
 ```
 
 
+With the above file as `environment.yml`, you can install with 
+```bash
+conda env create -f environment.yml --prefix /projects/rlmolecule/<USER>/envs/tf2_gpu
+```
+
 ## Usage
 
 This library is still under active development, and APIs are expected to change frequently. Currently, optimization proceeds by subclassing `alphazero.Node` to provide the expected reward function calculation. Example usage of the module is demonstrated for radical construction in `stable_radical_optimization/`.
