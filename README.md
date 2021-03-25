@@ -12,12 +12,15 @@ Code currently under development as part of the ["End-to-End Optimization for Ba
 Most dependencies for this project are installable via conda, with the exception of [nfp](https://github.com/NREL/nfp), which can be installed via pip. An example conda environment file is provided below:
 
 ```yaml
+name: tf2_gpu
 channels:
   - conda-forge
   - defaults
-  
 dependencies:
   - python=3.7
+  - xtb-python
+  - ase
+  - pytorch-cpu
   - jupyterlab
   - rdkit
   - seaborn
@@ -28,11 +31,14 @@ dependencies:
   - pymatgen
   - xlrd
   - tqdm
-  - tensorflow-gpu
   - psycopg2
+  - cudnn=7.6
   - pip
-    - pip:
-    - nfp >= 0.1.4
+  - pip:
+    - nfp
+    - networkx
+    - tensorflow-gpu==2.3.0
+    - tensorflow-addons
 ```
 
 
