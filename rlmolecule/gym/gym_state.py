@@ -1,9 +1,6 @@
-import base64
 from copy import deepcopy
 import logging
-import pickle
 from typing import Sequence
-
 
 import numpy as np
 import gym
