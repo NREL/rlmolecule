@@ -12,8 +12,8 @@ from rlmolecule.gym.gym_problem import GymProblem
 from rlmolecule.gym.gym_state import GymEnvState
 from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
 
-from examples.gym.tf_model import policy_model_2
-import examples.gym.gridworld_env as gw
+from tf_model import policy_model_2
+import gridworld_env as gw
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -35,6 +35,12 @@ class GridWorldEnv(AlphaZeroGymEnv):
 
 
 class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
+    def __init__(self, *,
+                 env: gw.GridEnv,
+                 engine: "sqlalchemy.engine.Engine",
+                 reward_class: Reward,
+                 **kwargs) -> None:
+        super().__init__(reward_class=reward_class, engine=engine, env=env, **kwargs)
 
     def policy_model(self) -> "tf.keras.Model":
         obs_shape = self.env.reset().shape
@@ -52,15 +58,30 @@ class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
             "steps": 0.*np.array([np.float64(self.env.episode_steps)])
         }
 
+    def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
+        return state.cumulative_reward, {}
 
 
 def construct_problem():
 
     from rlmolecule.tree_search.reward import RankedRewardFactory
 
-    engine = create_engine(f'sqlite:///gridworld_data.db',
-                           connect_args={'check_same_thread': False},
-                           execution_options = {"isolation_level": "AUTOCOMMIT"})
+    # engine = create_engine(f'sqlite:///gridworld_data.db',
+    #                        connect_args={'check_same_thread': False},
+    #                        execution_options = {"isolation_level": "AUTOCOMMIT"})
+
+    dbname = "bde"
+    port = "5432"
+    host = "yuma.hpc.nrel.gov"
+    user = "rlops"
+    # read the password from a file
+    passwd_file = '/projects/rlmolecule/rlops_pass'
+    with open(passwd_file, 'r') as f:
+        passwd = f.read().strip()
+
+    drivername = "postgresql+psycopg2"
+    engine_str = f'{drivername}://{user}:{passwd}@{host}:{port}/{dbname}'
+    engine = create_engine(engine_str, execution_options={"isolation_level": "AUTOCOMMIT"})
 
     run_id = "gridworld_example"
 
