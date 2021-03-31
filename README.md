@@ -37,6 +37,7 @@ dependencies:
   - pip
   - pip:
     - nfp
+    - sqlalchemy
     - networkx
     - tensorflow-gpu==2.3.0
     - tensorflow-addons
