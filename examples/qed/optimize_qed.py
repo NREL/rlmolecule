@@ -6,6 +6,7 @@ Starting point: a single carbon (C)
   - reward: 0, unless a terminal state is reached, then the qed estimate of the molecule
 """
 
+import os
 import argparse
 import pathlib
 import logging
@@ -16,7 +17,7 @@ import rdkit
 from rdkit.Chem.QED import qed
 from sqlalchemy import create_engine
 
-# logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -145,6 +146,8 @@ if __name__ == "__main__":
     if args.train_policy:
         train_model()
     elif args.rollout:
+        # make sure the rollouts do not use the GPU
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
         run_games()
     else:
         jobs = [multiprocessing.Process(target=monitor)]
