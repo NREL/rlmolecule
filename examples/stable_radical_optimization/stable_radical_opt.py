@@ -1,4 +1,4 @@
-import sys
+import os, sys
 import argparse
 import pathlib
 import logging
@@ -15,19 +15,9 @@ import rdkit
 from rdkit import Chem
 from rdkit.Chem import Mol, MolToSmiles
 
-from rlmolecule.molecule.policy import preprocessor
-
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# TODO update/incorporate this code
-sys.path.append('/projects/rlmolecule/pstjohn/models/20201031_bde/')
-from preprocess_inputs import preprocessor as bde_preprocessor
-bde_preprocessor.from_json('/projects/rlmolecule/pstjohn/models/20201031_bde/preprocessor.json')
-# TODO make this into a command-line argument(?)
-# or just store it in this directory
-#bde_preprocessor = preprocessor.load_preprocessor(saved_preprocessor_file="/projects/rlmolecule/pstjohn/models/20201031_bde/preprocessor.json")
 
 
 def construct_problem(
@@ -45,6 +35,15 @@ def construct_problem(
     #from rlmolecule.molecule.molecule_state import MoleculeState
     from examples.stable_radical_optimization.stable_radical_molecule_state import StableRadMoleculeState
     import tensorflow as tf
+
+    # TODO update/incorporate this code
+    sys.path.append('/projects/rlmolecule/pstjohn/models/20201031_bde/')
+    from preprocess_inputs import preprocessor as bde_preprocessor
+    bde_preprocessor.from_json('/projects/rlmolecule/pstjohn/models/20201031_bde/preprocessor.json')
+    # TODO make this into a command-line argument(?)
+    # or just store it in this directory
+    #bde_preprocessor = preprocessor.load_preprocessor(saved_preprocessor_file="/projects/rlmolecule/pstjohn/models/20201031_bde/preprocessor.json")
+
 
     @tf.function(experimental_relax_shapes=True)                
     def predict(model: 'tf.keras.Model', inputs):
@@ -324,6 +323,8 @@ if __name__ == "__main__":
     if args.train_policy:
         train_model(**kwargs)
     elif args.rollout:
+        # make sure the rollouts do not use the GPU
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
         run_games(**kwargs)
     else:
         print("Must specify either --train-policy or --rollout")
