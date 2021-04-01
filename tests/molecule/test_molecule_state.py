@@ -45,6 +45,7 @@ def test_serialize_deserialize(molecule):
     mol_state = MoleculeState(molecule, config)
     next_actions = list(mol_state.get_next_actions())
     string_molecule = mol_state.serialize()
-    assert type(string_molecule) == str
     new_mol = MoleculeState.deserialize(string_molecule)
+
+    assert new_mol == mol_state
     assert list(new_mol.get_next_actions()) == next_actions

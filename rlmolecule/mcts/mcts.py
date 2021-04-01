@@ -5,6 +5,7 @@ from typing import Callable, List, Optional, Type
 
 import numpy as np
 
+from rlmolecule.tree_search.dfs import dfs
 from rlmolecule.tree_search.reward import Reward
 from rlmolecule.mcts.mcts_problem import MCTSProblem
 from rlmolecule.mcts.mcts_vertex import MCTSVertex
@@ -65,7 +66,7 @@ class MCTS(GraphSearch[MCTSVertex]):
             self.sample(vertex, num_mcts_samples)
             self._accumulate_path_data(vertex, path)
             if len(vertex.children) == 0:
-                return path, self.problem.reward_wrapper(vertex.state)
+                return path, self.problem.reward_wrapper(vertex)
             logger.debug(f'{vertex} has children { {child: (round(child.value, 2), child.visit_count) for child in vertex.children} }')
             vertex = action_selection_function(vertex)
 
@@ -113,11 +114,18 @@ class MCTS(GraphSearch[MCTSVertex]):
         """
         Expansion step of MCTS
         From Wikipedia (https://en.wikipedia.org/wiki/Monte_Carlo_tree_search):
-        Expansion: Unless L ends the game decisively (e.g. win/loss/draw) for either player, create one (or more) child
-        vertices and choose vertex C from one of them. Child vertices are any valid moves from the game position defined by L.
+        Expansion: Unless L ends the game decisively (e.g. win/loss/draw) for either player, create one (or more)
+        child vertices and choose vertex C from one of them. Child vertices are any valid moves from the game
+        position defined by L.
         """
         if leaf.children is None:
             leaf.children = [self.get_vertex_for_state(state) for state in leaf.state.get_next_actions()]
+
+            for child in leaf.children:
+                # child.children is initialized to None, so this only checks nodes where a transposition pointed
+                # to an already existing node in the MCTS graph.
+                if child.children is not None:
+                    dfs(set(), child, leaf)
 
     def _evaluate(
             self,
@@ -143,7 +151,7 @@ class MCTS(GraphSearch[MCTSVertex]):
         while True:
             children = state.get_next_actions()
             if len(children) == 0:
-                return self.problem.reward_wrapper(state)
+                return self.problem.reward_wrapper(self.get_vertex_for_state(state))
             state = random.choice(children)
 
     @staticmethod

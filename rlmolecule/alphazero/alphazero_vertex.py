@@ -20,5 +20,5 @@ class AlphaZeroVertex(MCTSVertex):
         super().__init__(state)
 
         self.child_priors: Optional[Dict['AlphaZeroVertex', float]] = None  # lazily initialized
-        # self.policy_inputs: Optional[Dict[str, np.ndarray]] = None  # lazily initialized
-        # self.policy_data = None  # lazily initialized
+        self.policy_inputs: Optional[Dict[str, 'np.ndarray']] = None  # lazily initialized
+        self.policy_digest: Optional[str] = None  # lazily initialized
