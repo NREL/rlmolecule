@@ -2,7 +2,6 @@ from typing import Optional, Sequence
 
 from rdkit.Chem import Mol, MolToSmiles
 
-from rlmolecule.molecule.molecule_building import build_molecules
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
 

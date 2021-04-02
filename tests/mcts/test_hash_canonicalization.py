@@ -3,7 +3,6 @@ import random
 from rlmolecule.mcts.mcts import MCTS
 from rlmolecule.mcts.mcts_vertex import MCTSVertex
 from rlmolecule.molecule.builder.builder import MoleculeBuilder
-from rlmolecule.molecule.molecule_config import MoleculeConfig
 from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
 from tests.qed_optimization_problem import QEDWithRandomPolicy
 
