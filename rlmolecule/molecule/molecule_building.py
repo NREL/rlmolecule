@@ -4,7 +4,7 @@ import sys
 
 import numpy as np
 import rdkit
-from rlmolecule.molecule.molecule_filters import check_all_filters
+from rlmolecule.molecule.builder.gdb_filters import check_all_filters
 from rdkit import Chem
 from rdkit.Chem import RDConfig
 from rdkit.Chem.EnumerateStereoisomers import (

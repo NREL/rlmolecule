@@ -6,22 +6,22 @@ import pytest
 import tensorflow as tf
 
 from rlmolecule.alphazero.alphazero import AlphaZero
-from rlmolecule.molecule.molecule_config import MoleculeConfig
-from rlmolecule.tree_search.reward import LinearBoundedRewardFactory, RankedRewardFactory, RawRewardFactory
+from rlmolecule.molecule.builder.builder import MoleculeBuilder
+from rlmolecule.tree_search.reward import LinearBoundedRewardFactory, RankedRewardFactory
 from tests.qed_optimization_problem import QEDWithMoleculePolicy
 
 
 @pytest.fixture()
-def config():
-    return MoleculeConfig(max_atoms=4,
-                          min_atoms=1,
-                          tryEmbedding=False,
-                          sa_score_threshold=None,
-                          stereoisomers=False)
+def builder():
+    return MoleculeBuilder(max_atoms=4,
+                           min_atoms=1,
+                           tryEmbedding=False,
+                           sa_score_threshold=None,
+                           stereoisomers=False)
 
 
 @pytest.fixture(scope='function')
-def game(request, engine, tmpdirname, config):
+def game(request, engine, tmpdirname, builder):
     """
     The scope here is function, so that the problem gets recreated for each test. Otherwise the trained policy
     network doesn't need to be loaded, since the trained model already exists in the problem.
@@ -50,7 +50,7 @@ def game(request, engine, tmpdirname, config):
         raise RuntimeError(f"{name} not found")
 
     problem = QEDWithMoleculePolicy(engine,
-                                    config,
+                                    builder,
                                     features=8,
                                     num_heads=2,
                                     num_messages=1,
@@ -124,7 +124,6 @@ class TestPolicyTraining:
 
         outputs = problem.batched_policy_model(inputs)
         output_mask = problem.batched_policy_model.layers[-1].compute_mask(inputs_for_batch_layer, input_mask)
-
 
         assert output_mask[0].numpy().all(), 'no values should be masked'
 
