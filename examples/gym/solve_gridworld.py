@@ -174,6 +174,7 @@ if __name__ == "__main__":
                         help='Train the policy model only (on GPUs)')
     parser.add_argument('--rollout', action="store_true", default=False,
                         help='Run the game simulations only (on CPUs)')
+    parser.add_argument('--use_multiprocessing', action="store_true", default=False)
     parser.add_argument('--num-workers', type=int, default=7,
                         help='Number of multiprocessing workers when running local rollout')
     parser.add_argument("--num-games", type=int, default=None)
@@ -192,7 +193,7 @@ if __name__ == "__main__":
             use_mcts=args.use_mcts,
             num_mcts_samples=args.num_mcts_samples,
             num_games=args.num_games)
-    else:
+    elif args.use_multiprocessing:
         assert args.num_workers >= 3  # need at least 3 workers here...
 
         import multiprocessing
@@ -211,4 +212,6 @@ if __name__ == "__main__":
 
         for job in jobs:
             job.join(300)
+    else:
+        print("No arguments given!")
 
