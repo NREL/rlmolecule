@@ -281,7 +281,13 @@ def construct_problem(
 
 def run_games(**kwargs):
     from rlmolecule.alphazero.alphazero import AlphaZero
-    game = AlphaZero(construct_problem(**kwargs))
+    dirichlet_alpha = 1.0
+    dirichlet_x = 0.5
+    game = AlphaZero(
+            construct_problem(**kwargs),
+            dirichlet_alpha=dirichlet_alpha,
+            dirichlet_x=dirichlet_x, 
+            )
     while True:
         path, reward = game.run(num_mcts_samples=50)
         #logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
