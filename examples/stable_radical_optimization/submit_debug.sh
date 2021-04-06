@@ -3,14 +3,13 @@
 #SBATCH --account=rlmolecule
 #SBATCH --time=1:00:00
 #SBATCH --job-name=test_stable_rad_opt
-#SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --mail-user=jlaw@nrel.gov
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:2
 #SBATCH --ntasks=9
 #SBATCH --cpus-per-task=4
 
-export WORKING_DIR=/scratch/${USER}/rlmolecule/stable_radical_optimization/
+export WORKING_DIR=/scratch/${USER}/rlmolecule/stable_radical_optimization
+mkdir -p $WORKING_DIR
 export START_POLICY_SCRIPT="$SLURM_SUBMIT_DIR/$JOB/.policy.sh"
 export START_ROLLOUT_SCRIPT="$SLURM_SUBMIT_DIR/$JOB/.rollout.sh"
 
@@ -50,8 +49,8 @@ srun --gres=gpu:1 --ntasks=1 --cpus-per-task=4 \
     --output=$WORKING_DIR/gpu.%j.out \
     "$START_POLICY_SCRIPT" &
 
-# and run 8 cpu rollout jobs
-srun --gres=gpu:0 --ntasks=8 --cpus-per-task=4 \
+# and run 16 cpu rollout jobs
+srun --gres=gpu:0 --ntasks=16 --cpus-per-task=2 \
     --output=$WORKING_DIR/mcts.%j.out \
     "$START_ROLLOUT_SCRIPT"
 
