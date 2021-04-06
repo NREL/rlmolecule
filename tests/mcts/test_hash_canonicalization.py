@@ -2,19 +2,19 @@ import random
 
 from rlmolecule.mcts.mcts import MCTS
 from rlmolecule.mcts.mcts_vertex import MCTSVertex
-from rlmolecule.molecule.molecule_config import MoleculeConfig
+from rlmolecule.molecule.builder.builder import MoleculeBuilder
 from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
 from tests.qed_optimization_problem import QEDWithRandomPolicy
 
 
 def test_get_successors(engine):
-    config = MoleculeConfig(max_atoms=4,
-                            min_atoms=1,
-                            tryEmbedding=False,
-                            sa_score_threshold=None,
-                            stereoisomers=False)
+    builder = MoleculeBuilder(max_atoms=4,
+                              min_atoms=1,
+                              tryEmbedding=False,
+                              sa_score_threshold=None,
+                              stereoisomers=False)
 
-    problem = QEDWithRandomPolicy(reward_class=LinearBoundedRewardFactory(), config=config, engine=engine)
+    problem = QEDWithRandomPolicy(reward_class=LinearBoundedRewardFactory(), builder=builder, engine=engine)
     game = MCTS(problem)
     root: MCTSVertex = game._get_root()
     game._expand(root)

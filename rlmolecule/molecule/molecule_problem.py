@@ -7,7 +7,6 @@ import sqlalchemy
 
 from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
 from rlmolecule.mcts.mcts_problem import MCTSProblem
-from rlmolecule.molecule.molecule_config import MoleculeConfig
 from rlmolecule.molecule.molecule_state import MoleculeState
 from rlmolecule.molecule.policy.model import policy_model
 from rlmolecule.molecule.policy.preprocessor import MolPreprocessor, load_preprocessor
@@ -17,10 +16,10 @@ logger = logging.getLogger(__name__)
 
 class MoleculeProblem(MCTSProblem, ABC):
     def __init__(self,
-                 config: MoleculeConfig,
+                 builder: 'MoleculeBuilder',
                  *args,
                  **kwargs):
-        self._config = config
+        self._config = builder
         super(MoleculeProblem, self).__init__(*args, **kwargs)
 
     def get_initial_state(self) -> MoleculeState:
@@ -30,7 +29,7 @@ class MoleculeProblem(MCTSProblem, ABC):
 class MoleculeTFAlphaZeroProblem(MoleculeProblem, TFAlphaZeroProblem, ABC):
     def __init__(self,
                  engine: sqlalchemy.engine.Engine,
-                 config: MoleculeConfig,
+                 builder: 'MoleculeBuilder',
                  preprocessor: Optional[MolPreprocessor] = None,
                  preprocessor_data: Optional[str] = None,
                  features: int = 64,
@@ -41,7 +40,7 @@ class MoleculeTFAlphaZeroProblem(MoleculeProblem, TFAlphaZeroProblem, ABC):
         self.num_heads = num_heads
         self.features = features
         self.preprocessor = preprocessor if preprocessor else load_preprocessor(preprocessor_data)
-        super(MoleculeTFAlphaZeroProblem, self).__init__(config=config, engine=engine, **kwargs)
+        super(MoleculeTFAlphaZeroProblem, self).__init__(builder=builder, engine=engine, **kwargs)
 
     def policy_model(self) -> 'tf.keras.Model':
         return policy_model(

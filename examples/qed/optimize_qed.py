@@ -7,16 +7,17 @@ Starting point: a single carbon (C)
 """
 
 import argparse
-import pathlib
 import logging
 import multiprocessing
+import os
 import time
 
 import rdkit
 from rdkit.Chem.QED import qed
 from sqlalchemy import create_engine
 
-# logging.basicConfig(level=logging.INFO)
+
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -26,17 +27,17 @@ def construct_problem():
     # import tensorflow, especially if there's a chance we'll use tf.serving to do the policy / reward evaluations on
     # the workers. Might require upstream changes to nfp as well.
     from rlmolecule.tree_search.reward import RankedRewardFactory
-    from rlmolecule.molecule.molecule_config import MoleculeConfig
     from rlmolecule.molecule.molecule_problem import MoleculeTFAlphaZeroProblem
     from rlmolecule.molecule.molecule_state import MoleculeState
+    from rlmolecule.molecule.builder.builder import MoleculeBuilder
 
     class QEDOptimizationProblem(MoleculeTFAlphaZeroProblem):
 
         def __init__(self,
                      engine: 'sqlalchemy.engine.Engine',
-                     config: 'MoleculeConfig', **kwargs) -> None:
-            super(QEDOptimizationProblem, self).__init__(engine, config, **kwargs)
-            self._config = config
+                     builder: 'MoleculeBuilder', **kwargs) -> None:
+            super(QEDOptimizationProblem, self).__init__(engine, builder, **kwargs)
+            self._config = builder
 
         def get_initial_state(self) -> MoleculeState:
             return MoleculeState(rdkit.Chem.MolFromSmiles('C'), self._config)
@@ -46,13 +47,13 @@ def construct_problem():
                 return qed(state.molecule), {'forced_terminal': True, 'smiles': state.smiles}
             return 0.0, {'forced_terminal': False, 'smiles': state.smiles}
 
-    config = MoleculeConfig(max_atoms=25,
-                            min_atoms=1,
-                            tryEmbedding=True,
-                            sa_score_threshold=4.,
-                            stereoisomers=False)
+    builder = MoleculeBuilder(max_atoms=25,
+                              min_atoms=1,
+                              tryEmbedding=True,
+                              sa_score_threshold=4.,
+                              stereoisomers=False)
 
-    #engine = create_engine(f'sqlite:///qed_data.db',
+    # engine = create_engine(f'sqlite:///qed_data.db',
     #                       connect_args={'check_same_thread': False},
     #                       execution_options = {"isolation_level": "AUTOCOMMIT"})
     dbname = "bde"
@@ -80,7 +81,7 @@ def construct_problem():
 
     problem = QEDOptimizationProblem(
         engine,
-        config,
+        builder,
         run_id=run_id,
         reward_class=reward_factory,
         features=8,
@@ -108,7 +109,6 @@ def train_model():
 
 
 def monitor():
-
     from rlmolecule.sql.tables import RewardStore
     problem = construct_problem()
 
@@ -145,6 +145,8 @@ if __name__ == "__main__":
     if args.train_policy:
         train_model()
     elif args.rollout:
+        # make sure the rollouts do not use the GPU
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
         run_games()
     else:
         jobs = [multiprocessing.Process(target=monitor)]
