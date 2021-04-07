@@ -109,6 +109,10 @@ class RankedRewardFactory(RewardFactory):
         self._has_enough_games = False
 
     def _scale(self, reward: float) -> float:
+        """Convert the continuous reward value into either a win or loss based on the previous games played.
+        If the reward for this game is > the previous *ranked_reward_alpha* fraction of games (e.g., 90% of games), 
+        then this reward is a win. Otherwise, it's a loss.
+        """
 
         all_games = self._session.query(GameStore).filter_by(run_id=self.run_id)
 
