@@ -16,12 +16,14 @@ import rdkit
 from rdkit.Chem.QED import qed
 from sqlalchemy import create_engine
 
+from examples.run_config import Run_Config
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def construct_problem():
+def construct_problem(run_config):
     # We have to delay all importing of tensorflow until the child processes launch,
     # see https://github.com/tensorflow/tensorflow/issues/8220. We should be more careful about where / when we
     # import tensorflow, especially if there's a chance we'll use tf.serving to do the policy / reward evaluations on
@@ -47,36 +49,29 @@ def construct_problem():
                 return qed(state.molecule), {'forced_terminal': True, 'smiles': state.smiles}
             return 0.0, {'forced_terminal': False, 'smiles': state.smiles}
 
-    builder = MoleculeBuilder(max_atoms=25,
-                              min_atoms=1,
-                              tryEmbedding=True,
-                              sa_score_threshold=4.,
-                              stereoisomers=False)
+    prob_config = run_config.problem_config
+    builder = MoleculeBuilder(
+        max_atoms=prob_config.get('max_atoms',25),
+        min_atoms=prob_config.get('min_atoms',1),
+        tryEmbedding=prob_config.get('tryEmbedding',True),
+        sa_score_threshold=prob_config.get('sa_score_threshold',4),
+        stereoisomers=prob_config.get('stereoisomers',False)
+    )
 
+    engine = run_config.start_engine()
     # engine = create_engine(f'sqlite:///qed_data.db',
     #                       connect_args={'check_same_thread': False},
     #                       execution_options = {"isolation_level": "AUTOCOMMIT"})
-    dbname = "bde"
-    port = "5432"
-    host = "yuma.hpc.nrel.gov"
-    user = "rlops"
-    # read the password from a file
-    passwd_file = '/projects/rlmolecule/rlops_pass'
-    with open(passwd_file, 'r') as f:
-        passwd = f.read().strip()
 
-    drivername = "postgresql+psycopg2"
-    engine_str = f'{drivername}://{user}:{passwd}@{host}:{port}/{dbname}'
-    engine = create_engine(engine_str, execution_options={"isolation_level": "AUTOCOMMIT"})
+    run_id = run_config.run_id
 
-    run_id = 'qed_example_test'
-
+    az_config = run_config.alphazero_config
     reward_factory = RankedRewardFactory(
         engine=engine,
         run_id=run_id,
-        reward_buffer_min_size=10,
-        reward_buffer_max_size=50,
-        ranked_reward_alpha=0.75
+        reward_buffer_min_size=az_config.get('reward_buffer_min_size',10),
+        reward_buffer_max_size=az_config.get('reward_buffer_max_size',50),
+        ranked_reward_alpha=az_config.get('ranked_reward_alpha',0.75)
     )
 
     problem = QEDOptimizationProblem(
@@ -88,29 +83,43 @@ def construct_problem():
         num_heads=2,
         num_messages=1,
         min_buffer_size=15,
-        policy_checkpoint_dir='policy_checkpoints'
+        policy_checkpoint_dir=prob_config.get(
+            'policy_checkpoints_dir', 'policy_checkpoints')
     )
 
     return problem
 
 
-def run_games():
+def run_games(run_config):
     from rlmolecule.alphazero.alphazero import AlphaZero
-    game = AlphaZero(construct_problem())
+    config = run_config.mcts_config
+    game = AlphaZero(
+        construct_problem(run_config),
+        min_reward=config.get('min_reward',0.0),
+        pb_c_base=config.get('pb_c_base',1.0),
+        pb_c_init=config.get('pb_c_init',1.25),
+        dirichlet_noise=config.get('dirichlet_noise',True),
+        dirichlet_alpha=config.get('dirichlet_alpha',1.0),
+        dirichlet_x=config.get('dirichlet_x',0.25),
+    )
     while True:
-        path, reward = game.run(num_mcts_samples=50)
+        path, reward = game.run(
+            num_mcts_samples=config.get('num_mcts_samples',50)
+        )
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
 
 
-def train_model():
-    construct_problem().train_policy_model(steps_per_epoch=100,
-                                           game_count_delay=20,
-                                           verbose=2)
+def train_model(run_config):
+    config = run_config.train_config
+    construct_problem(run_config).train_policy_model(
+        steps_per_epoch=config.get('steps_per_epoch', 100),
+        game_count_delay=config.get('game_count_delay', 20),
+        verbose=config.get('verbose', 2))
 
 
-def monitor():
+def monitor(run_config):
     from rlmolecule.sql.tables import RewardStore
-    problem = construct_problem()
+    problem = construct_problem(run_config)
 
     while True:
         best_reward = problem.session.query(RewardStore) \
@@ -130,6 +139,8 @@ def setup_argparser():
     parser = argparse.ArgumentParser(
         description='Run the QED optimization. Default is to run the script locally')
 
+    parser.add_argument('--config', type=str,
+                        help='Configuration file')
     parser.add_argument('--train-policy', action="store_true", default=False,
                         help='Train the policy model only (on GPUs)')
     parser.add_argument('--rollout', action="store_true", default=False,
@@ -142,21 +153,23 @@ if __name__ == "__main__":
     parser = setup_argparser()
     args = parser.parse_args()
 
+    run_config = Run_Config(args.config)
+
     if args.train_policy:
-        train_model()
+        train_model(run_config)
     elif args.rollout:
         # make sure the rollouts do not use the GPU
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-        run_games()
+        run_games(run_config)
     else:
-        jobs = [multiprocessing.Process(target=monitor)]
+        jobs = [multiprocessing.Process(target=monitor, args=(run_config,))]
         jobs[0].start()
         time.sleep(1)
 
         for i in range(5):
-            jobs += [multiprocessing.Process(target=run_games)]
+            jobs += [multiprocessing.Process(target=run_games, args=(run_config,))]
 
-        jobs += [multiprocessing.Process(target=train_model)]
+        jobs += [multiprocessing.Process(target=train_model, args=(run_config,))]
 
         for job in jobs[1:]:
             job.start()

@@ -1,0 +1,49 @@
+# Optimize the Quantitative Estimate of Drug-likeness (QED)
+# See https://www.rdkit.org/docs/source/rdkit.Chem.QED.html
+# Starting point: a single carbon (C)
+#   - actions: add a bond or an atom
+#   - state: molecule state
+#   - reward: 0, unless a terminal state is reached, then the qed estimate of the molecule
+
+run_config:
+    run_id: 'qed_example'
+
+# Parameters for setting up the problem
+problem_config:
+    max_atoms: 200
+    min_atoms: 1
+    policy_checkpoint_dir: 'policy_checkpoints'
+
+# Parameters for training the policy model
+train_config:
+    ranked_reward_alpha: 0.75
+    reward_buffer_max_size: 50
+    reward_buffer_min_size: 10
+    steps_per_epoch: 100
+    game_count_delay: 20
+    verbose: 2
+    # TODO use these parameters and add the rest
+    #policy_buffer_max_size: 256
+    #policy_buffer_min_size: 128
+
+# Parameters for running the Monte Carlo Tree Search games
+mcts_config:
+    num_mcts_samples: 500
+    min_reward: 0
+    pbc_c_base: 1.0
+    pbc_c_init: 1.25
+    dirichlet_alpha: 1.0
+    dirichlet_x: 0.25
+    #max_depth: 1000000
+
+# Database settings for the Object Relational Model (ORM)
+# Used to store games and communicate between the policy model (run on GPUs) and rollout (run on CPUs)
+sql_database:
+   # settings to connect to NREL's yuma database
+   drivername: "postgresql+psycopg2"
+   dbname: "bde"
+   port: "5432"
+   host: "yuma.hpc.nrel.gov"
+   user: "rlops"
+   # read the password from a file
+   passwd_file: '/projects/rlmolecule/rlops_pass'
