@@ -6,7 +6,7 @@ import pytest
 
 from rlmolecule.alphazero.alphazero import AlphaZero
 from rlmolecule.mcts.mcts import MCTS
-from rlmolecule.molecule.molecule_config import MoleculeConfig
+from rlmolecule.molecule.builder.builder import MoleculeBuilder
 from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
 from tests.qed_optimization_problem import QEDWithMoleculePolicy, QEDWithRandomPolicy
 
@@ -14,19 +14,19 @@ from tests.qed_optimization_problem import QEDWithMoleculePolicy, QEDWithRandomP
 @pytest.fixture
 def problem(request, engine):
     name = request.param
-    config = MoleculeConfig(max_atoms=4,
-                            min_atoms=1,
-                            tryEmbedding=False,
-                            sa_score_threshold=None,
-                            stereoisomers=False)
+    builder = MoleculeBuilder(max_atoms=4,
+                             min_atoms=1,
+                             tryEmbedding=False,
+                             sa_score_threshold=None,
+                             stereoisomers=False)
 
     if name == 'random':
         return QEDWithRandomPolicy(reward_class=LinearBoundedRewardFactory(),
-                                   config=config,
+                                   builder=builder,
                                    engine=engine)
     if name == 'MoleculePolicy':
         return QEDWithMoleculePolicy(reward_class=LinearBoundedRewardFactory(),
-                                     config=config,
+                                     builder=builder,
                                      engine=engine,
                                      features=8,
                                      num_heads=2,
