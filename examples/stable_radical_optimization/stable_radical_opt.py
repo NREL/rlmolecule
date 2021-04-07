@@ -30,7 +30,7 @@ def construct_problem(
     # import tensorflow, especially if there's a chance we'll use tf.serving to do the policy / reward evaluations on
     # the workers. Might require upstream changes to nfp as well.
     from rlmolecule.tree_search.reward import RankedRewardFactory
-    from rlmolecule.molecule.molecule_config import MoleculeConfig
+    from rlmolecule.molecule.builder.builder import MoleculeBuilder
     from rlmolecule.molecule.molecule_problem import MoleculeTFAlphaZeroProblem
     #from rlmolecule.molecule.molecule_state import MoleculeState
     from examples.stable_radical_optimization.stable_radical_molecule_state import StableRadMoleculeState
@@ -53,20 +53,20 @@ def construct_problem(
 
         def __init__(self,
                      engine: 'sqlalchemy.engine.Engine',
-                     config: 'MoleculeConfig',
+                     builder: 'MoleculeBuilder',
                      stability_model: 'tf.keras.Model',
                      redox_model: 'tf.keras.Model',
                      bde_model: 'tf.keras.Model',
                      **kwargs) -> None:
-            super(StableRadOptProblem, self).__init__(engine, config, **kwargs)
             self.engine = engine
-            self._config = config
+            self._builder = builder
             self.stability_model = stability_model
             self.redox_model = redox_model
             self.bde_model = bde_model
+            super(StableRadOptProblem, self).__init__(engine, builder, **kwargs)
 
         def get_initial_state(self) -> StableRadMoleculeState:
-            return StableRadMoleculeState(rdkit.Chem.MolFromSmiles('C'), self._config)
+            return StableRadMoleculeState(rdkit.Chem.MolFromSmiles('C'), self._builder)
 
         def get_reward(self, state: StableRadMoleculeState) -> Tuple[float, dict]:
             # Node is outside the domain of validity
@@ -225,13 +225,14 @@ def construct_problem(
     redox_model = tf.keras.models.load_model(redox_model, compile=False)
     bde_model = tf.keras.models.load_model(bde_model, compile=False)
 
-    config = MoleculeConfig(max_atoms=15,
-                            min_atoms=4,
-                            tryEmbedding=True,
-                            sa_score_threshold=3.5,
-                            stereoisomers=True,
-                            atom_additions=('C', 'N', 'O', 'S'),
-                            )
+    builder = MoleculeBuilder(
+            max_atoms=15,
+            min_atoms=4,
+            tryEmbedding=True,
+            sa_score_threshold=3.5,
+            stereoisomers=True,
+            atom_additions=('C', 'N', 'O', 'S'),
+            )
 
     #engine = create_engine(f'sqlite:///stable_radical.db',
     #                       connect_args={'check_same_thread': False},
@@ -261,7 +262,7 @@ def construct_problem(
 
     problem = StableRadOptProblem(
         engine,
-        config,
+        builder,
         stability_model,
         redox_model,
         bde_model,

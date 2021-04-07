@@ -5,7 +5,7 @@ from rdkit import Chem
 from rdkit.Chem import Mol, MolToSmiles
 
 from rlmolecule.molecule.molecule_state import MoleculeState
-from rlmolecule.molecule.molecule_building import get_free_valence, build_molecules
+from rlmolecule.molecule.builder.builder import AddNewAtomsAndBonds
 
 
 class StableRadMoleculeState(MoleculeState):
@@ -19,27 +19,21 @@ class StableRadMoleculeState(MoleculeState):
 
     def __init__(self,
                  molecule: Mol,
-                 config: any,
+                 builder: any,
                  force_terminal: bool = False,
                  smiles: Optional[str] = None,
                  ) -> None:
-        super(StableRadMoleculeState, self).__init__(molecule, config, force_terminal, smiles)
+        super(StableRadMoleculeState, self).__init__(molecule, builder, force_terminal, smiles)
 
     def get_next_actions(self) -> Sequence['StableRadMoleculeState']:
         result = []
         if not self._forced_terminal:
-            if self.num_atoms < self.config.max_atoms:
-                result.extend((StableRadMoleculeState(molecule, self.config) for molecule in
-                            build_molecules(
-                                self.molecule,
-                                atom_additions=self.config.atom_additions,
-                                stereoisomers=self.config.stereoisomers,
-                                sa_score_threshold=self.config.sa_score_threshold,
-                                tryEmbedding=self.config.tryEmbedding
-                            )))
+            if self.num_atoms < self.builder.max_atoms:
+                result.extend((StableRadMoleculeState(molecule, self.builder) 
+                    for molecule in self.builder(self.molecule)))
 
-            if self.num_atoms >= self.config.min_atoms:
-                result.extend((StableRadMoleculeState(radical, self.config, force_terminal=True)
+            if self.num_atoms >= self.builder.min_atoms:
+                result.extend((StableRadMoleculeState(radical, self.builder, force_terminal=True)
                     for radical in build_radicals(self.molecule)
                                ))
 
@@ -52,7 +46,7 @@ def build_radicals(starting_mol):
     generated_smiles = set()
     
     for i, atom in enumerate(starting_mol.GetAtoms()):
-        if get_free_valence(atom) > 0:
+        if AddNewAtomsAndBonds._get_free_valence(atom) > 0:
             rw_mol = rdkit.Chem.RWMol(starting_mol)
             rw_mol.GetAtomWithIdx(i).SetNumRadicalElectrons(1)
             
