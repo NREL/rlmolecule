@@ -12,6 +12,8 @@ export WORKING_DIR=/scratch/${USER}/rlmolecule/stable_radical_optimization
 mkdir -p $WORKING_DIR
 export START_POLICY_SCRIPT="$SLURM_SUBMIT_DIR/$JOB/.policy.sh"
 export START_ROLLOUT_SCRIPT="$SLURM_SUBMIT_DIR/$JOB/.rollout.sh"
+# make sure the base folder of the repo is on the python path
+export PYTHONPATH="$(readlink -e ../../):$PYTHONPATH"
 
 model_dir="/projects/rlmolecule/pstjohn/models/"; 
 stability_model="$model_dir/20210214_radical_stability_new_data/"
@@ -20,7 +22,6 @@ bde_model="$model_dir/20210216_bde_new_nfp/"
 
 cat << EOF > "$START_POLICY_SCRIPT"
 #!/bin/bash
-export PYTHONPATH="/home/jlaw/projects/arpa-e/rlmolecule_fork:$PYTHONPATH"
 source /nopt/nrel/apps/anaconda/5.3/etc/profile.d/conda.sh; 
 conda activate /projects/rlmolecule/pstjohn/envs/tf2_gpu
 python -u stable_radical_opt.py --train-policy \
@@ -31,7 +32,6 @@ EOF
 
 cat << EOF > "$START_ROLLOUT_SCRIPT"
 #!/bin/bash
-export PYTHONPATH="/home/jlaw/projects/arpa-e/rlmolecule_fork:$PYTHONPATH"
 source /nopt/nrel/apps/anaconda/5.3/etc/profile.d/conda.sh; 
 conda activate /projects/rlmolecule/pstjohn/envs/tf2_cpu
 python -u stable_radical_opt.py --rollout \
