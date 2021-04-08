@@ -11,6 +11,9 @@ run_id: 'qed_example_local'
 problem_config:
     max_atoms: 25
     min_atoms: 1
+    try_embedding: True
+    sa_score_threshold: 4
+    stereoisomers: False
 
 # Parameters for training the policy model
 train_config:
