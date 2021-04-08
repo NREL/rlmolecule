@@ -11,6 +11,7 @@ import logging
 import multiprocessing
 import os
 import time
+import math
 
 import rdkit
 from rdkit.Chem.QED import qed
@@ -65,13 +66,13 @@ def construct_problem(run_config):
 
     run_id = run_config.run_id
 
-    az_config = run_config.alphazero_config
+    train_config = run_config.alphazero_config
     reward_factory = RankedRewardFactory(
         engine=engine,
         run_id=run_id,
-        reward_buffer_min_size=az_config.get('reward_buffer_min_size',10),
-        reward_buffer_max_size=az_config.get('reward_buffer_max_size',50),
-        ranked_reward_alpha=az_config.get('ranked_reward_alpha',0.75)
+        reward_buffer_min_size=train_config.get('reward_buffer_min_size', 10),
+        reward_buffer_max_size=train_config.get('reward_buffer_max_size', 50),
+        ranked_reward_alpha=train_config.get('ranked_reward_alpha', 0.75)
     )
 
     problem = QEDOptimizationProblem(
@@ -79,11 +80,13 @@ def construct_problem(run_config):
         builder,
         run_id=run_id,
         reward_class=reward_factory,
-        features=8,
-        num_heads=2,
-        num_messages=1,
-        min_buffer_size=15,
-        policy_checkpoint_dir=prob_config.get(
+        num_messages=train_config.get('num_messages', 1),
+        num_heads=train_config.get('num_heads', 2),
+        features=train_config.get('features', 8),
+        max_buffer_size=train_config.get('max_buffer_size', 200),
+        min_buffer_size=train_config.get('min_buffer_size', 15),
+        batch_size=train_config.get('batch_size', 32),
+        policy_checkpoint_dir=train_config.get(
             'policy_checkpoints_dir', 'policy_checkpoints')
     )
 
@@ -101,10 +104,13 @@ def run_games(run_config):
         dirichlet_noise=config.get('dirichlet_noise',True),
         dirichlet_alpha=config.get('dirichlet_alpha',1.0),
         dirichlet_x=config.get('dirichlet_x',0.25),
+        # MCTS parameters
+        ucb_constant=config.get('ucb_constant',math.sqrt(2)),
     )
     while True:
         path, reward = game.run(
-            num_mcts_samples=config.get('num_mcts_samples',50)
+            num_mcts_samples=config.get('num_mcts_samples',50),
+            max_depth=config.get('max_depth',1000000),
         )
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
 
@@ -113,8 +119,11 @@ def train_model(run_config):
     config = run_config.train_config
     construct_problem(run_config).train_policy_model(
         steps_per_epoch=config.get('steps_per_epoch', 100),
+        lr=float(config.get('lr', 1E-3)),
+        epochs=int(config.get('epochs', 1E4)),
         game_count_delay=config.get('game_count_delay', 20),
-        verbose=config.get('verbose', 2))
+        verbose=config.get('verbose', 2)
+    )
 
 
 def monitor(run_config):
