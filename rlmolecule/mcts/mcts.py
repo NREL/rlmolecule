@@ -21,6 +21,7 @@ class MCTS(GraphSearch[MCTSVertex]):
             problem: MCTSProblem,
             ucb_constant: float = math.sqrt(2),
             vertex_class: Optional[Type[MCTSVertex]] = None,
+            **kwargs
     ) -> None:
         super().__init__(MCTSVertex if vertex_class is None else vertex_class)
         self._problem: MCTSProblem = problem
