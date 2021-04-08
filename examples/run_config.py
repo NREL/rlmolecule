@@ -12,11 +12,13 @@ from sqlalchemy import create_engine
 class Run_Config:
     def __init__(self, config_file, **kwargs):
 
-        with open(config_file, 'r') as f:
-            #self.config_map = yaml.safe_load(f)
-            # expandvars is a neat trick to expand bash variables within the yaml file
-            # from here: https://stackoverflow.com/a/60283894/7483950
-            self.config_map = yaml.safe_load(os.path.expandvars(f.read()))
+        self.config_map = {}
+        if config_file is not None:
+            with open(config_file, 'r') as f:
+                #self.config_map = yaml.safe_load(f)
+                # expandvars is a neat trick to expand bash variables within the yaml file
+                # from here: https://stackoverflow.com/a/60283894/7483950
+                self.config_map = yaml.safe_load(os.path.expandvars(f.read()))
 
         # TODO overwrite settings in the config file if they were passed in via kwargs
         # Settings for setting up scripts to run everything
