@@ -76,6 +76,9 @@ def construct_problem(
                 return 0.0, {'forced_terminal': False, 'smiles': state.smiles}
 
             if state.forced_terminal:
+                # 2021-04-08 jlaw9: attempt to increase structural diversity among molecules
+                # by returning a reward of 0 for states already seen
+                # TODO should we modify the reward wrapper?
                 reward, stats = self.calc_reward(state)
                 stats.update({'forced_terminal': True, 'smiles': state.smiles})
                 return reward, stats
@@ -169,7 +172,6 @@ def construct_problem(
             radical_rank = Chem.CanonicalRankAtoms(mol, includeChirality=True)[radical_index]
 
             mol_smiles = Chem.MolToSmiles(mol)
-            # TODO this line seems redundant
             mol = Chem.MolFromSmiles(mol_smiles)
 
             radical_index_reordered = list(Chem.CanonicalRankAtoms(
@@ -250,7 +252,8 @@ def construct_problem(
     engine_str = f'{drivername}://{user}:{passwd}@{host}:{port}/{dbname}'
     engine = create_engine(engine_str, execution_options={"isolation_level": "AUTOCOMMIT"})
 
-    run_id = 'stable_radical_optimization'
+    #run_id = 'stable_radical_optimization'
+    run_id = '20210408_mol_diversity-2'
 
     reward_factory = RankedRewardFactory(
         engine=engine,

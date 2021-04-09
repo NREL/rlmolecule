@@ -63,7 +63,7 @@ class AlphaZeroProblem(MCTSProblem):
     def session(self) -> 'sqlalchemy.orm.session.Session':
         return self._session
 
-    def reward_wrapper(self, vertex: AlphaZeroVertex) -> Reward:
+    def reward_wrapper(self, vertex: AlphaZeroVertex, zero_for_seen=False) -> Reward:
         """A wrapper that caches reward calculations in a SQL database, and calls self.get_scaled_reward
 
         :param vertex: The vertex for which state rewards are cached
@@ -75,7 +75,12 @@ class AlphaZeroProblem(MCTSProblem):
         existing_record = self.session.query(RewardStore).get((policy_digest, vertex.state.hash(), self.run_id))
 
         if existing_record is not None:
-            reward = existing_record.reward
+            if zero_for_seen:
+                # 2021-04-08 jlaw9: attempt to increase structural diversity among molecules
+                # by returning a reward of 0 for states already seen
+                reward = 0.0
+            else:
+                reward = existing_record.reward
 
         else:
             reward, data = self.get_reward(vertex.state)

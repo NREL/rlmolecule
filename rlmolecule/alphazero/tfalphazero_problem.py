@@ -174,7 +174,9 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
         # Log the time as well as the epoch to synchronize with the game rewards
         csv_logger = TimeCsvLogger(
             os.path.join(self.policy_checkpoint_dir, 'log.csv'),
-            separator=',', append=False)
+            separator=',', 
+            # Temporarily set to true while running jobs on the debug queue
+            append=True)
 
         # Ensure the the policy checkpoint directory exists
         Path(self.policy_checkpoint_dir).mkdir(parents=True, exist_ok=True)

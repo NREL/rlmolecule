@@ -66,7 +66,7 @@ class MCTS(GraphSearch[MCTSVertex]):
             self.sample(vertex, num_mcts_samples)
             self._accumulate_path_data(vertex, path)
             if len(vertex.children) == 0:
-                return path, self.problem.reward_wrapper(vertex)
+                return path, self.problem.reward_wrapper(vertex, zero_for_seen=False)
             logger.debug(f'{vertex} has children { {child: (round(child.value, 2), child.visit_count) for child in vertex.children} }')
             vertex = action_selection_function(vertex)
 
@@ -151,7 +151,7 @@ class MCTS(GraphSearch[MCTSVertex]):
         while True:
             children = state.get_next_actions()
             if len(children) == 0:
-                return self.problem.reward_wrapper(self.get_vertex_for_state(state))
+                return self.problem.reward_wrapper(self.get_vertex_for_state(state), zero_for_seen=True)
             state = random.choice(children)
 
     @staticmethod
