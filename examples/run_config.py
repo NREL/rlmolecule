@@ -39,7 +39,7 @@ class RunConfig:
     #     return config_map
 
     def start_engine(self):
-        self.engine = Run_Config.start_db_engine(
+        self.engine = RunConfig.start_db_engine(
             **self.config_map.get('sql_database', {}))
         return self.engine
 
@@ -57,7 +57,7 @@ class RunConfig:
                 connect_args={'check_same_thread': False},
                 execution_options={"isolation_level": "AUTOCOMMIT"})
         else:
-            engine = Run_Config.start_server_db_engine(**kwargs)
+            engine = RunConfig.start_server_db_engine(**kwargs)
 
         return engine
 
