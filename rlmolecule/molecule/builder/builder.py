@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 from abc import ABC, abstractmethod
@@ -17,6 +18,7 @@ import sascorer
 
 pt = Chem.GetPeriodicTable()
 bond_orders = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE, Chem.BondType.TRIPLE]
+logger = logging.getLogger(__name__)
 
 
 class MoleculeBuilder:
@@ -182,4 +184,8 @@ class EmbeddingFilter(MoleculeFilter):
 
 class GdbFilter(MoleculeFilter):
     def filter(self, molecule: rdkit.Chem.Mol) -> bool:
-        return check_all_filters(molecule)
+        try:
+            return check_all_filters(molecule)
+        except Exception as ex:
+            logger.warning(f"Issue with GDBFilter and molecule {Chem.MolToSmiles(molecule)}: {ex}")
+            return False
