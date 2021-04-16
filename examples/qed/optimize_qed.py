@@ -57,7 +57,7 @@ def construct_problem(run_config):
 
     run_id = run_config.run_id
 
-    train_config = run_config.alphazero_config
+    train_config = run_config.train_config
     reward_factory = RankedRewardFactory(
         engine=engine,
         run_id=run_id,
