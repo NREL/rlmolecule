@@ -8,17 +8,15 @@ Starting point: a single carbon (C)
 
 import argparse
 import logging
+import math
 import multiprocessing
 import os
 import time
-import math
 
 import rdkit
 from rdkit.Chem.QED import qed
-from sqlalchemy import create_engine
 
-from examples.run_config import Run_Config
-
+from examples.run_config import RunConfig
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -35,13 +33,6 @@ def construct_problem(run_config):
     from rlmolecule.molecule.builder.builder import MoleculeBuilder
 
     class QEDOptimizationProblem(MoleculeTFAlphaZeroProblem):
-
-        def __init__(self,
-                     engine: 'sqlalchemy.engine.Engine',
-                     builder: 'MoleculeBuilder', **kwargs) -> None:
-            super(QEDOptimizationProblem, self).__init__(engine, builder, **kwargs)
-            self._config = builder
-
         def get_initial_state(self) -> MoleculeState:
             return MoleculeState(rdkit.Chem.MolFromSmiles('C'), self._config)
 
@@ -52,11 +43,11 @@ def construct_problem(run_config):
 
     prob_config = run_config.problem_config
     builder = MoleculeBuilder(
-        max_atoms=prob_config.get('max_atoms',25),
-        min_atoms=prob_config.get('min_atoms',1),
-        tryEmbedding=prob_config.get('tryEmbedding',True),
-        sa_score_threshold=prob_config.get('sa_score_threshold',4),
-        stereoisomers=prob_config.get('stereoisomers',False)
+        max_atoms=prob_config.get('max_atoms', 25),
+        min_atoms=prob_config.get('min_atoms', 1),
+        tryEmbedding=prob_config.get('tryEmbedding', True),
+        sa_score_threshold=prob_config.get('sa_score_threshold', 4),
+        stereoisomers=prob_config.get('stereoisomers', False)
     )
 
     engine = run_config.start_engine()
@@ -98,19 +89,19 @@ def run_games(run_config):
     config = run_config.mcts_config
     game = AlphaZero(
         construct_problem(run_config),
-        min_reward=config.get('min_reward',0.0),
-        pb_c_base=config.get('pb_c_base',1.0),
-        pb_c_init=config.get('pb_c_init',1.25),
-        dirichlet_noise=config.get('dirichlet_noise',True),
-        dirichlet_alpha=config.get('dirichlet_alpha',1.0),
-        dirichlet_x=config.get('dirichlet_x',0.25),
+        min_reward=config.get('min_reward', 0.0),
+        pb_c_base=config.get('pb_c_base', 1.0),
+        pb_c_init=config.get('pb_c_init', 1.25),
+        dirichlet_noise=config.get('dirichlet_noise', True),
+        dirichlet_alpha=config.get('dirichlet_alpha', 1.0),
+        dirichlet_x=config.get('dirichlet_x', 0.25),
         # MCTS parameters
-        ucb_constant=config.get('ucb_constant',math.sqrt(2)),
+        ucb_constant=config.get('ucb_constant', math.sqrt(2)),
     )
     while True:
         path, reward = game.run(
-            num_mcts_samples=config.get('num_mcts_samples',50),
-            max_depth=config.get('max_depth',1000000),
+            num_mcts_samples=config.get('num_mcts_samples', 50),
+            max_depth=config.get('max_depth', 1000000),
         )
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
 
@@ -162,7 +153,7 @@ if __name__ == "__main__":
     parser = setup_argparser()
     args = parser.parse_args()
 
-    run_config = Run_Config(args.config)
+    run_config = RunConfig(args.config)
 
     if args.train_policy:
         train_model(run_config)
