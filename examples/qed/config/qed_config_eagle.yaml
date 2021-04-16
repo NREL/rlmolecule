@@ -32,7 +32,7 @@ train_config:
     min_buffer_size: 15
     batch_size: 32
     # folder in which to store the trained models
-    policy_checkpoint_dir: 'policy_checkpoints'
+    policy_checkpoint_dir: '/projects/rlmolecule/$USER/qed/qed_example/policy_checkpoints'
     # MoleculeTFAlphaZeroProblem options
     num_messages: 1
     num_heads: 2
