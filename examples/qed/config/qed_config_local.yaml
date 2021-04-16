@@ -1,0 +1,63 @@
+# Optimize the Quantitative Estimate of Drug-likeness (QED)
+# See https://www.rdkit.org/docs/source/rdkit.Chem.QED.html
+# Starting point: a single carbon (C)
+#   - actions: add a bond or an atom
+#   - state: molecule state
+#   - reward: 0, unless a terminal state is reached, then the qed estimate of the molecule
+
+run_id: 'qed_example_local'
+
+# Parameters for setting up the problem
+problem_config:
+    max_atoms: 25
+    min_atoms: 1
+    try_embedding: True
+    sa_score_threshold: 4
+    stereoisomers: False
+
+# Parameters for training the policy model
+train_config:
+    # reward options:
+    ranked_reward_alpha: 0.75
+    reward_buffer_max_size: 50
+    reward_buffer_min_size: 10
+    # learning options:
+    lr: 1E-3
+    epochs: 1E4
+    steps_per_epoch: 100
+    game_count_delay: 20
+    verbose: 2
+    # AlphaZero problem options
+    max_buffer_size: 200
+    min_buffer_size: 15
+    batch_size: 32
+    # folder in which to store the trained models
+    policy_checkpoint_dir: 'policy_checkpoints_local'
+    # MoleculeTFAlphaZeroProblem options
+    num_messages: 1
+    num_heads: 2
+    features: 8
+
+# Parameters for running the Monte Carlo Tree Search games
+mcts_config:
+    # Minimum reward to return for invalid actions
+    min_reward: 0
+    pbc_c_base: 1.0
+    pbc_c_init: 1.25
+    # dirichlet 'shape' parameter. Larger values spread out probability over more moves.
+    dirichlet_alpha: 1.0
+    # percentage to favor dirichlet noise vs. prior estimation. Smaller means less noise
+    dirichlet_x: 0.25
+    # number of samples to perform at each level of the MCTS search
+    num_mcts_samples: 50
+    # the maximum search depth.
+    max_depth: 1000000
+    #ucb_constant: math.sqrt(2)
+
+# Database settings for the Object Relational Model (ORM)
+# Used to store games and communicate between the policy model (run on GPUs) and rollout (run on CPUs)
+sql_database:
+   # default database settings:
+   drivername: "sqlite"
+   db_file: "qed_data.db"
+
