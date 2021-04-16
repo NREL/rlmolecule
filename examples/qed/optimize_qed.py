@@ -78,7 +78,7 @@ def construct_problem(run_config):
         min_buffer_size=train_config.get('min_buffer_size', 15),
         batch_size=train_config.get('batch_size', 32),
         policy_checkpoint_dir=train_config.get(
-            'policy_checkpoints_dir', 'policy_checkpoints')
+            'policy_checkpoint_dir', 'policy_checkpoints')
     )
 
     return problem

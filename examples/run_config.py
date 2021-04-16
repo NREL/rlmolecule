@@ -29,7 +29,7 @@ class RunConfig:
         # Settings specific to the problem at hand
         self.problem_config = self.config_map.get('problem_config', {})
         # Settings for training the policy model
-        self.alphazero_config = self.config_map.get('alphazero_config', {})
+        self.train_config = self.config_map.get('train_config', {})
         self.mcts_config = self.config_map.get('mcts_config', {})
 
     # def load_config_file(config_file):
