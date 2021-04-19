@@ -47,13 +47,11 @@ def construct_problem(run_config):
         min_atoms=prob_config.get('min_atoms', 1),
         tryEmbedding=prob_config.get('tryEmbedding', True),
         sa_score_threshold=prob_config.get('sa_score_threshold', 4),
-        stereoisomers=prob_config.get('stereoisomers', False)
+        stereoisomers=prob_config.get('stereoisomers', False),
+        atom_additions=prob_config.get('atom_additions', ('C', 'N', 'O'))
     )
 
     engine = run_config.start_engine()
-    # engine = create_engine(f'sqlite:///qed_data.db',
-    #                       connect_args={'check_same_thread': False},
-    #                       execution_options = {"isolation_level": "AUTOCOMMIT"})
 
     run_id = run_config.run_id
 
@@ -111,7 +109,7 @@ def train_model(run_config):
     construct_problem(run_config).train_policy_model(
         steps_per_epoch=config.get('steps_per_epoch', 100),
         lr=float(config.get('lr', 1E-3)),
-        epochs=int(config.get('epochs', 1E4)),
+        epochs=int(float(config.get('epochs', 1E4))),
         game_count_delay=config.get('game_count_delay', 20),
         verbose=config.get('verbose', 2)
     )
