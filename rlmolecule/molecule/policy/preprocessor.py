@@ -85,9 +85,9 @@ class MolPreprocessor(nfp.preprocessing.SmilesPreprocessor):
         if n_bond == 0:
             n_bond = 1
 
-        atom_feature_matrix = np.zeros(n_atom, dtype='int')
-        bond_feature_matrix = np.zeros(n_bond, dtype='int')
-        connectivity = np.zeros((n_bond, 2), dtype='int')
+        atom_feature_matrix = np.zeros(n_atom, dtype='int64')
+        bond_feature_matrix = np.zeros(n_bond, dtype='int64')
+        connectivity = np.zeros((n_bond, 2), dtype='int64')
 
         if n_bond == 1:
             bond_feature_matrix[0] = self.bond_tokenizer('self-link')
