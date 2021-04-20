@@ -1,3 +1,5 @@
+[![Total alerts](https://img.shields.io/lgtm/alerts/g/NREL/rlmolecule.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/NREL/rlmolecule/alerts/)
+
 # rlmolecule
 
 ## About
@@ -18,9 +20,6 @@ channels:
   - defaults
 dependencies:
   - python=3.7
-  - xtb-python
-  - ase
-  - pytorch-cpu
   - jupyterlab
   - rdkit
   - seaborn
