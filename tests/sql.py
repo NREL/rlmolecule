@@ -1,6 +1,5 @@
 import os
 import tempfile
-from tempfile import NamedTemporaryFile
 
 import pytest
 from sqlalchemy import create_engine
@@ -12,10 +11,11 @@ def engine():
     # so here (and likely in other small codes) we'll want to make sure we at least write to a local file.
 
     file = os.path.join(tempfile.gettempdir(), os.urandom(24).hex())
-    engine = create_engine(f'sqlite:///{file}',
-                           connect_args={'check_same_thread': False},
-                           execution_options={"isolation_level": "AUTOCOMMIT"}
-                           )
+    engine = create_engine(f'sqlite:///{file}', check_same_thread=False)
     yield engine
     engine.dispose()
-    os.remove(file)
+    try:
+        os.remove(file)
+    except PermissionError:
+        # This construction is needed for windows, but sometimes the threads using the file haven't closed?
+        pass
