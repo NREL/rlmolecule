@@ -9,6 +9,8 @@ dependencies:
   - tqdm
   - psycopg2
   - sqlalchemy
+  - pytest
+  - pytest-cov
   - pip
   - pip:
     - nfp
