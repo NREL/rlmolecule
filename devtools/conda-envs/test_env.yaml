@@ -1,0 +1,16 @@
+name: test
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python
+  - rdkit
+  - pandas
+  - tqdm
+  - psycopg2
+  - sqlalchemy
+  - pip
+  - pip:
+    - nfp
+    - tensorflow
+    - tensorflow-addons

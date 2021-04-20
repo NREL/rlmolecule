@@ -18,9 +18,6 @@ channels:
   - defaults
 dependencies:
   - python=3.7
-  - xtb-python
-  - ase
-  - pytorch-cpu
   - jupyterlab
   - rdkit
   - seaborn
