@@ -10,3 +10,5 @@ path_classifiers:
     - devtools/*
   generated:
     - rlmolecule/_version.py
+  test:
+    - tests
