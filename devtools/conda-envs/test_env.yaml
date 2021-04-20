@@ -13,4 +13,3 @@ dependencies:
   - pip:
     - nfp
     - tensorflow
-    - tensorflow-addons
