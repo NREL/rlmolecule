@@ -13,9 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class Reward:
-    def __init__(self, *,
-                 raw_reward: Optional[float] = None,
-                 scaled_reward: Optional[float] = None):
+    def __init__(self, *, raw_reward: Optional[float] = None, scaled_reward: Optional[float] = None):
         """ Class to coordinate between rewards that are raw (provided by the user) and scaled (between zero and one
         using some type of reward scaling)
 
@@ -48,9 +46,7 @@ class RewardFactory(ABC):
     def _scale(self, reward: float) -> float:
         pass
 
-    def __call__(self, *,
-                 raw_reward: Optional[float] = None,
-                 scaled_reward: Optional[float] = None) -> Reward:
+    def __call__(self, *, raw_reward: Optional[float] = None, scaled_reward: Optional[float] = None) -> Reward:
         """ Initialize a Reward class with raw and scaled rewards, scaling the raw reward if a scaled reward is not
         provided. Allows a pass-through of a scaled reward if scaled_reward is provided
 
@@ -66,7 +62,6 @@ class RewardFactory(ABC):
 
 class RawRewardFactory(RewardFactory):
     """Just passes the raw reward through as the scaled reward"""
-
     def _scale(self, reward: float) -> float:
         return reward
 
@@ -74,10 +69,7 @@ class RawRewardFactory(RewardFactory):
 class LinearBoundedRewardFactory(RewardFactory):
     """Maps rewards to the 0->1 range, where the minimum reward maps to zero and the maximum reward maps to 1. Values
     above and below the max / min reward are capped at 0 or 1 respectively. """
-
-    def __init__(self,
-                 min_reward: float = 0.,
-                 max_reward: float = 1.) -> None:
+    def __init__(self, min_reward: float = 0., max_reward: float = 1.) -> None:
         self.min_reward = min_reward
         self.max_reward = max_reward
 
@@ -92,13 +84,14 @@ class LinearBoundedRewardFactory(RewardFactory):
 #  parameters between the reward and problem classes. I didn't want to combine these classes, since then it might be
 #  tricky to modularize which reward scaling scheme we wanted to use.
 class RankedRewardFactory(RewardFactory):
-    def __init__(self,
-                 engine: sqlalchemy.engine.Engine,
-                 run_id: Optional[str] = None,
-                 reward_buffer_min_size: int = 50,
-                 reward_buffer_max_size: int = 250,
-                 ranked_reward_alpha: float = 0.90,
-                 ) -> None:
+    def __init__(
+        self,
+        engine: sqlalchemy.engine.Engine,
+        run_id: Optional[str] = None,
+        reward_buffer_min_size: int = 50,
+        reward_buffer_max_size: int = 250,
+        ranked_reward_alpha: float = 0.90,
+    ) -> None:
 
         Session.configure(bind=engine)
         self._session = Session()
@@ -129,9 +122,7 @@ class RankedRewardFactory(RewardFactory):
         buffer_games = all_games.order_by(GameStore.time.desc()).limit(self._reward_buffer_max_size)
         buffer_raw_rewards = self._session.query(buffer_games.subquery().c.raw_reward).all()
 
-        r_alpha = np.percentile(np.array(buffer_raw_rewards),
-                                100 * self._ranked_reward_alpha,
-                                interpolation='lower')
+        r_alpha = np.percentile(np.array(buffer_raw_rewards), 100 * self._ranked_reward_alpha, interpolation='lower')
 
         logger.debug(f"ranked_reward: r_alpha={r_alpha}, reward={reward}")
 

@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 
 
 class AlphaZeroProblem(MCTSProblem):
-
-    def __init__(self, *,
+    def __init__(self,
+                 *,
                  reward_class: RewardFactory,
                  engine: sqlalchemy.engine.Engine,
                  run_id: Optional[str] = None,
@@ -189,8 +189,8 @@ class AlphaZeroProblem(MCTSProblem):
 
     def lookup_policy_inputs_from_digest(self, policy_digest: str) -> {str: np.ndarray}:
 
-        state_row = self.session.query(StateStore).filter_by(
-            digest=policy_digest).filter_by(run_id=self.run_id).first()
+        state_row = self.session.query(StateStore).filter_by(digest=policy_digest).filter_by(
+            run_id=self.run_id).first()
         if not state_row:
             raise RuntimeError(f"Could not find state matching digest {policy_digest}")
         return load_numpy_dict(state_row.policy_inputs)

@@ -26,8 +26,10 @@ class CyclicState(GraphSearchState):
             return []
 
         else:
-            return [CyclicState(self.position, is_terminal=True),
-                    CyclicState((self.position + 1) % 5, is_terminal=False)]
+            return [
+                CyclicState(self.position, is_terminal=True),
+                CyclicState((self.position + 1) % 5, is_terminal=False)
+            ]
 
     def hash(self) -> int:
         return hash((self.position, self.is_terminal))
@@ -39,12 +41,10 @@ class AcyclicState(CyclicState):
             return []
 
         else:
-            return [AcyclicState(self.position, is_terminal=True),
-                    AcyclicState(self.position + 1, is_terminal=False)]
+            return [AcyclicState(self.position, is_terminal=True), AcyclicState(self.position + 1, is_terminal=False)]
 
 
 class CyclicProblem(MCTSProblem):
-
     def get_initial_state(self) -> GraphSearchState:
         return CyclicState(0, is_terminal=False)
 
@@ -53,7 +53,6 @@ class CyclicProblem(MCTSProblem):
 
 
 class AcyclicProblem(CyclicProblem):
-
     def get_initial_state(self) -> GraphSearchState:
         return AcyclicState(0, is_terminal=False)
 

@@ -36,10 +36,8 @@ setup(
         # that you indicate whether you support Python 2, Python 3 or both.
         'Programming Language :: Python :: 3',
     ],
-
     packages=find_packages(),  # Required
     install_requires=[],  # TODO
-
     project_urls={
         'Source': 'https://github.com/NREL/rlmolecule',
     },

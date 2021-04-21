@@ -1,6 +1,5 @@
 import os
 import tempfile
-from tempfile import NamedTemporaryFile
 
 import pytest
 from sqlalchemy import create_engine
@@ -12,9 +11,10 @@ def engine():
     # so here (and likely in other small codes) we'll want to make sure we at least write to a local file.
 
     file = os.path.join(tempfile.gettempdir(), os.urandom(24).hex())
-    engine = create_engine(f'sqlite:///{file}',
-                           connect_args={'check_same_thread': False},
-                           )
+    engine = create_engine(
+        f'sqlite:///{file}',
+        connect_args={'check_same_thread': False},
+    )
     yield engine
     engine.dispose()
     try:

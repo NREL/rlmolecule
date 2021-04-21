@@ -2,14 +2,17 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 
-def policy_model(hidden_layers: int,
-                 hidden_dim: int) -> tf.keras.Model:
+def policy_model(hidden_layers: int, hidden_dim: int) -> tf.keras.Model:
 
     # Position input
-    position = layers.Input([1,], dtype=tf.float32, name="position")
+    position = layers.Input([
+        1,
+    ], dtype=tf.float32, name="position")
 
     # Steps input
-    steps = layers.Input([1,], dtype=tf.float32, name="steps")
+    steps = layers.Input([
+        1,
+    ], dtype=tf.float32, name="steps")
 
     # Concatenate inputs
     x = layers.Concatenate()([position, steps])
@@ -69,7 +72,6 @@ def policy_model(hidden_layers: int,
 
 #         return value_preds, masked_prior_logits
 
-    
 # def build_policy_trainer(hidden_layers: int,
 #                          hidden_dim: int) -> tf.keras.Model:
 #     """Builds a keras model that expects [bsz, actions] molecules as inputs and predicts batches of value scores and
@@ -83,9 +85,8 @@ def policy_model(hidden_layers: int,
 #     value_preds, masked_prior_logits = PolicyWrapper(hidden_layers, hidden_dim)([position, steps])
 
 #     policy_trainer = tf.keras.Model([position, steps], [value_preds, masked_prior_logits])
-    
-#     return policy_trainer
 
+#     return policy_trainer
 
 # def build_policy_evaluator(checkpoint_filepath: Optional[str] = None) -> Tuple[tf.function, Optional[str]]:
 #     """Builds (or loads from a checkpoint) a model that expects a single batch of input molecules.
@@ -103,4 +104,3 @@ def policy_model(hidden_layers: int,
 #     policy_predictor = tf.function(experimental_relax_shapes=True)(policy_model_layer.predict_step)
 
 #     return policy_predictor, latest
-

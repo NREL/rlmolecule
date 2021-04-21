@@ -42,13 +42,11 @@ def construct_problem(run_config):
             return 0.0, {'forced_terminal': False, 'smiles': state.smiles}
 
     prob_config = run_config.problem_config
-    builder = MoleculeBuilder(
-        max_atoms=prob_config.get('max_atoms', 25),
-        min_atoms=prob_config.get('min_atoms', 1),
-        tryEmbedding=prob_config.get('tryEmbedding', True),
-        sa_score_threshold=prob_config.get('sa_score_threshold', 4),
-        stereoisomers=prob_config.get('stereoisomers', False)
-    )
+    builder = MoleculeBuilder(max_atoms=prob_config.get('max_atoms', 25),
+                              min_atoms=prob_config.get('min_atoms', 1),
+                              tryEmbedding=prob_config.get('tryEmbedding', True),
+                              sa_score_threshold=prob_config.get('sa_score_threshold', 4),
+                              stereoisomers=prob_config.get('stereoisomers', False))
 
     engine = run_config.start_engine()
     # engine = create_engine(f'sqlite:///qed_data.db',
@@ -58,28 +56,24 @@ def construct_problem(run_config):
     run_id = run_config.run_id
 
     train_config = run_config.train_config
-    reward_factory = RankedRewardFactory(
-        engine=engine,
-        run_id=run_id,
-        reward_buffer_min_size=train_config.get('reward_buffer_min_size', 10),
-        reward_buffer_max_size=train_config.get('reward_buffer_max_size', 50),
-        ranked_reward_alpha=train_config.get('ranked_reward_alpha', 0.75)
-    )
+    reward_factory = RankedRewardFactory(engine=engine,
+                                         run_id=run_id,
+                                         reward_buffer_min_size=train_config.get('reward_buffer_min_size', 10),
+                                         reward_buffer_max_size=train_config.get('reward_buffer_max_size', 50),
+                                         ranked_reward_alpha=train_config.get('ranked_reward_alpha', 0.75))
 
-    problem = QEDOptimizationProblem(
-        engine,
-        builder,
-        run_id=run_id,
-        reward_class=reward_factory,
-        num_messages=train_config.get('num_messages', 1),
-        num_heads=train_config.get('num_heads', 2),
-        features=train_config.get('features', 8),
-        max_buffer_size=train_config.get('max_buffer_size', 200),
-        min_buffer_size=train_config.get('min_buffer_size', 15),
-        batch_size=train_config.get('batch_size', 32),
-        policy_checkpoint_dir=train_config.get(
-            'policy_checkpoint_dir', 'policy_checkpoints')
-    )
+    problem = QEDOptimizationProblem(engine,
+                                     builder,
+                                     run_id=run_id,
+                                     reward_class=reward_factory,
+                                     num_messages=train_config.get('num_messages', 1),
+                                     num_heads=train_config.get('num_heads', 2),
+                                     features=train_config.get('features', 8),
+                                     max_buffer_size=train_config.get('max_buffer_size', 200),
+                                     min_buffer_size=train_config.get('min_buffer_size', 15),
+                                     batch_size=train_config.get('batch_size', 32),
+                                     policy_checkpoint_dir=train_config.get('policy_checkpoint_dir',
+                                                                            'policy_checkpoints'))
 
     return problem
 
@@ -108,13 +102,11 @@ def run_games(run_config):
 
 def train_model(run_config):
     config = run_config.train_config
-    construct_problem(run_config).train_policy_model(
-        steps_per_epoch=config.get('steps_per_epoch', 100),
-        lr=float(config.get('lr', 1E-3)),
-        epochs=int(config.get('epochs', 1E4)),
-        game_count_delay=config.get('game_count_delay', 20),
-        verbose=config.get('verbose', 2)
-    )
+    construct_problem(run_config).train_policy_model(steps_per_epoch=config.get('steps_per_epoch', 100),
+                                                     lr=float(config.get('lr', 1E-3)),
+                                                     epochs=int(config.get('epochs', 1E4)),
+                                                     game_count_delay=config.get('game_count_delay', 20),
+                                                     verbose=config.get('verbose', 2))
 
 
 def monitor(run_config):
@@ -136,14 +128,16 @@ def monitor(run_config):
 
 
 def setup_argparser():
-    parser = argparse.ArgumentParser(
-        description='Run the QED optimization. Default is to run the script locally')
+    parser = argparse.ArgumentParser(description='Run the QED optimization. Default is to run the script locally')
 
-    parser.add_argument('--config', type=str,
-                        help='Configuration file')
-    parser.add_argument('--train-policy', action="store_true", default=False,
+    parser.add_argument('--config', type=str, help='Configuration file')
+    parser.add_argument('--train-policy',
+                        action="store_true",
+                        default=False,
                         help='Train the policy model only (on GPUs)')
-    parser.add_argument('--rollout', action="store_true", default=False,
+    parser.add_argument('--rollout',
+                        action="store_true",
+                        default=False,
                         help='Run the game simulations only (on CPUs)')
 
     return parser
@@ -162,14 +156,14 @@ if __name__ == "__main__":
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
         run_games(run_config)
     else:
-        jobs = [multiprocessing.Process(target=monitor, args=(run_config,))]
+        jobs = [multiprocessing.Process(target=monitor, args=(run_config, ))]
         jobs[0].start()
         time.sleep(1)
 
         for i in range(5):
-            jobs += [multiprocessing.Process(target=run_games, args=(run_config,))]
+            jobs += [multiprocessing.Process(target=run_games, args=(run_config, ))]
 
-        jobs += [multiprocessing.Process(target=train_model, args=(run_config,))]
+        jobs += [multiprocessing.Process(target=train_model, args=(run_config, ))]
 
         for job in jobs[1:]:
             job.start()

@@ -1,8 +1,7 @@
 import logging
 import os
 from typing import (
-    Optional,
-)
+    Optional, )
 
 import numpy as np
 import psycopg2
@@ -24,26 +23,23 @@ from rlmolecule.molecule.policy.preprocessor import load_preprocessor
 
 logger = logging.getLogger(__name__)
 
-default_preprocessor = MolPreprocessor(atom_features=atom_featurizer,
-                                       bond_features=bond_featurizer,
-                                       explicit_hs=False)
+default_preprocessor = MolPreprocessor(atom_features=atom_featurizer, bond_features=bond_featurizer, explicit_hs=False)
 
-default_preprocessor.from_json(os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), '../../molecule_game/preprocessor.json'))
+default_preprocessor.from_json(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../molecule_game/preprocessor.json'))
 
 
 class StableRadicalOptimizationProblem(AlphaZeroProblem):
     """
     An AlphaZeroProblem that implements a stable radical optimization search.
     """
-
     def __init__(
-            self,
-            config: any,
-            start_smiles: str,
-            preprocessor: Optional[MolPreprocessor] = None,
-            preprocessor_data=None,
-            policy_checkpoint_dir=None,
+        self,
+        config: any,
+        start_smiles: str,
+        preprocessor: Optional[MolPreprocessor] = None,
+        preprocessor_data=None,
+        policy_checkpoint_dir=None,
     ) -> None:
         # super().__init__(
         #     config.min_reward,
@@ -94,15 +90,14 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
         with psycopg2.connect(**config.dbparams) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "select real_reward from {table}_reward where smiles = %s".format(
-                        table=config.sql_basename), (state.smiles,))
+                    "select real_reward from {table}_reward where smiles = %s".format(table=config.sql_basename),
+                    (state.smiles, ))
                 result = cur.fetchone()
             if result:
                 reward = result[0]
 
         if reward is None:
-            if ((policy_inputs['atom'] == 1).any() |
-                    (policy_inputs['bond'] == 1).any()):
+            if ((policy_inputs['atom'] == 1).any() | (policy_inputs['bond'] == 1).any()):
                 # Node is outside the domain of validity
                 # self._true_reward = 0.
                 return config.min_reward
@@ -126,13 +121,19 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
 
                 with psycopg2.connect(**config.dbparams) as conn:
                     with conn.cursor() as cur:
-                        cur.execute("""
+                        cur.execute(
+                            """
                             INSERT INTO {table}_reward
                             (smiles, real_reward, atom_type, buried_vol, max_spin, atom_index)
                             values (%s, %s, %s, %s, %s, %s)
-                            ON CONFLICT DO NOTHING;""".format(table=config.sql_basename), (
-                            state.smiles, float(reward), atom_type,  # This should be the real reward
-                            float(spin_buried_vol), float(max_spin), atom_index))
+                            ON CONFLICT DO NOTHING;""".format(table=config.sql_basename),
+                            (
+                                state.smiles,
+                                float(reward),
+                                atom_type,  # This should be the real reward
+                                float(spin_buried_vol),
+                                float(max_spin),
+                                atom_index))
 
             ranked_reward = self._get_ranked_rewards(reward)
 
@@ -158,8 +159,10 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
         network.
         """
         policy_inputs = [self._get_policy_inputs(vertex) for vertex in vertices]
-        return {key: pad_sequences([elem[key] for elem in policy_inputs], padding='post')
-                for key in policy_inputs[0].keys()}
+        return {
+            key: pad_sequences([elem[key] for elem in policy_inputs], padding='post')
+            for key in policy_inputs[0].keys()
+        }
 
     def _get_policy_inputs(self, vertex: AlphaZeroVertex) -> {}:
         """
@@ -177,8 +180,9 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
         config = self.config
         with psycopg2.connect(**config.dbparams) as conn:
             with conn.cursor() as cur:
-                cur.execute("select count(*) from {table}_game where experiment_id = %s;".format(
-                    table=config.sql_basename), (config.experiment_id,))
+                cur.execute(
+                    "select count(*) from {table}_game where experiment_id = %s;".format(table=config.sql_basename),
+                    (config.experiment_id, ))
                 n_games = cur.fetchone()[0]
 
             if n_games < config.reward_buffer_min_size:
@@ -189,12 +193,13 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
 
             else:
                 with conn.cursor() as cur:
-                    cur.execute("""
+                    cur.execute(
+                        """
                             select percentile_disc(%s) within group (order by real_reward)
                             from (select real_reward from {table}_game where experiment_id = %s
                                   order by id desc limit %s) as finals
                             """.format(table=config.sql_basename),
-                                (config.ranked_reward_alpha, config.experiment_id, config.reward_buffer_max_size))
+                        (config.ranked_reward_alpha, config.experiment_id, config.reward_buffer_max_size))
 
                     r_alpha = cur.fetchone()[0]
 

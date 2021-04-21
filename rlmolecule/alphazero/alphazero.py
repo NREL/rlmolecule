@@ -20,7 +20,6 @@ class AlphaZero(MCTS):
     
     AlphaZeroGame interacts with AlphaZeroVertex. See AlphaZeroVertex for more details.
     """
-
     def __init__(self,
                  problem: AlphaZeroProblem,
                  min_reward: float = 0.0,
@@ -29,8 +28,7 @@ class AlphaZero(MCTS):
                  dirichlet_noise: bool = True,
                  dirichlet_alpha: float = 1.0,
                  dirichlet_x: float = 0.25,
-                 **kwargs
-                 ) -> None:
+                 **kwargs) -> None:
         """
         Constructor.
         :param min_reward: Minimum reward to return for invalid actions
@@ -56,13 +54,12 @@ class AlphaZero(MCTS):
     def _accumulate_path_data(self, vertex: MCTSVertex, path: []):
         children = vertex.children
         visit_sum = sum(child.visit_count for child in children)
-        child_visits = [(child, child.visit_count / visit_sum)
-                        for child in children]
+        child_visits = [(child, child.visit_count / visit_sum) for child in children]
         path.append((vertex, child_visits))
 
     def _evaluate(
-            self,
-            search_path: [AlphaZeroVertex],
+        self,
+        search_path: [AlphaZeroVertex],
     ) -> Reward:
         """
         Expansion step of AlphaZero, overrides MCTS evaluate step.

@@ -7,7 +7,6 @@ Vertex = TypeVar('Vertex')
 
 
 class HashCanonicalizer(GraphSearchCanonicalizer[Vertex]):
-
     def __init__(self):
         self._vertex_map: {GraphSearchState: Vertex} = {}
 

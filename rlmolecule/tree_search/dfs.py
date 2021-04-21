@@ -29,8 +29,7 @@ class GraphCycleError(Exception):
         super().__init__()
 
     def __str__(self):
-        return (f'Cyclic edge encountered at state:\n{self.parent_node}.\n' +
-                textwrap.dedent("""
+        return (f'Cyclic edge encountered at state:\n{self.parent_node}.\n' + textwrap.dedent("""
                 This library is currently only equipped to search spaces defined as 
                 directional acyclic graphs. Cycles inside the search graph give rise to a
                 graph history interaction problem, which require careful handling. For more
