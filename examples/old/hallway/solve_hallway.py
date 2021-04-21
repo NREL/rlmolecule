@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def construct_problem(ranked_reward=True):
-    
+
     from rlmolecule.tree_search.reward import RankedRewardFactory
     from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
 
@@ -22,12 +22,8 @@ def construct_problem(ranked_reward=True):
     from hallway_config import HallwayConfig
     from hallway_state import HallwayState
 
-
     class HallwayProblem(TFAlphaZeroProblem):
-        def __init__(self,
-                     engine: sqlalchemy.engine.Engine,
-                     model: tf.keras.Model,
-                     config: HallwayConfig,
+        def __init__(self, engine: sqlalchemy.engine.Engine, model: tf.keras.Model, config: HallwayConfig,
                      **kwargs) -> None:
             super(HallwayProblem, self).__init__(engine, model, **kwargs)
             self._config = config
@@ -46,35 +42,30 @@ def construct_problem(ranked_reward=True):
 
     engine = create_engine(f'sqlite:///hallway_data.db',
                            connect_args={'check_same_thread': False},
-                           execution_options = {"isolation_level": "AUTOCOMMIT"})
+                           execution_options={"isolation_level": "AUTOCOMMIT"})
 
     model = policy_model(hidden_layers=1, hidden_dim=16)
 
     run_id = "hallway_example"
 
     if ranked_reward:
-        reward_factory = RankedRewardFactory(
-            engine=engine,
-            run_id=run_id,
-            reward_buffer_min_size=10,
-            reward_buffer_max_size=50,
-            ranked_reward_alpha=0.75
-        )
+        reward_factory = RankedRewardFactory(engine=engine,
+                                             run_id=run_id,
+                                             reward_buffer_min_size=10,
+                                             reward_buffer_max_size=50,
+                                             ranked_reward_alpha=0.75)
     else:
         reward_factory = LinearBoundedRewardFactory(min_reward=-30, max_reward=-15)
 
-    problem = HallwayProblem(
-        engine,
-        model,
-        config,
-        run_id=run_id,
-        reward_class=reward_factory,
-        min_buffer_size=15,
-        policy_checkpoint_dir='policy_checkpoints'
-    )
+    problem = HallwayProblem(engine,
+                             model,
+                             config,
+                             run_id=run_id,
+                             reward_class=reward_factory,
+                             min_buffer_size=15,
+                             policy_checkpoint_dir='policy_checkpoints')
 
     return problem
-
 
 
 def run_games(use_az=True, num_mcts_samples=50):
@@ -89,9 +80,8 @@ def run_games(use_az=True, num_mcts_samples=50):
     rewards_file = "_rewards.csv"
     #with open(rewards_file, "w") as f:  pass
     while True:
-        path, reward = game.run(
-            num_mcts_samples=num_mcts_samples,
-            action_selection_function=MCTS.visit_selection if not use_az else None)
+        path, reward = game.run(num_mcts_samples=num_mcts_samples,
+                                action_selection_function=MCTS.visit_selection if not use_az else None)
 
         print(path)
 
@@ -99,13 +89,12 @@ def run_games(use_az=True, num_mcts_samples=50):
         if use_az:
             # Breaks if you use MCTS:
             logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
-        #with open(rewards_file, "a") as f: 
+        #with open(rewards_file, "a") as f:
         #    f.write(str(reward.raw_reward) + "\n")
 
+
 def train_model():
-    construct_problem().train_policy_model(steps_per_epoch=100,
-                                           game_count_delay=20,
-                                           verbose=2)
+    construct_problem().train_policy_model(steps_per_epoch=100, game_count_delay=20, verbose=2)
 
 
 def monitor():
@@ -148,4 +137,3 @@ if __name__ == "__main__":
     else:
 
         run_games(use_az=True, num_mcts_samples=64)
-

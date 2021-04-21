@@ -1,5 +1,4 @@
-from sqlalchemy import (BigInteger, Column, DateTime, Float, JSON, LargeBinary, String,
-                        func)
+from sqlalchemy import (BigInteger, Column, DateTime, Float, JSON, LargeBinary, String, func)
 
 from rlmolecule.sql import Base
 from rlmolecule.sql.guid import GUID
@@ -14,6 +13,7 @@ class RewardStore(Base):
     time = Column(DateTime, server_default=func.now())
     reward = Column(Float)
     data = Column(JSON)
+
 
 class StateStore(Base):
     __tablename__ = 'State'

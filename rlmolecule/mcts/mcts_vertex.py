@@ -7,7 +7,6 @@ logger = logging.getLogger(__name__)
 
 
 class MCTSVertex:
-
     def __init__(self, state: GraphSearchState) -> None:
         self.state: GraphSearchState = state
         self.visit_count: int = 0

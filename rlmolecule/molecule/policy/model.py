@@ -31,16 +31,15 @@ def policy_model(preprocessor: Optional[MolPreprocessor] = None,
     input_tensors = [atom_class, bond_class, connectivity]
 
     # Initialize the atom states
-    atom_state = layers.Embedding(preprocessor.atom_classes, features,
-                                  name='atom_embedding', mask_zero=True)(atom_class)
+    atom_state = layers.Embedding(preprocessor.atom_classes, features, name='atom_embedding',
+                                  mask_zero=True)(atom_class)
 
     # Initialize the bond states
-    bond_state = layers.Embedding(preprocessor.bond_classes, features,
-                                  name='bond_embedding', mask_zero=True)(bond_class)
+    bond_state = layers.Embedding(preprocessor.bond_classes, features, name='bond_embedding',
+                                  mask_zero=True)(bond_class)
 
     units = features // num_heads
-    global_state = nfp.GlobalUpdate(units=units, num_heads=num_heads)(
-        [atom_state, bond_state, connectivity])
+    global_state = nfp.GlobalUpdate(units=units, num_heads=num_heads)([atom_state, bond_state, connectivity])
 
     for _ in range(num_messages):  # Do the message passing
         new_bond_state = nfp.EdgeUpdate()([atom_state, bond_state, connectivity, global_state])
@@ -49,14 +48,16 @@ def policy_model(preprocessor: Optional[MolPreprocessor] = None,
         new_atom_state = nfp.NodeUpdate()([atom_state, bond_state, connectivity, global_state])
         atom_state = layers.Add()([atom_state, new_atom_state])
 
-        new_global_state = nfp.GlobalUpdate(units=units, num_heads=num_heads)(
-            [atom_state, bond_state, connectivity, global_state])
+        new_global_state = nfp.GlobalUpdate(units=units,
+                                            num_heads=num_heads)([atom_state, bond_state, connectivity, global_state])
         global_state = layers.Add()([global_state, new_global_state])
 
     value_logit = layers.Dense(1)(global_state)
     pi_logit = layers.Dense(1)(global_state)
 
     return tf.keras.Model(input_tensors, [value_logit, pi_logit], name='policy_model')
+
+
 #
 #
 # class PolicyWrapper(layers.Layer):

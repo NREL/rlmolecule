@@ -1,5 +1,6 @@
 import argparse
 import sys
+
 sys.path.append("../..")
 
 import psycopg2
@@ -13,19 +14,19 @@ parser.add_argument("--drop", action='store_true', help="whether to drop existin
 args = parser.parse_args()
 
 ## This creates the table used to store the rewards
-## But, we don't want this to run every time we run the script, 
+## But, we don't want this to run every time we run the script,
 ## just keeping it here as a reference
 
-with psycopg2.connect(**config.dbparams) as conn:    
+with psycopg2.connect(**config.dbparams) as conn:
     with conn.cursor() as cur:
-        
+
         if args.drop:
             cur.execute("""
             DROP TABLE IF EXISTS {table}_reward;
             DROP TABLE IF EXISTS {table}_replay;
             DROP TABLE IF EXISTS {table}_game;
             """.format(table=config.sql_basename))
-            
+
         cur.execute("""
         CREATE TABLE IF NOT EXISTS {table}_reward (
             smiles varchar(50) PRIMARY KEY,

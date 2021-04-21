@@ -4,7 +4,7 @@ import os
 loglevel = 'INFO'
 logging.basicConfig(level=os.environ.get("LOGLEVEL", loglevel))
 
-# Molecule 
+# Molecule
 max_atoms = 10  # max atoms in molecule
 min_atoms = 4  # max atoms in molecule
 

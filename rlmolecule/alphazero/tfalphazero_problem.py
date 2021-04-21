@@ -20,11 +20,11 @@ logger = logging.getLogger(__name__)
 
 
 class TFAlphaZeroProblem(AlphaZeroProblem):
-    def __init__(self, *,
+    def __init__(self,
+                 *,
                  engine: sqlalchemy.engine.Engine,
                  policy_checkpoint_dir: str = 'policy_checkpoints',
-                 **kwargs
-                 ) -> None:
+                 **kwargs) -> None:
 
         super(TFAlphaZeroProblem, self).__init__(engine=engine, **kwargs)
         self.mask_dict = self.get_policy_mask()
@@ -40,7 +40,7 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
         pass
 
     def get_policy_mask(self) -> {str: Optional[float]}:
-        initial_inputs = self.get_policy_inputs(self.get_initial_state()) # numpy
+        initial_inputs = self.get_policy_inputs(self.get_initial_state())  # numpy
         model_inputs = self.policy_model().inputs  # keras
         for (x, y) in zip(initial_inputs.values(), model_inputs):
             types = (x.dtype, y.dtype.as_numpy_dtype)
@@ -73,13 +73,15 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
         """
         # Get the list of policy inputs
         return self._batch_policy_inputs(
-            [self.policy_input_wrapper(vertex)
-             for vertex in itertools.chain((parent,), parent.children)])
+            [self.policy_input_wrapper(vertex) for vertex in itertools.chain((parent, ), parent.children)])
 
     def _batch_policy_inputs(self, list_of_policy_inputs: [{str: np.ndarray}]) -> {str: np.ndarray}:
-        return {key: pad_sequences(
-            [elem[key] for elem in list_of_policy_inputs], padding='post', value=self.mask_dict[key])
-            for key in list_of_policy_inputs[0].keys()}
+        return {
+            key: pad_sequences([elem[key] for elem in list_of_policy_inputs],
+                               padding='post',
+                               value=self.mask_dict[key])
+            for key in list_of_policy_inputs[0].keys()
+        }
 
     def get_value_and_policy(self, parent: AlphaZeroVertex) -> Tuple[float, dict]:
 
@@ -103,8 +105,8 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
         :param digests: A tf.Tensor(dtype=tf.string) containing the (parent, children) policy digests
         :return: A batched dictionary of numpy array policy inputs
         """
-        batched_policy_inputs = self._batch_policy_inputs([
-            self.lookup_policy_inputs_from_digest(digest.decode()) for digest in digests.numpy()])
+        batched_policy_inputs = self._batch_policy_inputs(
+            [self.lookup_policy_inputs_from_digest(digest.decode()) for digest in digests.numpy()])
         sorted_policy_inputs = tuple([batched_policy_inputs[input_name] for input_name in self.input_names])
         return sorted_policy_inputs
 
@@ -112,15 +114,12 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
         """
         Creates a tensorflow dataset pipeline to batch game positions from the replay buffer into
         """
-
-        def get_policy_inputs_tf(policy_digests, reward_and_visit_probs,
-                                 problem: TFAlphaZeroProblem):
+        def get_policy_inputs_tf(policy_digests, reward_and_visit_probs, problem: TFAlphaZeroProblem):
             input_layers = self.batched_policy_model.inputs
 
-            inputs = tf.py_function(
-                problem._get_policy_inputs_from_digests,
-                inp=[policy_digests],
-                Tout=[inp.dtype for inp in input_layers])
+            inputs = tf.py_function(problem._get_policy_inputs_from_digests,
+                                    inp=[policy_digests],
+                                    Tout=[inp.dtype for inp in input_layers])
 
             for inp, input_layer in zip(inputs, input_layers):
                 inp.set_shape(input_layer.shape[1:])
@@ -150,13 +149,12 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
 
         return dataset
 
-    def train_policy_model(
-            self,
-            steps_per_epoch: int = 750,
-            lr: float = 1E-3,
-            epochs: int = int(1E4),
-            game_count_delay: int = 30,
-            **kwargs) -> tf.keras.callbacks.History:
+    def train_policy_model(self,
+                           steps_per_epoch: int = 750,
+                           lr: float = 1E-3,
+                           epochs: int = int(1E4),
+                           game_count_delay: int = 30,
+                           **kwargs) -> tf.keras.callbacks.History:
 
         # wait to start training until enough games have occurred
         while len(list(self.iter_recent_games())) < self.min_buffer_size:
@@ -167,25 +165,26 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
         dataset = self._create_dataset()
 
         # Create a callback to store optimized models at given frequencies
-        model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
-            os.path.join(self.policy_checkpoint_dir, 'policy.{epoch:02d}'),
-            save_best_only=False, save_weights_only=True)
+        model_checkpoint = tf.keras.callbacks.ModelCheckpoint(os.path.join(self.policy_checkpoint_dir,
+                                                                           'policy.{epoch:02d}'),
+                                                              save_best_only=False,
+                                                              save_weights_only=True)
 
         # Log the time as well as the epoch to synchronize with the game rewards
-        csv_logger = TimeCsvLogger(
-            os.path.join(self.policy_checkpoint_dir, 'log.csv'),
-            separator=',', append=False)
+        csv_logger = TimeCsvLogger(os.path.join(self.policy_checkpoint_dir, 'log.csv'), separator=',', append=False)
 
         # Ensure the the policy checkpoint directory exists
         Path(self.policy_checkpoint_dir).mkdir(parents=True, exist_ok=True)
 
         # Compile the model with a loss function and optimizer
-        self.batched_policy_model.compile(
-            optimizer=tf.keras.optimizers.Adam(lr),
-            loss=[tf.keras.losses.BinaryCrossentropy(from_logits=True), KLWithLogits()])
+        self.batched_policy_model.compile(optimizer=tf.keras.optimizers.Adam(lr),
+                                          loss=[tf.keras.losses.BinaryCrossentropy(from_logits=True),
+                                                KLWithLogits()])
 
         logger.info("Policy trainer: starting training")
 
-        return self.batched_policy_model.fit(
-            dataset, steps_per_epoch=steps_per_epoch,
-            epochs=epochs, callbacks=[model_checkpoint, csv_logger], **kwargs)
+        return self.batched_policy_model.fit(dataset,
+                                             steps_per_epoch=steps_per_epoch,
+                                             epochs=epochs,
+                                             callbacks=[model_checkpoint, csv_logger],
+                                             **kwargs)

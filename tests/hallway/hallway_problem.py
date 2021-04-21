@@ -3,9 +3,7 @@ from tests.hallway.hallway_state import HallwayState
 
 
 class HallwayProblem(MCTSProblem):
-    def __init__(self,
-                 config: 'HallwayConfig',
-                 **kwargs) -> None:
+    def __init__(self, config: 'HallwayConfig', **kwargs) -> None:
         super(HallwayProblem, self).__init__(**kwargs)
         self._config = config
 

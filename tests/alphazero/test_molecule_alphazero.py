@@ -13,11 +13,7 @@ from tests.qed_optimization_problem import QEDWithMoleculePolicy
 
 @pytest.fixture()
 def builder():
-    return MoleculeBuilder(max_atoms=4,
-                           min_atoms=1,
-                           tryEmbedding=False,
-                           sa_score_threshold=None,
-                           stereoisomers=False)
+    return MoleculeBuilder(max_atoms=4, min_atoms=1, tryEmbedding=False, sa_score_threshold=None, stereoisomers=False)
 
 
 @pytest.fixture(scope='function')
@@ -34,12 +30,10 @@ def game(request, engine, tmpdirname, builder):
         noise = True
 
     elif name == 'ranked':
-        reward_class = RankedRewardFactory(
-            reward_buffer_min_size=2,
-            reward_buffer_max_size=4,
-            run_id=name,
-            engine=engine
-        )
+        reward_class = RankedRewardFactory(reward_buffer_min_size=2,
+                                           reward_buffer_max_size=4,
+                                           run_id=name,
+                                           engine=engine)
         noise = True
 
     elif name == 'nonoise':
@@ -64,7 +58,6 @@ def game(request, engine, tmpdirname, builder):
 
 @pytest.mark.parametrize('game', ['raw', 'ranked', 'nonoise'], indirect=True)
 class TestPolicyTraining:
-
     def test_reward_caching(self, game):
         root = game._get_root()
 
@@ -153,8 +146,7 @@ class TestPolicyTraining:
         def get_root_value_pred(problem):
             root = game.get_vertex_for_state(problem.get_initial_state())
             game._evaluate([root])
-            value, prior_logits = problem.policy_evaluator(
-                problem._get_batched_policy_inputs(root))
+            value, prior_logits = problem.policy_evaluator(problem._get_batched_policy_inputs(root))
 
             return float(value[0]), prior_logits.numpy()[1:]
 
