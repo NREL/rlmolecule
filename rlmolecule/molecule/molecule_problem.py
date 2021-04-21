@@ -15,10 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class MoleculeProblem(MCTSProblem, ABC):
-    def __init__(self,
-                 builder: 'MoleculeBuilder',
-                 *args,
-                 **kwargs):
+    def __init__(self, builder: 'MoleculeBuilder', *args, **kwargs):
         self._config = builder
         super(MoleculeProblem, self).__init__(*args, **kwargs)
 
@@ -43,11 +40,10 @@ class MoleculeTFAlphaZeroProblem(MoleculeProblem, TFAlphaZeroProblem, ABC):
         super(MoleculeTFAlphaZeroProblem, self).__init__(builder=builder, engine=engine, **kwargs)
 
     def policy_model(self) -> 'tf.keras.Model':
-        return policy_model(
-            self.preprocessor,
-            features=self.features,
-            num_heads=self.num_heads,
-            num_messages=self.num_messages)
+        return policy_model(self.preprocessor,
+                            features=self.features,
+                            num_heads=self.num_heads,
+                            num_messages=self.num_messages)
 
     def get_policy_inputs(self, state: MoleculeState) -> Dict:
         return self.preprocessor.construct_feature_matrices(state.molecule)

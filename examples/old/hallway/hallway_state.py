@@ -4,11 +4,12 @@ from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
 
 class HallwayState(GraphSearchState):
-    def __init__(self, 
-                 position: int,
-                 steps: int,
-                 config: any,
-                 ) -> None:
+    def __init__(
+        self,
+        position: int,
+        steps: int,
+        config: any,
+    ) -> None:
 
         self._position: int = position
         self._steps: int = steps
@@ -27,13 +28,15 @@ class HallwayState(GraphSearchState):
 
     def get_next_actions(self) -> Sequence['HallwayState']:
         if self.position == self.config.size or self.steps == self.config.max_steps:
-            return []   # This is how you decalre "terminal"
+            return []  # This is how you decalre "terminal"
         else:
             # Otherwise, return the new left/right positions.  We imagine there
-            # is a wall at the leftmost endpoint, so going left from position 1 
+            # is a wall at the leftmost endpoint, so going left from position 1
             # has no effect on position.
-            return [HallwayState(max(1, self.position-1), self.steps+1, self.config),
-                    HallwayState(self.position+1, self.steps+1, self.config)]
+            return [
+                HallwayState(max(1, self.position - 1), self.steps + 1, self.config),
+                HallwayState(self.position + 1, self.steps + 1, self.config)
+            ]
 
     @property
     def config(self) -> any:

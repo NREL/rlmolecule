@@ -15,15 +15,13 @@ from tests.qed_optimization_problem import QEDWithMoleculePolicy, QEDWithRandomP
 def problem(request, engine):
     name = request.param
     builder = MoleculeBuilder(max_atoms=4,
-                             min_atoms=1,
-                             tryEmbedding=False,
-                             sa_score_threshold=None,
-                             stereoisomers=False)
+                              min_atoms=1,
+                              tryEmbedding=False,
+                              sa_score_threshold=None,
+                              stereoisomers=False)
 
     if name == 'random':
-        return QEDWithRandomPolicy(reward_class=LinearBoundedRewardFactory(),
-                                   builder=builder,
-                                   engine=engine)
+        return QEDWithRandomPolicy(reward_class=LinearBoundedRewardFactory(), builder=builder, engine=engine)
     if name == 'MoleculePolicy':
         return QEDWithMoleculePolicy(reward_class=LinearBoundedRewardFactory(),
                                      builder=builder,
@@ -68,8 +66,7 @@ def test_mcts_ucb_score(solver, problem):
     child.update(0.0)
     child.update(1.0)
 
-    assert game._ucb_score(root, child) == pytest.approx(
-        0.5 + game.ucb_constant * math.sqrt(math.log(2) / 2))
+    assert game._ucb_score(root, child) == pytest.approx(0.5 + game.ucb_constant * math.sqrt(math.log(2) / 2))
 
 
 @pytest.mark.parametrize('solver,problem', [("AlphaZero", "random")], indirect=True)
@@ -87,16 +84,13 @@ def test_az_ucb_score(solver, problem):
     pb_c = np.log((root.visit_count + game._pb_c_base + 1) / game._pb_c_base) + game._pb_c_init
     pb_c *= np.sqrt(root.visit_count) / (child.visit_count + 1)
 
-    assert game._ucb_score(root, child) == pytest.approx(
-        pb_c * root.child_priors[child] + child.value)
+    assert game._ucb_score(root, child) == pytest.approx(pb_c * root.child_priors[child] + child.value)
 
 
-@pytest.mark.parametrize('solver,problem',
-                         [("MCTS", "random"),
-                          ("AlphaZero", "random"),
-                          ("AlphaZero", "MoleculePolicy")], indirect=True)
+@pytest.mark.parametrize('solver,problem', [("MCTS", "random"), ("AlphaZero", "random"),
+                                            ("AlphaZero", "MoleculePolicy")],
+                         indirect=True)
 class TestMCTSwithMoleculeState:
-
     def test_reward(self, solver, problem):
         game, root = setup_game(solver, problem)
         game._expand(root)

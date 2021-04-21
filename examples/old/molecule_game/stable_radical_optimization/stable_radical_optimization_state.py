@@ -14,7 +14,6 @@ class StableRadicalOptimizationState(MoleculeState):
     A MoleculeNode implementation which uses simple transformations (such as adding a bond) to define
     a graph over molecular structures.
     """
-
     def __init__(self, molecule: Mol, builder: any, force_terminal: bool) -> None:
         super().__init__(molecule, builder, force_terminal)
 

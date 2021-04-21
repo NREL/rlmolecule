@@ -7,7 +7,6 @@ Vertex = TypeVar('Vertex')
 
 
 class GraphSearchCanonicalizer(Generic[Vertex], ABC):
-
     @abstractmethod
     def get_canonical_vertex(self, state: GraphSearchState) -> Optional[Vertex]:
         pass

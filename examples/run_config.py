@@ -6,7 +6,6 @@ import os
 import yaml
 from sqlalchemy import create_engine
 
-
 # TODO add the command line args that correspond to the config file options here
 
 
@@ -39,8 +38,7 @@ class RunConfig:
     #     return config_map
 
     def start_engine(self):
-        self.engine = RunConfig.start_db_engine(
-            **self.config_map.get('sql_database', {}))
+        self.engine = RunConfig.start_db_engine(**self.config_map.get('sql_database', {}))
         return self.engine
 
     @staticmethod
@@ -62,11 +60,14 @@ class RunConfig:
         return engine
 
     @staticmethod
-    def start_server_db_engine(
-            drivername="postgresql+psycopg2", dbname='bde',
-            port=None, host="yuma.hpc.nrel.gov", user="rlops",
-            passwd_file=None, passwd=None,
-            **kwargs):
+    def start_server_db_engine(drivername="postgresql+psycopg2",
+                               dbname='bde',
+                               port=None,
+                               host="yuma.hpc.nrel.gov",
+                               user="rlops",
+                               passwd_file=None,
+                               passwd=None,
+                               **kwargs):
         # add the ':' to separate host from port
         port = ":" + str(port) if port is not None else ""
 
@@ -80,6 +81,5 @@ class RunConfig:
         engine_str = f'{drivername}://{user}{passwd}@{host}{port}/{dbname}'
         # don't print since it has the user's password
         # print(f'connecting to database using: {engine_str}')
-        engine = create_engine(
-            engine_str, execution_options={"isolation_level": "AUTOCOMMIT"})
+        engine = create_engine(engine_str, execution_options={"isolation_level": "AUTOCOMMIT"})
         return engine

@@ -16,13 +16,11 @@ logger = logging.getLogger(__name__)
 
 
 class MCTS(GraphSearch[MCTSVertex]):
-    def __init__(
-            self,
-            problem: MCTSProblem,
-            ucb_constant: float = math.sqrt(2),
-            vertex_class: Optional[Type[MCTSVertex]] = None,
-            **kwargs
-    ) -> None:
+    def __init__(self,
+                 problem: MCTSProblem,
+                 ucb_constant: float = math.sqrt(2),
+                 vertex_class: Optional[Type[MCTSVertex]] = None,
+                 **kwargs) -> None:
         super().__init__(MCTSVertex if vertex_class is None else vertex_class)
         self._problem: MCTSProblem = problem
         self.ucb_constant: float = ucb_constant
@@ -32,12 +30,12 @@ class MCTS(GraphSearch[MCTSVertex]):
         return self._problem
 
     def run(
-            self,
-            state: Optional[GraphSearchState] = None,
-            num_mcts_samples: int = 256,
-            max_depth: int = 1000000,
-            action_selection_function: Optional[Callable[[MCTSVertex], MCTSVertex]] = None,
-            reset_canonicalizer: bool = True,
+        self,
+        state: Optional[GraphSearchState] = None,
+        num_mcts_samples: int = 256,
+        max_depth: int = 1000000,
+        action_selection_function: Optional[Callable[[MCTSVertex], MCTSVertex]] = None,
+        reset_canonicalizer: bool = True,
     ) -> ([], float):
         """
         Run the MCTS search from the given starting state (or the root node if not provided). This function runs a
@@ -68,16 +66,18 @@ class MCTS(GraphSearch[MCTSVertex]):
             self._accumulate_path_data(vertex, path)
             if len(vertex.children) == 0:
                 return path, self.problem.reward_wrapper(vertex)
-            logger.debug(f'{vertex} has children { {child: (round(child.value, 2), child.visit_count) for child in vertex.children} }')
+            logger.debug(
+                f'{vertex} has children { {child: (round(child.value, 2), child.visit_count) for child in vertex.children} }'
+            )
             vertex = action_selection_function(vertex)
 
         logger.warning(f"{self} reached max_depth.")
         return path, math.nan  # todo: make sure this returns a reward class
 
     def sample(
-            self,
-            vertex: MCTSVertex,
-            num_mcts_samples: int = 1,
+        self,
+        vertex: MCTSVertex,
+        num_mcts_samples: int = 1,
     ) -> None:
         """
         Perform MCTS sampling from the given vertex.
@@ -92,8 +92,8 @@ class MCTS(GraphSearch[MCTSVertex]):
         path.append(vertex)
 
     def _select(
-            self,
-            root: MCTSVertex,
+        self,
+        root: MCTSVertex,
     ) -> [MCTSVertex]:
         """
         Selection step of MCTS
@@ -129,8 +129,8 @@ class MCTS(GraphSearch[MCTSVertex]):
                     dfs(set(), child, leaf)
 
     def _evaluate(
-            self,
-            search_path: [MCTSVertex],
+        self,
+        search_path: [MCTSVertex],
     ) -> Reward:
         """
         Estimates the value of a leaf vertex.

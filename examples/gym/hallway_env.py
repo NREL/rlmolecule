@@ -6,9 +6,8 @@ import gym
 
 
 class HallwayEnv(gym.Env):
-
     def __init__(self, size: int, max_steps: int):
-        
+
         self.size = size
         self.max_steps = max_steps
 
@@ -16,10 +15,9 @@ class HallwayEnv(gym.Env):
         self.episode_steps = 0
 
         self.action_space = gym.spaces.Discrete(2)
-        self.observation_space = gym.spaces.Box(
-            low=np.array([0, 0]),
-            high=np.array([self.size, self.max_steps]),
-            dtype=np.int)
+        self.observation_space = gym.spaces.Box(low=np.array([0, 0]),
+                                                high=np.array([self.size, self.max_steps]),
+                                                dtype=np.int)
 
     def reset(self) -> np.ndarray:
         self.position = 0
@@ -43,7 +41,6 @@ class HallwayEnv(gym.Env):
     def get_obs(self) -> np.ndarray:
         return np.array([self.position, self.episode_steps], dtype=int)
 
-    
 
 if __name__ == "__main__":
     env = HallwayEnv(16, 16)

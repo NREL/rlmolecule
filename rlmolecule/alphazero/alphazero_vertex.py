@@ -15,7 +15,6 @@ class AlphaZeroVertex(MCTSVertex):
     Users must implement a `policy` function, that takes as inputs the next possible actions and returns a value
     score for the current vertex and prior score for each child.
     """
-
     def __init__(self, state: GraphSearchState) -> None:
         super().__init__(state)
 

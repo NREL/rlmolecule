@@ -112,33 +112,24 @@ class AddNewAtomsAndBonds(UniqueMoleculeTransformer):
         """ For a given atom, calculate the free valence remaining """
         return pt.GetDefaultValence(atom.GetSymbol()) - atom.GetExplicitValence()
 
-    def _get_valid_partners(self,
-                            starting_mol: rdkit.Chem.Mol,
-                            atom: rdkit.Chem.Atom) -> List[int]:
+    def _get_valid_partners(self, starting_mol: rdkit.Chem.Mol, atom: rdkit.Chem.Atom) -> List[int]:
         """ For a given atom, return other atoms it can be connected to """
         return list(
-            set(range(starting_mol.GetNumAtoms())) -
-            set((neighbor.GetIdx() for neighbor in atom.GetNeighbors())) -
+            set(range(starting_mol.GetNumAtoms())) - set((neighbor.GetIdx() for neighbor in atom.GetNeighbors())) -
             set(range(atom.GetIdx())) -  # Prevent duplicates by only bonding forward
-            set((atom.GetIdx(),)) |
-            set(np.arange(len(self.atom_additions)) + starting_mol.GetNumAtoms()))
+            set((atom.GetIdx(), )) | set(np.arange(len(self.atom_additions)) + starting_mol.GetNumAtoms()))
 
-    def _get_valid_bonds(self,
-                         starting_mol: rdkit.Chem.Mol,
-                         atom1_idx: int, atom2_idx: int) -> range:
+    def _get_valid_bonds(self, starting_mol: rdkit.Chem.Mol, atom1_idx: int, atom2_idx: int) -> range:
         """ Compare free valences of two atoms to calculate valid bonds """
         free_valence_1 = self._get_free_valence(starting_mol.GetAtomWithIdx(atom1_idx))
         if atom2_idx < starting_mol.GetNumAtoms():
             free_valence_2 = self._get_free_valence(starting_mol.GetAtomWithIdx(int(atom2_idx)))
         else:
-            free_valence_2 = pt.GetDefaultValence(
-                self.atom_additions[atom2_idx - starting_mol.GetNumAtoms()])
+            free_valence_2 = pt.GetDefaultValence(self.atom_additions[atom2_idx - starting_mol.GetNumAtoms()])
 
         return range(min(min(free_valence_1, free_valence_2), 3))
 
-    def _add_bond(self,
-                  starting_mol: rdkit.Chem.Mol,
-                  atom1_idx: int, atom2_idx: int, bond_type: int) -> Chem.RWMol:
+    def _add_bond(self, starting_mol: rdkit.Chem.Mol, atom1_idx: int, atom2_idx: int, bond_type: int) -> Chem.RWMol:
         """ Given two atoms and a bond type, execute the addition using rdkit """
         num_atom = starting_mol.GetNumAtoms()
         rw_mol = Chem.RWMol(starting_mol)
@@ -147,8 +138,7 @@ class AddNewAtomsAndBonds(UniqueMoleculeTransformer):
             rw_mol.AddBond(atom1_idx, atom2_idx, bond_orders[bond_type])
 
         else:
-            rw_mol.AddAtom(Chem.Atom(
-                self.atom_additions[atom2_idx - num_atom]))
+            rw_mol.AddAtom(Chem.Atom(self.atom_additions[atom2_idx - num_atom]))
             rw_mol.AddBond(atom1_idx, num_atom, bond_orders[bond_type])
 
         return rw_mol

@@ -4,7 +4,6 @@ import logging
 import pickle
 from typing import Sequence
 
-
 import numpy as np
 import gym
 
@@ -17,8 +16,7 @@ logger = logging.getLogger(__name__)
 class GymEnvState(GraphSearchState):
     """Gyn env state implementation that maps the gym API to the GraphSearchState
     interface.  Should work generically for any gym env."""
-
-    def __init__(self, 
+    def __init__(self,
                  env: AlphaZeroGymEnv,
                  step_count: int,
                  step_reward: float,
@@ -51,6 +49,5 @@ class GymEnvState(GraphSearchState):
                 env_copy = deepcopy(self.env)
                 _, step_rew, done, meta = env_copy.step(action)
                 cumulative_rew = self.cumulative_reward + step_rew
-                next_actions.append(
-                    GymEnvState(env_copy, self.step_count+1, step_rew, cumulative_rew, done, meta))
+                next_actions.append(GymEnvState(env_copy, self.step_count + 1, step_rew, cumulative_rew, done, meta))
         return next_actions

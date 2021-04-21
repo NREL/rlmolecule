@@ -2,8 +2,6 @@ import functools
 from abc import ABC
 
 import numpy as np
-import rdkit
-import sqlalchemy
 from rdkit.Chem.QED import qed
 
 from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
@@ -13,7 +11,6 @@ from rlmolecule.molecule.molecule_state import MoleculeState
 
 
 class QEDOptimizationProblem(MoleculeProblem, AlphaZeroProblem, ABC):
-
     @functools.lru_cache(maxsize=None)
     def get_reward(self, state: MoleculeState) -> (float, {}):
         if state.forced_terminal:
@@ -22,7 +19,6 @@ class QEDOptimizationProblem(MoleculeProblem, AlphaZeroProblem, ABC):
 
 
 class QEDWithRandomPolicy(QEDOptimizationProblem):
-
     def get_value_and_policy(self, parent: AlphaZeroVertex) -> (float, {AlphaZeroVertex: float}):
         random_state = np.random.RandomState()
         children = parent.children

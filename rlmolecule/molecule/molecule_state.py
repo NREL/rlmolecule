@@ -13,13 +13,13 @@ class MoleculeState(GraphSearchState):
     Molecules are stored as rdkit Mol instances, and the rdkit-generated SMILES string is also stored for
     efficient hashing.
     """
-
-    def __init__(self,
-                 molecule: Mol,
-                 builder: any,
-                 force_terminal: bool = False,
-                 smiles: Optional[str] = None,
-                 ) -> None:
+    def __init__(
+        self,
+        molecule: Mol,
+        builder: any,
+        force_terminal: bool = False,
+        smiles: Optional[str] = None,
+    ) -> None:
         """
         :param molecule: an RDKit molecule specifying the current state
         :param builder: A MoleculeConfig class

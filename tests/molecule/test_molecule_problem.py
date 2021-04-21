@@ -12,18 +12,12 @@ from tests.qed_optimization_problem import QEDWithMoleculePolicy
 
 @pytest.fixture
 def builder():
-    return MoleculeBuilder(max_atoms=4,
-                           min_atoms=1,
-                           tryEmbedding=False,
-                           sa_score_threshold=None,
-                           stereoisomers=False)
+    return MoleculeBuilder(max_atoms=4, min_atoms=1, tryEmbedding=False, sa_score_threshold=None, stereoisomers=False)
 
 
 @pytest.fixture
 def problem(engine, builder):
-    return QEDWithMoleculePolicy(reward_class=LinearBoundedRewardFactory(),
-                                 engine=engine,
-                                 builder=builder)
+    return QEDWithMoleculePolicy(reward_class=LinearBoundedRewardFactory(), engine=engine, builder=builder)
 
 
 @pytest.fixture
@@ -49,8 +43,8 @@ def test_get_batched_network_inputs(solver, vertex):
     assert batched_network_inputs['atom'].ndim == 2
     assert batched_network_inputs['connectivity'].ndim == 3
 
-    assert (batched_network_inputs['atom'][5] ==
-            solver.problem.get_policy_inputs(vertex.children[4].state)['atom']).all()
+    assert (batched_network_inputs['atom'][5] == solver.problem.get_policy_inputs(
+        vertex.children[4].state)['atom']).all()
 
 
 def test_get_value_and_policy(solver, vertex):
