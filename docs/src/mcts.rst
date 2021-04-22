@@ -3,6 +3,8 @@
 MCTS
 ====
 
+MCTS Base
+---------
 Monte Carlo Tree Search
 
 .. automodule:: rlmolecule.mcts.mcts
