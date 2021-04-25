@@ -1,3 +1,4 @@
+from examples.gym.gridworld_env import policy
 import logging
 import time
 import sys
@@ -12,8 +13,10 @@ from rlmolecule.gym.gym_problem import GymProblem
 from rlmolecule.gym.gym_state import GymEnvState
 from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
 
-from tf_model import policy_model_2
-import gridworld_env as gw
+from tf_model import scalar_obs_policy #policy_model_2
+
+from gridworld_env import GridWorldEnv as GridEnv
+from gridworld_env import make_empty_grid
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -36,33 +39,38 @@ class GridWorldEnv(AlphaZeroGymEnv):
 
 class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
     def __init__(self, *,
-                 env: gw.GridEnv,
+                 env: GridWorldEnv,
                  engine: "sqlalchemy.engine.Engine",
                  reward_class: Reward,
                  **kwargs) -> None:
         super().__init__(reward_class=reward_class, engine=engine, env=env, **kwargs)
 
     def policy_model(self) -> "tf.keras.Model":
-        obs_shape = self.env.reset().shape
-        return policy_model_2(obs_dim=obs_shape,
-                              hidden_layers=2,
-                              conv_layers=1,
-                              filters_dim=[16],
-                              kernel_dim=[2],
-                              strides_dim=[1],
-                              hidden_dim=64)
+
+        # obs_shape = self.env.reset().shape
+        
+        # _dim = int(self.env.size / 4)
+        # return policy_model_2(
+        #     filters=[4, 8, 16],
+        #     kernel_size=[_dim, 2, 2],
+        #     strides=[_dim, 2, 1],
+        #     obs_dim=obs_shape,
+        #     hidden_layers=1,
+        #     hidden_dim=256)
+
+        return scalar_obs_policy(hidden_layers=2, hidden_dim=256)
 
     def get_policy_inputs(self, state: GymEnvState) -> dict:
         return {
             "obs": state.env.get_obs(),
-            "steps": 0.*np.array([np.float64(self.env.episode_steps)])
+            #"steps": 0.*np.array([np.float64(self.env.episode_steps)])
         }
 
     def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
         return state.cumulative_reward, {}
 
 
-def construct_problem():
+def construct_problem(size):
 
     from rlmolecule.tree_search.reward import RankedRewardFactory
 
@@ -83,43 +91,43 @@ def construct_problem():
     engine_str = f'{drivername}://{user}:{passwd}@{host}:{port}/{dbname}'
     engine = create_engine(engine_str, execution_options={"isolation_level": "AUTOCOMMIT"})
 
-    run_id = "gridworld_example"
+    run_id = "gridworld_{}".format(size)
+    policy_checkpoint_dir = "{}_policy_checkpoints".format(run_id)
+    logger.info("run_id={}, policy_checkpoint_dir={}".format(run_id, policy_checkpoint_dir))
 
     reward_factory = RankedRewardFactory(
             engine=engine,
             run_id=run_id,
-            reward_buffer_min_size=20,
-            reward_buffer_max_size=20,
-            ranked_reward_alpha=0.75
+            reward_buffer_min_size=34,
+            reward_buffer_max_size=200,
+            ranked_reward_alpha=0.8
     )
 
-    grid = np.zeros((3, 5, 5), dtype=np.float64)
-    grid[gw.PLAYER_CHANNEL, 0, 0] = 1
-    grid[gw.GOAL_CHANNEL, -1, -1] = 1
-    env = gw.GridEnv(grid, max_episode_steps=12)
+    grid = make_empty_grid(size=size)
+    env = GridEnv(grid, sparse_rewards=True, use_grayscale_obs=True)
 
     problem = GridWorldProblem(
         env=env,
         engine=engine,
         reward_class=reward_factory,
         run_id=run_id,
-        min_buffer_size=10,
-        max_buffer_size=10,
+        min_buffer_size=34,
+        max_buffer_size=200,
         batch_size=32,
-        policy_checkpoint_dir='gridworld_policy_checkpoints'
+        policy_checkpoint_dir=policy_checkpoint_dir
     )
 
     return problem
 
 
-def run_games(use_mcts=False, num_mcts_samples=64, num_games=None):
+def run_games(size, use_mcts=False, num_mcts_samples=64, num_games=None):
 
     if use_mcts:
         from rlmolecule.mcts.mcts import MCTS
-        game = MCTS(construct_problem())
+        game = MCTS(construct_problem(size=size))
     else:
         from rlmolecule.alphazero.alphazero import AlphaZero
-        game = AlphaZero(construct_problem(), dirichlet_noise=False)
+        game = AlphaZero(construct_problem(size=size), dirichlet_noise=False)
 
     # TODO: here, allow max games
     num_games = num_games if num_games is not None else sys.maxsize
@@ -129,19 +137,19 @@ def run_games(use_mcts=False, num_mcts_samples=64, num_games=None):
         elapsed = time.time() - start_time
         print("REWARD:", reward.__dict__)
         logger.info(('Game Finished -- Reward {:.3f}'.format(reward.raw_reward) +
-                      ' -- Final state {}'.format(path[-1]) +
+                      #' -- Final state {}'.format(path[-1]) +
                       ' -- CPU time {:1.3f} (s)'.format(elapsed)))
 
-def train_model():
-    construct_problem().train_policy_model(steps_per_epoch=100,
+def train_model(size):
+    construct_problem(size).train_policy_model(steps_per_epoch=100,
                                            game_count_delay=10,
                                            verbose=2)
 
 
-def monitor():
+def monitor(size):
 
     from rlmolecule.sql.tables import RewardStore
-    problem = construct_problem()
+    problem = construct_problem(size=size)
 
     while True:
         best_reward = problem.session.query(RewardStore) \
@@ -170,13 +178,13 @@ if __name__ == "__main__":
         description='Solve the Hallway problem (move from one side of the hallway to the other). ' +
                 'Default is to run multiple games and training using multiprocessing')
 
+    parser.add_argument("--size", type=int, default=8)
     parser.add_argument('--train-policy', action="store_true", default=False,
                         help='Train the policy model only (on GPUs)')
     parser.add_argument('--rollout', action="store_true", default=False,
                         help='Run the game simulations only (on CPUs)')
-    parser.add_argument('--use_multiprocessing', action="store_true", default=False)
-    parser.add_argument('--num-workers', type=int, default=7,
-                        help='Number of multiprocessing workers when running local rollout')
+    parser.add_argument('--num-workers', type=int, default=3,
+                        help='Number of multiprocessing workers')
     parser.add_argument("--num-games", type=int, default=None)
     parser.add_argument("--num-mcts-samples", type=int, default=50)
     parser.add_argument("--use-mcts", action="store_true")
@@ -187,31 +195,34 @@ if __name__ == "__main__":
     logger.setLevel(level=getattr(logging, args.log_level.upper()))
 
     if args.train_policy:
-        train_model()
+        train_model(args.size)
     elif args.rollout:
         run_games(
+            size=args.size,
             use_mcts=args.use_mcts,
             num_mcts_samples=args.num_mcts_samples,
             num_games=args.num_games)
-    elif args.use_multiprocessing:
+    else:
         assert args.num_workers >= 3  # need at least 3 workers here...
 
         import multiprocessing
 
-        jobs = [multiprocessing.Process(target=monitor)]
+        jobs = [multiprocessing.Process(target=monitor, args=(args.size,))]
         jobs[0].start()
         time.sleep(1)
 
         for i in range(args.num_workers - 2):
-            jobs += [multiprocessing.Process(target=run_games)]
+            jobs += [
+                multiprocessing.Process(
+                    target=run_games,
+                    args=(args.size, args.use_mcts, args.num_mcts_samples)
+                )
+            ]
 
-        jobs += [multiprocessing.Process(target=train_model)]
+        jobs += [multiprocessing.Process(target=train_model, args=(args.size,))]
 
         for job in jobs[1:]:
             job.start()
 
         for job in jobs:
             job.join(300)
-    else:
-        print("No arguments given!")
-
