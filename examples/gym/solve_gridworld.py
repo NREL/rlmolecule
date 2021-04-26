@@ -63,7 +63,7 @@ class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
     def get_policy_inputs(self, state: GymEnvState) -> dict:
         return {
             "obs": state.env.get_obs(),
-            #"steps": 0.*np.array([np.float64(self.env.episode_steps)])
+            "steps": 0.*np.array([np.float64(self.env.episode_steps)])
         }
 
     def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
@@ -98,9 +98,9 @@ def construct_problem(size):
     reward_factory = RankedRewardFactory(
             engine=engine,
             run_id=run_id,
-            reward_buffer_min_size=34,
-            reward_buffer_max_size=200,
-            ranked_reward_alpha=0.8
+            reward_buffer_min_size=32,
+            reward_buffer_max_size=32,
+            ranked_reward_alpha=0.75
     )
 
     grid = make_empty_grid(size=size)
@@ -111,8 +111,8 @@ def construct_problem(size):
         engine=engine,
         reward_class=reward_factory,
         run_id=run_id,
-        min_buffer_size=34,
-        max_buffer_size=200,
+        min_buffer_size=32,
+        max_buffer_size=32,
         batch_size=32,
         policy_checkpoint_dir=policy_checkpoint_dir
     )
@@ -120,7 +120,9 @@ def construct_problem(size):
     return problem
 
 
-def run_games(size, use_mcts=False, num_mcts_samples=64, num_games=None):
+def run_games(size, use_mcts=False, num_mcts_samples=64, num_games=None, seed=None):
+
+    if seed is not None: np.random.seed(seed)
 
     if use_mcts:
         from rlmolecule.mcts.mcts import MCTS
@@ -141,9 +143,10 @@ def run_games(size, use_mcts=False, num_mcts_samples=64, num_games=None):
                       ' -- CPU time {:1.3f} (s)'.format(elapsed)))
 
 def train_model(size):
-    construct_problem(size).train_policy_model(steps_per_epoch=100,
-                                           game_count_delay=10,
-                                           verbose=2)
+    construct_problem(size).train_policy_model(
+        steps_per_epoch=100,
+        game_count_delay=10,
+        verbose=2)
 
 
 def monitor(size):
@@ -215,7 +218,7 @@ if __name__ == "__main__":
             jobs += [
                 multiprocessing.Process(
                     target=run_games,
-                    args=(args.size, args.use_mcts, args.num_mcts_samples)
+                    args=(args.size, args.use_mcts, args.num_mcts_samples, i)
                 )
             ]
 

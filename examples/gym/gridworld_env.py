@@ -59,7 +59,7 @@ class GridWorldEnv(gym.Env):
 
         # Gym spaces
         if self.use_scalar_obs:
-            self.obs_shape = [1, 2]
+            self.obs_shape = [2]
         else:
             self.obs_shape = list(self.initial_grid.shape)
         if self.use_grayscale_obs:
@@ -85,7 +85,7 @@ class GridWorldEnv(gym.Env):
         if self.use_scalar_obs:
             obs = np.where(obs[:, :, PLAYER_CHANNEL].squeeze())
             obs = np.array([1.*obs[0]/self.size, 1.*obs[1]/self.size])
-            obs = obs.reshape(1, 2)
+            obs = obs.squeeze()
         elif self.use_grayscale_obs:
             obs[0, :, :] *= 1/3.
             obs[1, :, :] *= 2/3.
@@ -165,9 +165,10 @@ def make_doorway_grid():
 
     return grid
 
+
 def policy(env):
-    # Find the vector pointing towards the goal, and choose the first non-zero
-    # direction.  
+    # An optimal policy for empty gridworld: find the vector pointing towards
+    # the goal, and choose the first non-zero direction.  
     goal_direction = np.array(env.goal) - np.array(env.player)
     action = np.where(goal_direction.squeeze() != 0)[0][0]
     if action == 0:
@@ -181,20 +182,21 @@ def policy(env):
 
 if __name__ == "__main__":
     
-    from tf_model import scalar_obs_policy
-
-    model = scalar_obs_policy()
+    #from tf_model import scalar_obs_policy
+    #model = scalar_obs_policy()
 
     grid = make_empty_grid(size=32)
     env = GridWorldEnv(grid=grid, use_scalar_obs=True)
     obs = env.reset()
     
-    print("OBS", obs, obs.shape)
-    print("PREDICT", model.predict(obs.reshape(1, 1, 2)))
+    #print("OBS", obs, obs.shape)
+    #print("PREDICT", model.predict(obs.reshape(1, 1, 2)))
 
     done, rew, step = False, 0., 0
     while not done:
-        action = env.action_space.sample()
+        # action = env.action_space.sample()
+        # action = model.predict(obs.reshape(1, 1, 2))
+        action = policy(env)
         obs, r, done, _ = env.step(action)
         rew += r
         step += 1
