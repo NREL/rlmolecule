@@ -124,13 +124,16 @@ class RankedRewardFactory(RewardFactory):
 
         r_alpha = np.percentile(np.array(buffer_raw_rewards), 100 * self._ranked_reward_alpha, interpolation='lower')
 
-        logger.debug(f"ranked_reward: r_alpha={r_alpha}, reward={reward}")
-
         if np.isclose(reward, r_alpha):
-            return np.random.choice([0., 1.])
+            scaled_reward = np.random.choice([0., 1.])
 
         elif reward > r_alpha:
-            return 1.
+            scaled_reward = 1.
 
         elif reward < r_alpha:
-            return 0.
+            scaled_reward = 0.
+
+        logger.debug(f"ranked_reward: run_id={self.run_id}, r_alpha={r_alpha}, "
+                     f"reward={reward}, scaled={scaled_reward}")
+
+        return scaled_reward
