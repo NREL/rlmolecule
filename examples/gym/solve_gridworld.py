@@ -47,17 +47,6 @@ class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
 
     def policy_model(self) -> "tf.keras.Model":
 
-        # obs_shape = self.env.reset().shape
-        
-        # _dim = int(self.env.size / 4)
-        # return policy_model_2(
-        #     filters=[4, 8, 16],
-        #     kernel_size=[_dim, 2, 2],
-        #     strides=[_dim, 2, 1],
-        #     obs_dim=obs_shape,
-        #     hidden_layers=1,
-        #     hidden_dim=256)
-
         return scalar_obs_policy(hidden_layers=2, hidden_dim=256)
 
     def get_policy_inputs(self, state: GymEnvState) -> dict:
@@ -92,14 +81,14 @@ def construct_problem(size):
     engine = create_engine(engine_str, execution_options={"isolation_level": "AUTOCOMMIT"})
 
     run_id = "gridworld_{}".format(size)
-    policy_checkpoint_dir = "{}_policy_checkpoints".format(run_id)
-    logger.info("run_id={}, policy_checkpoint_dir={}".format(run_id, policy_checkpoint_dir))
+    #policy_checkpoint_dir = "{}_policy_checkpoints".format(run_id)
+    #logger.info("run_id={}, policy_checkpoint_dir={}".format(run_id, policy_checkpoint_dir))
 
     reward_factory = RankedRewardFactory(
             engine=engine,
             run_id=run_id,
-            reward_buffer_min_size=32,
-            reward_buffer_max_size=32,
+            reward_buffer_min_size=64,
+            reward_buffer_max_size=200,
             ranked_reward_alpha=0.75
     )
 
@@ -111,10 +100,9 @@ def construct_problem(size):
         engine=engine,
         reward_class=reward_factory,
         run_id=run_id,
-        min_buffer_size=32,
-        max_buffer_size=32,
-        batch_size=32,
-        policy_checkpoint_dir=policy_checkpoint_dir
+        min_buffer_size=64,
+        max_buffer_size=200,
+        batch_size=32
     )
 
     return problem
@@ -122,14 +110,14 @@ def construct_problem(size):
 
 def run_games(size, use_mcts=False, num_mcts_samples=64, num_games=None, seed=None):
 
-    if seed is not None: np.random.seed(seed)
+    np.random.seed(seed)
 
     if use_mcts:
         from rlmolecule.mcts.mcts import MCTS
         game = MCTS(construct_problem(size=size))
     else:
         from rlmolecule.alphazero.alphazero import AlphaZero
-        game = AlphaZero(construct_problem(size=size), dirichlet_noise=False)
+        game = AlphaZero(construct_problem(size=size), dirichlet_noise=True)
 
     # TODO: here, allow max games
     num_games = num_games if num_games is not None else sys.maxsize
@@ -137,8 +125,8 @@ def run_games(size, use_mcts=False, num_mcts_samples=64, num_games=None, seed=No
         start_time = time.time()
         path, reward = game.run(num_mcts_samples=num_mcts_samples)
         elapsed = time.time() - start_time
-        print("REWARD:", reward.__dict__)
-        logger.info(('Game Finished -- Reward {:.3f}'.format(reward.raw_reward) +
+        print("Seed {} | REWARD: {}   ".format(seed, reward.__dict__))
+        logger.info(('Seed {} | Game Finished -- Reward {:.3f}'.format(seed, reward.raw_reward) +
                       #' -- Final state {}'.format(path[-1]) +
                       ' -- CPU time {:1.3f} (s)'.format(elapsed)))
 
@@ -215,10 +203,11 @@ if __name__ == "__main__":
         time.sleep(1)
 
         for i in range(args.num_workers - 2):
+            seed = np.random.randint(99999999)
             jobs += [
                 multiprocessing.Process(
                     target=run_games,
-                    args=(args.size, args.use_mcts, args.num_mcts_samples, i)
+                    args=(args.size, args.use_mcts, args.num_mcts_samples, seed)
                 )
             ]
 
