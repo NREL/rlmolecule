@@ -14,7 +14,6 @@ class GraphSearchState(ABC):
     """
     Simply defines a directed graph structure which is incrementally navigated via the get_successors() method.
     """
-
     @abstractmethod
     def equals(self, other: 'GraphSearchState') -> bool:
         """

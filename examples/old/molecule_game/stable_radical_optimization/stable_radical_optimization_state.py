@@ -14,9 +14,8 @@ class StableRadicalOptimizationState(MoleculeState):
     A MoleculeNode implementation which uses simple transformations (such as adding a bond) to define
     a graph over molecular structures.
     """
-
-    def __init__(self, molecule: Mol, config: any, force_terminal: bool) -> None:
-        super().__init__(molecule, config, force_terminal)
+    def __init__(self, molecule: Mol, builder: any, force_terminal: bool) -> None:
+        super().__init__(molecule, builder, force_terminal)
 
     @property
     def is_radical(self) -> bool:
@@ -24,7 +23,7 @@ class StableRadicalOptimizationState(MoleculeState):
 
     def get_next_actions(self) -> Iterable['StableRadicalOptimizationState']:
         # TODO: should these functions be brought into this class?
-        config = self.config
+        config = self.builder
         result = []
         if not self._forced_terminal:
             if self.num_atoms < config.max_atoms:

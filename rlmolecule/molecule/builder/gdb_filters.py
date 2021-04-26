@@ -2,8 +2,8 @@ from collections import Counter
 
 import rdkit
 
-
 # These filters should return 'False' if it passes the criteria
+
 
 def h2(mol):
     """no atom shared by two small rings"""
@@ -32,8 +32,8 @@ def s2(mol):
         for bond in bonds:
             if mol.GetBondWithIdx(bond).GetBondTypeAsDouble() > 1:
                 return True
-    else:
-        return False
+
+    return False
 
 
 def s3(mol):
@@ -43,8 +43,8 @@ def s3(mol):
         atom_centers = Counter((mol.GetAtomWithIdx(atom).GetHybridization() for atom in c_atoms))
         if atom_centers[rdkit.Chem.rdchem.HybridizationType.SP2] > 1:
             return True
-    else:
-        return False
+
+    return False
 
 
 def s4(mol):
@@ -58,8 +58,8 @@ def f2(mol):
         atom_types = Counter((mol.GetAtomWithIdx(atom).GetSymbol() for atom in atoms))
         if atom_types['O'] + atom_types['S'] + atom_types['N'] > 1:
             return True
-    else:
-        return False
+
+    return False
 
 
 def check_all_filters(mol):
@@ -68,5 +68,4 @@ def check_all_filters(mol):
         if fn(mol):
             return False
 
-    else:
-        return True
+    return True

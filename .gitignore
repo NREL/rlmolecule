@@ -145,3 +145,4 @@ rlops_pass
 .idea/
 
 .vscode
+*.sw[op]

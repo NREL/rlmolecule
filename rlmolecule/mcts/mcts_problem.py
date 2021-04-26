@@ -8,7 +8,6 @@ from rlmolecule.tree_search.reward import RawRewardFactory, Reward, RewardFactor
 
 
 class MCTSProblem(ABC):
-
     def __init__(self, *, reward_class: RewardFactory):
         self.__id = None
         self.reward_class = reward_class

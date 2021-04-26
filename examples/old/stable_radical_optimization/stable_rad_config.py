@@ -27,8 +27,7 @@ config.checkpoint_filepath = os.path.expandvars(
 
 config.dirichlet_x = 0.5  # percentage to favor dirichlet noise vs. prior estimation. Smaller means less noise
 
-config.build_kwargs.update({'atom_additions':     ('C', 'N', 'O', 'S'),
-                            'sa_score_threshold': 4.})
+config.build_kwargs.update({'atom_additions': ('C', 'N', 'O', 'S'), 'sa_score_threshold': 4.})
 
 # config.max_atoms = 15
 config.max_atoms = 5

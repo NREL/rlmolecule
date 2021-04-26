@@ -2,7 +2,6 @@ from typing import Optional, Sequence
 
 from rdkit.Chem import Mol, MolToSmiles
 
-from rlmolecule.molecule.molecule_building import build_molecules
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
 
@@ -14,20 +13,20 @@ class MoleculeState(GraphSearchState):
     Molecules are stored as rdkit Mol instances, and the rdkit-generated SMILES string is also stored for
     efficient hashing.
     """
-
-    def __init__(self,
-                 molecule: Mol,
-                 config: any,
-                 force_terminal: bool = False,
-                 smiles: Optional[str] = None,
-                 ) -> None:
+    def __init__(
+        self,
+        molecule: Mol,
+        builder: any,
+        force_terminal: bool = False,
+        smiles: Optional[str] = None,
+    ) -> None:
         """
         :param molecule: an RDKit molecule specifying the current state
-        :param config: A MoleculeConfig class
+        :param builder: A MoleculeConfig class
         :param force_terminal: Whether to force this molecule to be a terminal state
         :param smiles: An optional smiles string for the molecule; must match `molecule`.
         """
-        self._config: any = config
+        self._builder: any = builder
         self._molecule: Mol = molecule
         self._smiles: str = MolToSmiles(self._molecule) if smiles is None else smiles
         self._forced_terminal: bool = force_terminal
@@ -56,18 +55,11 @@ class MoleculeState(GraphSearchState):
     def get_next_actions(self) -> Sequence['MoleculeState']:
         result = []
         if not self._forced_terminal:
-            if self.num_atoms < self.config.max_atoms:
-                result.extend((MoleculeState(molecule, self.config) for molecule in
-                               build_molecules(
-                                   self.molecule,
-                                   atom_additions=self.config.atom_additions,
-                                   stereoisomers=self.config.stereoisomers,
-                                   sa_score_threshold=self.config.sa_score_threshold,
-                                   tryEmbedding=self.config.tryEmbedding
-                               )))
+            if self.num_atoms < self.builder.max_atoms:
+                result.extend((MoleculeState(molecule, self.builder) for molecule in self.builder(self.molecule)))
 
-            if self.num_atoms >= self.config.min_atoms:
-                result.append(MoleculeState(self.molecule, self.config, force_terminal=True))
+            if self.num_atoms >= self.builder.min_atoms:
+                result.append(MoleculeState(self.molecule, self.builder, force_terminal=True))
 
         return result
 
@@ -76,8 +68,8 @@ class MoleculeState(GraphSearchState):
         return self._forced_terminal
 
     @property
-    def config(self) -> any:
-        return self._config
+    def builder(self) -> any:
+        return self._builder
 
     @property
     def smiles(self) -> str:

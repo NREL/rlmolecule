@@ -20,7 +20,6 @@ class AlphaZero(MCTS):
     
     AlphaZeroGame interacts with AlphaZeroVertex. See AlphaZeroVertex for more details.
     """
-
     def __init__(self,
                  problem: AlphaZeroProblem,
                  min_reward: float = 0.0,
@@ -29,7 +28,7 @@ class AlphaZero(MCTS):
                  dirichlet_noise: bool = True,
                  dirichlet_alpha: float = 1.0,
                  dirichlet_x: float = 0.25,
-                 ) -> None:
+                 **kwargs) -> None:
         """
         Constructor.
         :param min_reward: Minimum reward to return for invalid actions
@@ -39,7 +38,7 @@ class AlphaZero(MCTS):
         :param dirichlet_alpha: dirichlet 'shape' parameter. Larger values spread out probability over more moves.
         :param dirichlet_x: percentage to favor dirichlet noise vs. prior estimation. Smaller means less noise
         """
-        super().__init__(problem, vertex_class=AlphaZeroVertex)
+        super().__init__(problem, vertex_class=AlphaZeroVertex, **kwargs)
         self._min_reward: float = min_reward
         self._pb_c_base: float = pb_c_base
         self._pb_c_init: float = pb_c_init
@@ -55,13 +54,12 @@ class AlphaZero(MCTS):
     def _accumulate_path_data(self, vertex: MCTSVertex, path: []):
         children = vertex.children
         visit_sum = sum(child.visit_count for child in children)
-        child_visits = [(child, child.visit_count / visit_sum)
-                        for child in children]
+        child_visits = [(child, child.visit_count / visit_sum) for child in children]
         path.append((vertex, child_visits))
 
     def _evaluate(
-            self,
-            search_path: [AlphaZeroVertex],
+        self,
+        search_path: [AlphaZeroVertex],
     ) -> Reward:
         """
         Expansion step of AlphaZero, overrides MCTS evaluate step.

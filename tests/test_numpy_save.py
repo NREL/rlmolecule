@@ -21,4 +21,3 @@ def test_load():
 
     for key in data.keys():
         assert np.all(data[key] == loaded_data[key])
-

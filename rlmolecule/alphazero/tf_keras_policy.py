@@ -9,10 +9,7 @@ from tensorflow.python.keras.utils import losses_utils
 
 
 class PolicyWrapper(layers.Layer):
-
-    def __init__(self,
-                 single_position_policy: tf.keras.Model,
-                 **kwargs):
+    def __init__(self, single_position_policy: tf.keras.Model, **kwargs):
 
         super().__init__(**kwargs)
         self.single_position_policy = single_position_policy
@@ -51,10 +48,7 @@ class PolicyWrapper(layers.Layer):
         value_mask, prior_mask = self.compute_mask(inputs, mask)
 
         # Apply the mask
-        masked_prior_logits = tf.where(
-            prior_mask,
-            prior_logits,
-            tf.ones_like(prior_logits) * prior_logits.dtype.min)
+        masked_prior_logits = tf.where(prior_mask, prior_logits, tf.ones_like(prior_logits) * prior_logits.dtype.min)
 
         return value_preds, masked_prior_logits
 
@@ -82,10 +76,8 @@ class PolicyWrapper(layers.Layer):
             return None
 
     @classmethod
-    def build_policy_model(cls,
-                           single_position_policy: tf.keras.Model,
-                           mask_dict: {str: Optional[float]}
-                           ) -> tf.keras.Model:
+    def build_policy_model(cls, single_position_policy: tf.keras.Model,
+                           mask_dict: {str: Optional[float]}) -> tf.keras.Model:
         """ Main entry point for initializing the wrapped policy model. Expands the input dimensions of the single
         position policy model in order to account for batches of positions.
 
@@ -101,9 +93,7 @@ class PolicyWrapper(layers.Layer):
         batched_inputs_with_mask = []
 
         for single_input, input_name in zip(inputs, align_input_names(inputs, mask_dict)):
-            batched_input = tf.keras.Input(shape=single_input.shape,
-                                           name=input_name,
-                                           dtype=single_input.dtype)
+            batched_input = tf.keras.Input(shape=single_input.shape, name=input_name, dtype=single_input.dtype)
             batched_inputs += [batched_input]
             batched_inputs_with_mask += [layers.Masking(mask_dict[input_name])(batched_input)]
 
@@ -147,22 +137,16 @@ def kl_with_logits(y_true, y_pred) -> tf.Tensor:
     # Mask nan values in y_true with zeros
     y_true = tf.where(tf.math.is_finite(y_true), y_true, tf.zeros_like(y_true))
 
-    return (
-            tf.keras.losses.categorical_crossentropy(y_true, y_pred, from_logits=True) -
+    return (tf.keras.losses.categorical_crossentropy(y_true, y_pred, from_logits=True) -
             tf.keras.losses.categorical_crossentropy(y_true, y_true, from_logits=False))
 
 
 class KLWithLogits(LossFunctionWrapper):
     """ Keras sometimes wants these loss function wrappers to define how to
     reduce the loss over variable batch sizes """
+    def __init__(self, reduction=losses_utils.ReductionV2.AUTO, name='kl_with_logits'):
+        super(KLWithLogits, self).__init__(kl_with_logits, name=name, reduction=reduction)
 
-    def __init__(self,
-                 reduction=losses_utils.ReductionV2.AUTO,
-                 name='kl_with_logits'):
-        super(KLWithLogits, self).__init__(
-            kl_with_logits,
-            name=name,
-            reduction=reduction)
 
 # def get_input_mask_dict(inputs: list,
 #                         mask_dict: dict = {},

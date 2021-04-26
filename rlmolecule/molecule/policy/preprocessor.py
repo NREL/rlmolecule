@@ -12,16 +12,9 @@ def atom_featurizer(atom: rdkit.Chem.Atom) -> str:
     :return: a string representation for embedding
     """
 
-    return str((
-        atom.GetSymbol(),
-        atom.GetNumRadicalElectrons(),
-        atom.GetFormalCharge(),
-        atom.GetChiralTag().name,
-        atom.GetIsAromatic(),
-        nfp.get_ring_size(atom, max_size=6),
-        atom.GetDegree(),
-        atom.GetTotalNumHs(includeNeighbors=True)
-    ))
+    return str((atom.GetSymbol(), atom.GetNumRadicalElectrons(), atom.GetFormalCharge(), atom.GetChiralTag().name,
+                atom.GetIsAromatic(), nfp.get_ring_size(atom, max_size=6), atom.GetDegree(),
+                atom.GetTotalNumHs(includeNeighbors=True)))
 
 
 def bond_featurizer(bond: rdkit.Chem.Bond, flipped: bool = False) -> str:
@@ -32,13 +25,9 @@ def bond_featurizer(bond: rdkit.Chem.Bond, flipped: bool = False) -> str:
     :return: a string representation of the bond type
     """
     if not flipped:
-        atoms = "{}-{}".format(
-            *tuple((bond.GetBeginAtom().GetSymbol(),
-                    bond.GetEndAtom().GetSymbol())))
+        atoms = "{}-{}".format(*tuple((bond.GetBeginAtom().GetSymbol(), bond.GetEndAtom().GetSymbol())))
     else:
-        atoms = "{}-{}".format(
-            *tuple((bond.GetEndAtom().GetSymbol(),
-                    bond.GetBeginAtom().GetSymbol())))
+        atoms = "{}-{}".format(*tuple((bond.GetEndAtom().GetSymbol(), bond.GetBeginAtom().GetSymbol())))
 
     bstereo = bond.GetStereo().name
     btype = str(bond.GetBondType())
@@ -53,8 +42,7 @@ def filter_keys(attribute: Dict) -> Dict:
     :param attribute: A dictionary containing unnecessary keys
     :return: The same dictionary with only 'atom', 'bond', and 'connectivity' arrays
     """
-    return {key: value for key, value in attribute.items()
-            if key in {'atom', 'bond', 'connectivity'}}
+    return {key: value for key, value in attribute.items() if key in {'atom', 'bond', 'connectivity'}}
 
 
 class MolPreprocessor(nfp.preprocessing.SmilesPreprocessor):
@@ -85,9 +73,9 @@ class MolPreprocessor(nfp.preprocessing.SmilesPreprocessor):
         if n_bond == 0:
             n_bond = 1
 
-        atom_feature_matrix = np.zeros(n_atom, dtype='int')
-        bond_feature_matrix = np.zeros(n_bond, dtype='int')
-        connectivity = np.zeros((n_bond, 2), dtype='int')
+        atom_feature_matrix = np.zeros(n_atom, dtype='int64')
+        bond_feature_matrix = np.zeros(n_bond, dtype='int64')
+        connectivity = np.zeros((n_bond, 2), dtype='int64')
 
         if n_bond == 1:
             bond_feature_matrix[0] = self.bond_tokenizer('self-link')
@@ -96,8 +84,7 @@ class MolPreprocessor(nfp.preprocessing.SmilesPreprocessor):
         for n, atom in enumerate(mol.GetAtoms()):
 
             # Atom Classes
-            atom_feature_matrix[n] = self.atom_tokenizer(
-                self.atom_features(atom))
+            atom_feature_matrix[n] = self.atom_tokenizer(self.atom_features(atom))
 
             start_index = atom.GetIdx()
 
@@ -106,8 +93,7 @@ class MolPreprocessor(nfp.preprocessing.SmilesPreprocessor):
                 rev = bond.GetBeginAtomIdx() != start_index
 
                 # Bond Classes
-                bond_feature_matrix[bond_index] = self.bond_tokenizer(
-                    self.bond_features(bond, flipped=rev))
+                bond_feature_matrix[bond_index] = self.bond_tokenizer(self.bond_features(bond, flipped=rev))
 
                 # Connectivity
                 if not rev:  # Original direction
@@ -133,9 +119,7 @@ def load_preprocessor(saved_preprocessor_file: Optional[str] = None) -> MolPrepr
     :param saved_preprocessor_file: directory of the saved nfp.Preprocessor json data
     :return: a MolPreprocessor instance for the molecule policy network
     """
-    preprocessor = MolPreprocessor(atom_features=atom_featurizer,
-                                   bond_features=bond_featurizer,
-                                   explicit_hs=False)
+    preprocessor = MolPreprocessor(atom_features=atom_featurizer, bond_features=bond_featurizer, explicit_hs=False)
 
     if not saved_preprocessor_file:
         saved_preprocessor_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'preprocessor.json')

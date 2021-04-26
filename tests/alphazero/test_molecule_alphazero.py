@@ -6,22 +6,18 @@ import pytest
 import tensorflow as tf
 
 from rlmolecule.alphazero.alphazero import AlphaZero
-from rlmolecule.molecule.molecule_config import MoleculeConfig
-from rlmolecule.tree_search.reward import LinearBoundedRewardFactory, RankedRewardFactory, RawRewardFactory
+from rlmolecule.molecule.builder.builder import MoleculeBuilder
+from rlmolecule.tree_search.reward import LinearBoundedRewardFactory, RankedRewardFactory
 from tests.qed_optimization_problem import QEDWithMoleculePolicy
 
 
 @pytest.fixture()
-def config():
-    return MoleculeConfig(max_atoms=4,
-                          min_atoms=1,
-                          tryEmbedding=False,
-                          sa_score_threshold=None,
-                          stereoisomers=False)
+def builder():
+    return MoleculeBuilder(max_atoms=4, min_atoms=1, tryEmbedding=False, sa_score_threshold=None, stereoisomers=False)
 
 
 @pytest.fixture(scope='function')
-def game(request, engine, tmpdirname, config):
+def game(request, engine, tmpdirname, builder):
     """
     The scope here is function, so that the problem gets recreated for each test. Otherwise the trained policy
     network doesn't need to be loaded, since the trained model already exists in the problem.
@@ -34,12 +30,10 @@ def game(request, engine, tmpdirname, config):
         noise = True
 
     elif name == 'ranked':
-        reward_class = RankedRewardFactory(
-            reward_buffer_min_size=2,
-            reward_buffer_max_size=4,
-            run_id=name,
-            engine=engine
-        )
+        reward_class = RankedRewardFactory(reward_buffer_min_size=2,
+                                           reward_buffer_max_size=4,
+                                           run_id=name,
+                                           engine=engine)
         noise = True
 
     elif name == 'nonoise':
@@ -50,7 +44,7 @@ def game(request, engine, tmpdirname, config):
         raise RuntimeError(f"{name} not found")
 
     problem = QEDWithMoleculePolicy(engine,
-                                    config,
+                                    builder,
                                     features=8,
                                     num_heads=2,
                                     num_messages=1,
@@ -64,7 +58,6 @@ def game(request, engine, tmpdirname, config):
 
 @pytest.mark.parametrize('game', ['raw', 'ranked', 'nonoise'], indirect=True)
 class TestPolicyTraining:
-
     def test_reward_caching(self, game):
         root = game._get_root()
 
@@ -125,7 +118,6 @@ class TestPolicyTraining:
         outputs = problem.batched_policy_model(inputs)
         output_mask = problem.batched_policy_model.layers[-1].compute_mask(inputs_for_batch_layer, input_mask)
 
-
         assert output_mask[0].numpy().all(), 'no values should be masked'
 
         # make sure that the final output masks matches where there's no atoms.
@@ -154,8 +146,7 @@ class TestPolicyTraining:
         def get_root_value_pred(problem):
             root = game.get_vertex_for_state(problem.get_initial_state())
             game._evaluate([root])
-            value, prior_logits = problem.policy_evaluator(
-                problem._get_batched_policy_inputs(root))
+            value, prior_logits = problem.policy_evaluator(problem._get_batched_policy_inputs(root))
 
             return float(value[0]), prior_logits.numpy()[1:]
 
