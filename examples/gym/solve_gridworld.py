@@ -7,7 +7,7 @@ from typing import Tuple
 import numpy as np
 from sqlalchemy import create_engine
 
-from rlmolecule.tree_search.reward import Reward
+from rlmolecule.tree_search.reward import LinearBoundedRewardFactory, Reward
 from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
 from rlmolecule.gym.gym_problem import GymProblem
 from rlmolecule.gym.gym_state import GymEnvState
@@ -18,7 +18,6 @@ from tf_model import scalar_obs_policy #policy_model_2
 from gridworld_env import GridWorldEnv as GridEnv
 from gridworld_env import make_empty_grid
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -38,21 +37,18 @@ class GridWorldEnv(AlphaZeroGymEnv):
 
 
 class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
-    def __init__(self, *,
-                 env: GridWorldEnv,
-                 engine: "sqlalchemy.engine.Engine",
-                 reward_class: Reward,
-                 **kwargs) -> None:
-        super().__init__(reward_class=reward_class, engine=engine, env=env, **kwargs)
 
     def policy_model(self) -> "tf.keras.Model":
-
-        return scalar_obs_policy(hidden_layers=2, hidden_dim=256)
+        return scalar_obs_policy(
+            obs_dim=self.env.observation_space.high[0],
+            embed_dim=32,
+            hidden_layers=2,
+            hidden_dim=64)
 
     def get_policy_inputs(self, state: GymEnvState) -> dict:
         return {
             "obs": state.env.get_obs(),
-            "steps": 0.*np.array([np.float64(self.env.episode_steps)])
+            #"steps": np.array([np.float64(self.env.episode_steps / self.env.max_episode_steps)])
         }
 
     def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
@@ -81,28 +77,29 @@ def construct_problem(size):
     engine = create_engine(engine_str, execution_options={"isolation_level": "AUTOCOMMIT"})
 
     run_id = "gridworld_{}".format(size)
-    #policy_checkpoint_dir = "{}_policy_checkpoints".format(run_id)
-    #logger.info("run_id={}, policy_checkpoint_dir={}".format(run_id, policy_checkpoint_dir))
+    policy_checkpoint_dir = "{}_policy_checkpoints".format(run_id)
+    logger.info("run_id={}, policy_checkpoint_dir={}".format(run_id, policy_checkpoint_dir))
 
-    reward_factory = RankedRewardFactory(
-            engine=engine,
-            run_id=run_id,
-            reward_buffer_min_size=64,
-            reward_buffer_max_size=200,
-            ranked_reward_alpha=0.75
-    )
-
+    # reward_factory = RankedRewardFactory(
+    #         engine=engine,
+    #         run_id=run_id,
+    #         reward_buffer_min_size=32,
+    #         reward_buffer_max_size=1000,
+    #         ranked_reward_alpha=0.75
+    # )
     grid = make_empty_grid(size=size)
-    env = GridEnv(grid, sparse_rewards=True, use_grayscale_obs=True)
+    env = GridEnv(grid, use_scalar_obs=True)
 
     problem = GridWorldProblem(
         env=env,
         engine=engine,
-        reward_class=reward_factory,
+        #reward_class=reward_factory,
+        reward_class=LinearBoundedRewardFactory(min_reward=-60., max_reward=0.),
         run_id=run_id,
-        min_buffer_size=64,
-        max_buffer_size=200,
-        batch_size=32
+        min_buffer_size=32,
+        max_buffer_size=64,
+        batch_size=32,
+        policy_checkpoint_dir=policy_checkpoint_dir
     )
 
     return problem
@@ -117,7 +114,7 @@ def run_games(size, use_mcts=False, num_mcts_samples=64, num_games=None, seed=No
         game = MCTS(construct_problem(size=size))
     else:
         from rlmolecule.alphazero.alphazero import AlphaZero
-        game = AlphaZero(construct_problem(size=size), dirichlet_noise=True)
+        game = AlphaZero(construct_problem(size=size), dirichlet_noise=False)
 
     # TODO: here, allow max games
     num_games = num_games if num_games is not None else sys.maxsize
@@ -125,14 +122,15 @@ def run_games(size, use_mcts=False, num_mcts_samples=64, num_games=None, seed=No
         start_time = time.time()
         path, reward = game.run(num_mcts_samples=num_mcts_samples)
         elapsed = time.time() - start_time
-        print("Seed {} | REWARD: {}   ".format(seed, reward.__dict__))
-        logger.info(('Seed {} | Game Finished -- Reward {:.3f}'.format(seed, reward.raw_reward) +
+        print("Worker {} | REWARD: {}   ".format(seed, reward.__dict__))
+        #print("PATH", path)
+        logger.info(('Worker {} | Game {} Finished -- Reward {:.3f}'.format(seed, _, reward.raw_reward) +
                       #' -- Final state {}'.format(path[-1]) +
                       ' -- CPU time {:1.3f} (s)'.format(elapsed)))
 
 def train_model(size):
     construct_problem(size).train_policy_model(
-        steps_per_epoch=100,
+        steps_per_epoch=75,
         game_count_delay=10,
         verbose=2)
 
@@ -203,11 +201,10 @@ if __name__ == "__main__":
         time.sleep(1)
 
         for i in range(args.num_workers - 2):
-            seed = np.random.randint(99999999)
             jobs += [
                 multiprocessing.Process(
                     target=run_games,
-                    args=(args.size, args.use_mcts, args.num_mcts_samples, seed)
+                    args=(args.size, args.use_mcts, args.num_mcts_samples, args.num_games, i)
                 )
             ]
 

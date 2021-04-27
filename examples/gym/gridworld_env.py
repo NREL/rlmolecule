@@ -50,24 +50,28 @@ class GridWorldEnv(gym.Env):
         # An easy way to do this is to choose the terminal reward such that
         # the best possible cumulative reward equals the worst possible cumulative
         # reward, so you only need to rescale by that interval half-width.
-        self._distance_to_goal = self._tuple_distance(self.start, self.goal)
-        self._terminal_reward = self.max_episode_steps + 2*self._distance_to_goal
-        self._best_reward = self._terminal_reward - self._distance_to_goal
-        self._reward_scale = abs(self._best_reward)
-        self._scaled_step_reward = -1. / self._reward_scale
-        self._scaled_terminal_reward = self._terminal_reward / self._reward_scale
+        # self._distance_to_goal = self._tuple_distance(self.start, self.goal)
+        # self._terminal_reward = self.max_episode_steps + 2*self._distance_to_goal
+        # self._best_reward = self._terminal_reward - self._distance_to_goal
+        # self._reward_scale = abs(self._best_reward)
+        # self._scaled_step_reward = -1. / self._reward_scale
+        # self._scaled_terminal_reward = self._terminal_reward / self._reward_scale
 
         # Gym spaces
         if self.use_scalar_obs:
-            self.obs_shape = [2]
+            self.obs_shape = [1]
+            high = self.size * self.size - 1
+            dtype = np.int64
         else:
             self.obs_shape = list(self.initial_grid.shape)
-        if self.use_grayscale_obs:
-            self.obs_shape[-1] = 1
+            if self.use_grayscale_obs:
+                self.obs_shape[-1] = 1
+            high = 1
+            dtype = np.float64
         self.obs_shape = tuple(self.obs_shape)
 
         self.observation_space = gym.spaces.Box(
-            low=0, high=1, shape=self.obs_shape, dtype=np.float64)
+            low=0, high=high, shape=self.obs_shape, dtype=dtype)
 
         self.action_space = gym.spaces.Discrete(4)
 
@@ -84,8 +88,7 @@ class GridWorldEnv(gym.Env):
         obs = self.grid.copy()
         if self.use_scalar_obs:
             obs = np.where(obs[:, :, PLAYER_CHANNEL].squeeze())
-            obs = np.array([1.*obs[0]/self.size, 1.*obs[1]/self.size])
-            obs = obs.squeeze()
+            obs = np.array([obs[0]*self.size + obs[1]], dtype=np.int64).reshape(1)
         elif self.use_grayscale_obs:
             obs[0, :, :] *= 1/3.
             obs[1, :, :] *= 2/3.
@@ -115,9 +118,13 @@ class GridWorldEnv(gym.Env):
         done = goal_reached or max_steps_reached
 
         # Compute reward
-        reward = self._scaled_step_reward
+        # reward = self._scaled_step_reward
+        # if done:
+            # reward += self.get_terminal_reward(goal_reached)
+        # self.cumulative_reward += reward
+        reward = -1
         if done:
-            reward += self.get_terminal_reward(goal_reached)
+            reward += self.get_terminal_reward()
         self.cumulative_reward += reward
 
         # If using sparse rewards, only return cumulative reward if done, else 0.
@@ -134,12 +141,14 @@ class GridWorldEnv(gym.Env):
         return np.sum(np.abs((np.array(t1) - np.array(t2))))
 
 
-    def get_terminal_reward(self, goal_reached: bool) -> float:
-        if goal_reached:
+    def get_terminal_reward(self) -> float:
+        # if goal_reached:
             # If goal is reached, return scaled terminal reward
-            return self._scaled_terminal_reward
+            #return self._scaled_terminal_reward
         # Otherwise, scaled final distance to goal
-        return -self._tuple_distance(self.player, self.goal) / self._reward_scale
+        #return -self._tuple_distance(self.player, self.goal) / self._reward_scale
+        # return 1./(1 + self._tuple_distance(self.player, self.goal)) * self.max_episode_steps
+        return -self._tuple_distance(self.player, self.goal) + 2 * (self.size - 1)
 
 
 def make_empty_grid(size=5):
@@ -170,6 +179,7 @@ def policy(env):
     # An optimal policy for empty gridworld: find the vector pointing towards
     # the goal, and choose the first non-zero direction.  
     goal_direction = np.array(env.goal) - np.array(env.player)
+    print("goal direction", goal_direction)
     action = np.where(goal_direction.squeeze() != 0)[0][0]
     if action == 0:
         if goal_direction[action] > 0:
@@ -183,20 +193,20 @@ def policy(env):
 if __name__ == "__main__":
     
     #from tf_model import scalar_obs_policy
-    #model = scalar_obs_policy()
+    #model = scalar_obs_policy(256)
 
-    grid = make_empty_grid(size=32)
+    grid = make_empty_grid(size=16)
     env = GridWorldEnv(grid=grid, use_scalar_obs=True)
     obs = env.reset()
     
-    #print("OBS", obs, obs.shape)
-    #print("PREDICT", model.predict(obs.reshape(1, 1, 2)))
+    print("OBS", obs)
+    #print("PREDICT", model.predict(obs.reshape(1, 1)))
 
     done, rew, step = False, 0., 0
     while not done:
-        # action = env.action_space.sample()
-        # action = model.predict(obs.reshape(1, 1, 2))
+        #action = env.action_space.sample()
         action = policy(env)
+        #action = 2
         obs, r, done, _ = env.step(action)
         rew += r
         step += 1

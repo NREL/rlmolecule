@@ -97,28 +97,28 @@ def policy_model_2(filters,
 
 
 def scalar_obs_policy(
+        obs_dim: int,
+        embed_dim: int = 16,
         hidden_layers: int = 2,
-        hidden_dim: int = 256,
-        activation: str = "relu") -> tf.keras.Model:
+        hidden_dim: int = 256) -> tf.keras.Model:
 
-    obs = layers.Input(shape=(2,), dtype=tf.float64, name="obs")
-    steps = layers.Input(shape=(1,), dtype=tf.float64, name="steps")
+    def dense(dim=None, activation="relu", **kwargs):
+        return layers.Dense(
+                    units=dim if dim is not None else hidden_dim, 
+                    activation=activation,
+                    **kwargs)
 
-    x = layers.Dense(hidden_dim, activation=activation)(obs)
+    obs = layers.Input(shape=(1, ), dtype=tf.int64, name="obs")
+    x = layers.Embedding(obs_dim+1, embed_dim, input_length=1)(obs)
+    #x = layers.Flatten()(x)
+    #x = dense()(obs)
+    x = dense()(x)
     for _ in range(hidden_layers):
-        x = layers.Dense(hidden_dim, activation=activation)(x)
+        x = dense()(x)
 
-    x = layers.BatchNormalization()(x)
-
-    y = layers.Dense(hidden_dim, activation=activation)(steps)
-    x = layers.Concatenate()((x, y))
-
-    x = layers.Dense(hidden_dim, activation=activation)(obs)
-    x = layers.BatchNormalization()(x)
-    
     value_logit = layers.Dense(1, name="value")(x)
     pi_logit = layers.Dense(1, name="prior")(x)
 
-    return tf.keras.Model([obs, steps], [value_logit, pi_logit], name="policy_model")
+    return tf.keras.Model([obs], [value_logit, pi_logit], name="policy_model")
 
 
