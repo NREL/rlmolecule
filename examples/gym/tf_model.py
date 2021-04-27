@@ -54,49 +54,48 @@ def policy_model_cnn(obs_type: str = "RGB",
     return tf.keras.Model([obs], [value_logit, pi_logit], name="policy_model_cnn")
 
 
+# def policy_model_2(filters,
+#                    kernel_size,
+#                    strides,
+#                    obs_dim: Tuple[int],
+#                    hidden_layers: int = 2,
+#                    hidden_dim: int = 128,
+#                    activation: str = "relu") -> tf.keras.Model:
 
-def policy_model_2(filters,
-                   kernel_size,
-                   strides,
-                   obs_dim: Tuple[int],
-                   hidden_layers: int = 2,
-                   hidden_dim: int = 128,
-                   activation: str = "relu") -> tf.keras.Model:
-
-    obs = layers.Input(shape=obs_dim, dtype=tf.float64, name="obs")
-    #steps = layers.Input(shape=(1,), dtype=tf.float64, name="steps")
+#     obs = layers.Input(shape=obs_dim, dtype=tf.float64, name="obs")
+#     #steps = layers.Input(shape=(1,), dtype=tf.float64, name="steps")
     
-    # Convolutions on the frames on the screen
-    x = layers.Conv2D(
-        filters[0], 
-        (kernel_size[0],kernel_size[0]),
-        strides[0],
-        activation=activation)(obs)
+#     # Convolutions on the frames on the screen
+#     x = layers.Conv2D(
+#         filters[0], 
+#         (kernel_size[0],kernel_size[0]),
+#         strides[0],
+#         activation=activation)(obs)
 
-    for i in range(1, len(filters)):
-        x = layers.Conv2D(
-                filters[i],
-                (kernel_size[i],kernel_size[i]),
-                strides[i],
-                activation=activation)(x)
+#     for i in range(1, len(filters)):
+#         x = layers.Conv2D(
+#                 filters[i],
+#                 (kernel_size[i],kernel_size[i]),
+#                 strides[i],
+#                 activation=activation)(x)
 
-    x = layers.Flatten()(x)
+#     x = layers.Flatten()(x)
 
-    #x = layers.Concatenate()((x, steps))
+#     #x = layers.Concatenate()((x, steps))
 
-    for _ in range(hidden_layers):
-        x = layers.Dense(hidden_dim, activation=activation)(x)
-        x = layers.BatchNormalization()(x)
+#     for _ in range(hidden_layers):
+#         x = layers.Dense(hidden_dim, activation=activation)(x)
+#         x = layers.BatchNormalization()(x)
     
-    value_logit = layers.Dense(1, name="value")(x)
-    pi_logit = layers.Dense(1, name="prior")(x)
+#     value_logit = layers.Dense(1, name="value")(x)
+#     pi_logit = layers.Dense(1, name="prior")(x)
 
-    #return tf.keras.Model([obs, steps], [value_logit, pi_logit], name="policy_model")
-    return tf.keras.Model([obs], [value_logit, pi_logit], name="policy_model")
+#     #return tf.keras.Model([obs, steps], [value_logit, pi_logit], name="policy_model")
+#     return tf.keras.Model([obs], [value_logit, pi_logit], name="policy_model")
 
 
 
-def scalar_obs_policy(
+def discrete_obs_policy(
         obs_dim: int,
         embed_dim: int = 16,
         hidden_layers: int = 2,
@@ -110,8 +109,7 @@ def scalar_obs_policy(
 
     obs = layers.Input(shape=(1, ), dtype=tf.int64, name="obs")
     x = layers.Embedding(obs_dim+1, embed_dim, input_length=1)(obs)
-    #x = layers.Flatten()(x)
-    #x = dense()(obs)
+    
     x = dense()(x)
     for _ in range(hidden_layers):
         x = dense()(x)

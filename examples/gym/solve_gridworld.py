@@ -1,7 +1,6 @@
-from examples.gym.gridworld_env import policy
 import logging
-import time
 import sys
+import time
 from typing import Tuple
 
 import numpy as np
@@ -9,11 +8,10 @@ from sqlalchemy import create_engine
 
 from rlmolecule.tree_search.reward import LinearBoundedRewardFactory, Reward
 from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
+from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
 from rlmolecule.gym.gym_problem import GymProblem
 from rlmolecule.gym.gym_state import GymEnvState
-from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
-
-from tf_model import scalar_obs_policy #policy_model_2
+from tf_model import discrete_obs_policy as policy  # policy_model_2
 
 from gridworld_env import GridWorldEnv as GridEnv
 from gridworld_env import make_empty_grid
@@ -24,11 +22,6 @@ logger = logging.getLogger(__name__)
 # NOTE: These class definitions need to stay outside of construct_problem
 # or you will error out on not being able to pickle/serialize them.
 class GridWorldEnv(AlphaZeroGymEnv):
-    def __init__(self,
-                 configured_env: AlphaZeroGymEnv,
-                 **kwargs):
-        super().__init__(configured_env, **kwargs)
-
     def reset(self):
         return self.env.reset()
 
@@ -39,7 +32,7 @@ class GridWorldEnv(AlphaZeroGymEnv):
 class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
 
     def policy_model(self) -> "tf.keras.Model":
-        return scalar_obs_policy(
+        return policy(
             obs_dim=self.env.observation_space.high[0],
             embed_dim=32,
             hidden_layers=2,
@@ -56,7 +49,6 @@ class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
 
 
 def construct_problem(size):
-
     from rlmolecule.tree_search.reward import RankedRewardFactory
 
     # engine = create_engine(f'sqlite:///gridworld_data.db',
@@ -106,7 +98,6 @@ def construct_problem(size):
 
 
 def run_games(size, use_mcts=False, num_mcts_samples=64, num_games=None, seed=None):
-
     np.random.seed(seed)
 
     if use_mcts:
@@ -136,7 +127,6 @@ def train_model(size):
 
 
 def monitor(size):
-
     from rlmolecule.sql.tables import RewardStore
     problem = construct_problem(size=size)
 
@@ -155,25 +145,27 @@ def monitor(size):
 
 
 def setup_argparser():
-    
-
     return parser
 
 
 if __name__ == "__main__":
 
     import argparse
+
     parser = argparse.ArgumentParser(
         description='Solve the Hallway problem (move from one side of the hallway to the other). ' +
-                'Default is to run multiple games and training using multiprocessing')
+        'Default is to run multiple games and training using multiprocessing')
 
     parser.add_argument("--size", type=int, default=8)
-    parser.add_argument('--train-policy', action="store_true", default=False,
+    parser.add_argument('--train-policy',
+                        action="store_true",
+                        default=False,
                         help='Train the policy model only (on GPUs)')
-    parser.add_argument('--rollout', action="store_true", default=False,
+    parser.add_argument('--rollout',
+                        action="store_true",
+                        default=False,
                         help='Run the game simulations only (on CPUs)')
-    parser.add_argument('--num-workers', type=int, default=3,
-                        help='Number of multiprocessing workers')
+    parser.add_argument('--num-workers', type=int, default=3, help='Number of multiprocessing workers')
     parser.add_argument("--num-games", type=int, default=None)
     parser.add_argument("--num-mcts-samples", type=int, default=50)
     parser.add_argument("--use-mcts", action="store_true")
@@ -186,17 +178,16 @@ if __name__ == "__main__":
     if args.train_policy:
         train_model(args.size)
     elif args.rollout:
-        run_games(
-            size=args.size,
-            use_mcts=args.use_mcts,
-            num_mcts_samples=args.num_mcts_samples,
-            num_games=args.num_games)
+        run_games(size=args.size,
+                  use_mcts=args.use_mcts,
+                  num_mcts_samples=args.num_mcts_samples,
+                  num_games=args.num_games)
     else:
-        assert args.num_workers >= 3  # need at least 3 workers here...
+        assert args.num_workers >= 3, "need at least 3 workers for multiprocessing"
 
         import multiprocessing
 
-        jobs = [multiprocessing.Process(target=monitor, args=(args.size,))]
+        jobs = [multiprocessing.Process(target=monitor, args=(args.size, ))]
         jobs[0].start()
         time.sleep(1)
 
@@ -208,7 +199,7 @@ if __name__ == "__main__":
                 )
             ]
 
-        jobs += [multiprocessing.Process(target=train_model, args=(args.size,))]
+        jobs += [multiprocessing.Process(target=train_model, args=(args.size, ))]
 
         for job in jobs[1:]:
             job.start()
