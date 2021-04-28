@@ -122,7 +122,7 @@ class AlphaZeroProblem(MCTSProblem):
 
         return vertex.policy_digest, policy_inputs
 
-    def maybe_store_state(self, vertex: AlphaZeroVertex) -> str:
+    def maybe_store_state(self, vertex: AlphaZeroVertex) -> (str, str):
         """ Add the serialized state to the StateStore table if it doesn't exist
 
         :param vertex: The state to store in the StateStore database (if it doesn't already exist)
@@ -145,7 +145,7 @@ class AlphaZeroProblem(MCTSProblem):
                 logger.debug(f"Duplicate state entry encountered with {vertex.state}")
                 self.session.rollback()
 
-        return policy_digest
+        return (policy_digest, state_hash)
 
     def store_search_statistics(self, path: [], reward: Reward) -> None:
         """Store the game data in the replay buffer
@@ -184,7 +184,7 @@ class AlphaZeroProblem(MCTSProblem):
         for game in recent_games:
             parent_state_string, visit_probabilities = random.choice(game.search_statistics)
 
-            yield ([parent_state_string] + list(visit_probabilities.keys()),
+            yield ([parent_state_string] + [key[0] for key in visit_probabilities.keys()],
                    [game.scaled_reward] + list(visit_probabilities.values()))
 
     def lookup_policy_inputs_from_digest(self, policy_digest: str) -> {str: np.ndarray}:
