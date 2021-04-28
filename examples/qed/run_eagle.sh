@@ -1,6 +1,5 @@
-""" Wrapper script to set the run_id and 
-copy the config file to the output directory for a given experiment
-"""
+# Wrapper script to set the run_id and 
+# copy the config file to the output directory for a given experiment
 
 # run_id is the first parameter, config is the second
 run_id="$1"
@@ -15,7 +14,7 @@ if [ "$2" == "" ]; then
     exit
 fi
 
-WORKING_DIR="/projects/rlmolecule/jlaw/qed/${run_id}"
+WORKING_DIR="/projects/rlmolecule/$USER/qed/${run_id}"
 mkdir -p $WORKING_DIR
 
 # copy the config file with the rest of the results
