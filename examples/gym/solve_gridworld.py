@@ -1,7 +1,7 @@
 import logging
 import sys
 import time
-from typing import Tuple
+from typing import Tuple, Optional
 
 import numpy as np
 from sqlalchemy import create_engine
@@ -12,7 +12,7 @@ from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
 from rlmolecule.gym.gym_problem import GymProblem
 from rlmolecule.gym.gym_state import GymEnvState
 
-from tf_model import gridworld_policy as policy
+from tf_model import gridworld_image_embed_policy as policy
 from gridworld_env import GridWorldEnv as GridEnv
 from gridworld_env import make_empty_grid
 
@@ -32,11 +32,15 @@ class GridWorldEnv(AlphaZeroGymEnv):
 class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
 
     def policy_model(self) -> "tf.keras.Model":
+        size = self.env.size
         return policy(
-            obs_dim=self.env.observation_space.high[0],
-            embed_dim=32,
+            size=size,
+            filters=[4, 8, 16],
+            kernel_size=[int(size/4), 2, 3],
+            strides=[int(size/4), 1, 1],
             hidden_layers=2,
-            hidden_dim=64)
+            hidden_dim=256
+        )
 
     def get_policy_inputs(self, state: GymEnvState) -> dict:
         return {
@@ -46,6 +50,15 @@ class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
 
     def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
         return state.cumulative_reward, {}
+
+    def get_policy_mask(self) -> {str: Optional[float]}:
+        initial_inputs = self.get_policy_inputs(self.get_initial_state())  # numpy
+        model_inputs = self.policy_model().inputs  # keras
+        for (x, y) in zip(initial_inputs.values(), model_inputs):
+            types = (x.dtype, y.dtype.as_numpy_dtype)
+            if not np.issubdtype(*types):
+                raise TypeError("State and policy input types must match, got", types)
+        return {key: np.array(-1, dtype=val.dtype) for key, val in initial_inputs.items()}
 
 
 def construct_problem(size):
@@ -71,11 +84,11 @@ def construct_problem(size):
     policy_checkpoint_dir = "{}_policy_checkpoints".format(run_id)
     logger.info("run_id={}, policy_checkpoint_dir={}".format(run_id, policy_checkpoint_dir))
 
-    # reward_factory = RankedRewardFactory(
+    # ranked_reward = RankedRewardFactory(
     #         engine=engine,
     #         run_id=run_id,
     #         reward_buffer_min_size=32,
-    #         reward_buffer_max_size=1000,
+    #         reward_buffer_max_size=64,
     #         ranked_reward_alpha=0.75
     # )
     grid = make_empty_grid(size=size)
@@ -84,11 +97,12 @@ def construct_problem(size):
     problem = GridWorldProblem(
         env=env,
         engine=engine,
-        reward_class=LinearBoundedRewardFactory(min_reward=-60., max_reward=0.),
+        reward_class=LinearBoundedRewardFactory(min_reward=-env.size*4, max_reward=0.),
+        #reward_class=ranked_reward,
         run_id=run_id,
         min_buffer_size=10,
-        max_buffer_size=128,
-        batch_size=64,
+        max_buffer_size=64,
+        batch_size=32,
         policy_checkpoint_dir=policy_checkpoint_dir
     )
 
@@ -118,7 +132,7 @@ def run_games(size, use_mcts=False, num_mcts_samples=64, num_games=None, seed=No
 
 def train_model(size):
     construct_problem(size).train_policy_model(
-        steps_per_epoch=75,
+        steps_per_epoch=200,
         game_count_delay=10,
         verbose=2)
 

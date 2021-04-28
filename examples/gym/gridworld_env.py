@@ -170,25 +170,31 @@ def policy(env):
 
 if __name__ == "__main__":
     
-    # from tf_model import gridworld_policy as policy
-    # model = policy(256)
+    from tf_model import gridworld_image_embed_policy
+    model = gridworld_image_embed_policy(
+        size=32,
+        filters=[4, 8, 16],
+        kernel_size=[8, 2, 2],
+        strides=[8, 2, 1]
+    )
 
-    grid = make_empty_grid(size=16)
+    grid = make_empty_grid(size=32)
     env = GridWorldEnv(grid=grid, use_index_obs=True)
     obs = env.reset()
     
     print("obs", obs)
-    #print("PREDICT", model.predict(obs.reshape(1, 1)))
+    print("PREDICT", model.predict(obs.reshape(1, 1)))
     done, rew, step = False, 0., 0
     while not done:
         #action = env.action_space.sample()
-        action = policy(env)
         #action = 2
+        action = policy(env)
         obs, r, done, _ = env.step(action)
         rew += r
         step += 1
         print("\nstep {}, reward {}, done {}".format(step, r, done))
         print("action", action)
-        print("obs\n", obs)
+        print("obs", obs)
+        print("policy", model.predict(obs.reshape(1, 1)))
         
     print("final reward", rew)
