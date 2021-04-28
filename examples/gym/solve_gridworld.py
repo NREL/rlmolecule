@@ -11,8 +11,8 @@ from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
 from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
 from rlmolecule.gym.gym_problem import GymProblem
 from rlmolecule.gym.gym_state import GymEnvState
-from tf_model import discrete_obs_policy as policy  # policy_model_2
 
+from tf_model import discrete_obs_policy as policy  # policy_model_2
 from gridworld_env import GridWorldEnv as GridEnv
 from gridworld_env import make_empty_grid
 
@@ -85,7 +85,6 @@ def construct_problem(size):
     problem = GridWorldProblem(
         env=env,
         engine=engine,
-        #reward_class=reward_factory,
         reward_class=LinearBoundedRewardFactory(min_reward=-60., max_reward=0.),
         run_id=run_id,
         min_buffer_size=32,

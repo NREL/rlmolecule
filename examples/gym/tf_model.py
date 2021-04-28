@@ -99,24 +99,18 @@ def discrete_obs_policy(
         obs_dim: int,
         embed_dim: int = 16,
         hidden_layers: int = 2,
-        hidden_dim: int = 256) -> tf.keras.Model:
+        hidden_dim: int = 256,
+        activation: str = "relu") -> tf.keras.Model:
 
-    def dense(dim=None, activation="relu", **kwargs):
-        return layers.Dense(
-                    units=dim if dim is not None else hidden_dim, 
-                    activation=activation,
-                    **kwargs)
-
-    obs = layers.Input(shape=(1, ), dtype=tf.int64, name="obs")
-    x = layers.Embedding(obs_dim+1, embed_dim, input_length=1)(obs)
+    obs = layers.Input(shape=(1,), dtype=tf.int64, name="obs")
+    emb = layers.Embedding(obs_dim+1, embed_dim, input_length=1)(obs)
     
-    x = dense()(x)
-    for _ in range(hidden_layers):
-        x = dense()(x)
+    x = layers.Dense(hidden_dim, activation=activation)(emb)
+    for _ in range(hidden_layers-1):
+        x = layers.Dense(hidden_dim, activation=activation)(x)
 
     value_logit = layers.Dense(1, name="value")(x)
     pi_logit = layers.Dense(1, name="prior")(x)
 
     return tf.keras.Model([obs], [value_logit, pi_logit], name="policy_model")
-
 
