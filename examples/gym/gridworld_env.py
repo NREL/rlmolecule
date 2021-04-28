@@ -93,7 +93,7 @@ class GridWorldEnv(gym.Env):
             obs[0, :, :] *= 1/3.
             obs[1, :, :] *= 2/3.
             obs = np.sum(obs, axis=-1).reshape(self.obs_shape)
-        return obs
+        return obs.copy()
 
 
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, dict]:
@@ -192,15 +192,15 @@ def policy(env):
 
 if __name__ == "__main__":
     
-    #from tf_model import scalar_obs_policy
-    #model = scalar_obs_policy(256)
+    from tf_model import discrete_obs_policy
+    model = discrete_obs_policy(256)
 
     grid = make_empty_grid(size=16)
     env = GridWorldEnv(grid=grid, use_scalar_obs=True)
     obs = env.reset()
     
     print("OBS", obs)
-    #print("PREDICT", model.predict(obs.reshape(1, 1)))
+    print("PREDICT", model.predict(obs.reshape(1, 1)))
 
     done, rew, step = False, 0., 0
     while not done:

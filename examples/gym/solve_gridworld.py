@@ -87,9 +87,9 @@ def construct_problem(size):
         engine=engine,
         reward_class=LinearBoundedRewardFactory(min_reward=-60., max_reward=0.),
         run_id=run_id,
-        min_buffer_size=32,
-        max_buffer_size=64,
-        batch_size=32,
+        min_buffer_size=10,
+        max_buffer_size=128,
+        batch_size=64,
         policy_checkpoint_dir=policy_checkpoint_dir
     )
 

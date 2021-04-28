@@ -136,6 +136,14 @@ def kl_with_logits(y_true, y_pred) -> tf.Tensor:
 
     # Mask nan values in y_true with zeros
     y_true = tf.where(tf.math.is_finite(y_true), y_true, tf.zeros_like(y_true))
+    
+    # Check that all values are on [0, 1]
+    tf.debugging.assert_greater_equal(y_true, tf.zeros_like(y_true))
+    tf.debugging.assert_less_equal(y_true, tf.ones_like(y_true))
+
+    # Check that colsums are close to 1
+    colsum = tf.reduce_sum(y_true, axis=1)
+    tf.debugging.assert_near(colsum, tf.ones_like(colsum))
 
     return (tf.keras.losses.categorical_crossentropy(y_true, y_pred, from_logits=True) -
             tf.keras.losses.categorical_crossentropy(y_true, y_true, from_logits=False))

@@ -126,7 +126,7 @@ class MCTS(GraphSearch[MCTSVertex]):
             return [x for x in seq if not (x in seen or seen_add(x))]
 
         if leaf.children is None:
-             leaf.children = dedupe((self.get_vertex_for_state(state) for state in leaf.state.get_next_actions()))
+            leaf.children = dedupe((self.get_vertex_for_state(state) for state in leaf.state.get_next_actions()))
 
             for child in leaf.children:
                 # child.children is initialized to None, so this only checks nodes where a transposition pointed

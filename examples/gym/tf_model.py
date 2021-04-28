@@ -94,7 +94,6 @@ def policy_model_cnn(obs_type: str = "RGB",
 #     return tf.keras.Model([obs], [value_logit, pi_logit], name="policy_model")
 
 
-
 def discrete_obs_policy(
         obs_dim: int,
         embed_dim: int = 16,
@@ -103,11 +102,13 @@ def discrete_obs_policy(
         activation: str = "relu") -> tf.keras.Model:
 
     obs = layers.Input(shape=(1,), dtype=tf.int64, name="obs")
-    emb = layers.Embedding(obs_dim+1, embed_dim, input_length=1)(obs)
+    x = layers.Embedding(obs_dim+1, embed_dim, input_length=1)(obs)
+    x = layers.Flatten()(x)
     
-    x = layers.Dense(hidden_dim, activation=activation)(emb)
+    x = layers.Dense(hidden_dim, activation=activation)(x)
     for _ in range(hidden_layers-1):
         x = layers.Dense(hidden_dim, activation=activation)(x)
+    x = layers.Flatten()(x)
 
     value_logit = layers.Dense(1, name="value")(x)
     pi_logit = layers.Dense(1, name="prior")(x)
