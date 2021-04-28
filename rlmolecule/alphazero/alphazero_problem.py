@@ -159,8 +159,8 @@ class AlphaZeroProblem(MCTSProblem):
         for parent, child_visits in path[:-1]:
             search_statistics += [
                 (self.maybe_store_state(parent),
-                 {self.maybe_store_state(child): visit_probability
-                  for child, visit_probability in child_visits})
+                 [(self.maybe_store_state(child), visit_probability)
+                  for child, visit_probability in child_visits])
             ]
 
         record = GameStore(id=str(self.id),
@@ -183,9 +183,9 @@ class AlphaZeroProblem(MCTSProblem):
 
         for game in recent_games:
             parent_state_string, visit_probabilities = random.choice(game.search_statistics)
-
-            yield ([parent_state_string] + list(visit_probabilities.keys()),
-                   [game.scaled_reward] + list(visit_probabilities.values()))
+            policy_digests, visit_probs = zip(*visit_probabilities)
+            yield ([parent_state_string] + list(policy_digests),
+                   [game.scaled_reward] + list(visit_probs))
 
     def lookup_policy_inputs_from_digest(self, policy_digest: str) -> {str: np.ndarray}:
 
