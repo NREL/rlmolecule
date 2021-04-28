@@ -119,8 +119,14 @@ class MCTS(GraphSearch[MCTSVertex]):
         child vertices and choose vertex C from one of them. Child vertices are any valid moves from the game
         position defined by L.
         """
+
+        def dedupe(seq):  # TODO: move me
+            seen = set()
+            seen_add = seen.add
+            return [x for x in seq if not (x in seen or seen_add(x))]
+
         if leaf.children is None:
-            leaf.children = list(set((self.get_vertex_for_state(state) for state in leaf.state.get_next_actions())))
+            leaf.children = dedupe((self.get_vertex_for_state(state) for state in leaf.state.get_next_actions()))
 
             for child in leaf.children:
                 # child.children is initialized to None, so this only checks nodes where a transposition pointed
