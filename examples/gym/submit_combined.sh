@@ -9,7 +9,7 @@
 #SBATCH hetjob
 #SBATCH -N 1
 
-export WORKING_DIR=/scratch/${USER}/git-repos/rlmolecule_new/rlmolecule/examples/gym/
+export WORKING_DIR=/projects/rlmolecule/dbiagion/rlmolecule/examples/gym/
 export START_POLICY_SCRIPT="$SLURM_SUBMIT_DIR/$JOB/.policy.sh"
 export START_ROLLOUT_SCRIPT="$SLURM_SUBMIT_DIR/$JOB/.rollout.sh"
 
@@ -25,7 +25,7 @@ cat << "EOF" > "$START_ROLLOUT_SCRIPT"
 #!/bin/bash
 source /nopt/nrel/apps/anaconda/5.3/etc/profile.d/conda.sh; 
 module purge
-conda activate /projects/rlmolecule/eskordil/envs/tf2_cpu_cloned
+     conda activate /projects/rlmolecule/eskordil/envs/tf2_cpu_cloned
 python -u solve_gridworld.py --rollout
 EOF
 

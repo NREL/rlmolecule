@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 class TFAlphaZeroProblem(AlphaZeroProblem):
     def __init__(self,
-                 *,
                  engine: sqlalchemy.engine.Engine,
                  policy_checkpoint_dir: str = 'policy_checkpoints',
                  **kwargs) -> None:
@@ -76,12 +75,13 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
             [self.policy_input_wrapper(vertex) for vertex in itertools.chain((parent, ), parent.children)])
 
     def _batch_policy_inputs(self, list_of_policy_inputs: [{str: np.ndarray}]) -> {str: np.ndarray}:
-        return {
+        inp = {
             key: pad_sequences([elem[key] for elem in list_of_policy_inputs],
                                padding='post',
                                value=self.mask_dict[key])
             for key in list_of_policy_inputs[0].keys()
         }
+        return inp
 
     def get_value_and_policy(self, parent: AlphaZeroVertex) -> Tuple[float, dict]:
 
@@ -93,8 +93,13 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
         # here for output shape, or enforce an output shape (?).
         priors = tf.nn.softmax(prior_logits[1:, 0]).numpy().flatten()
 
+        print("PRIORS", priors)
+        #print("PRIORS.shape", priors.shape)
+
         # Update child nodes with predicted prior_logits
+        #print("CHILD VERTICES", list(zip(parent.children, priors)))
         children_priors = {vertex: prior for vertex, prior in zip(parent.children, priors)}
+        #print("AS DICT", children_priors)
         value = float(tf.nn.sigmoid(values[0]))
 
         return value, children_priors
