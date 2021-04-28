@@ -10,14 +10,14 @@ run_id: 'qed_example'
 # Parameters for setting up the problem
 problem_config:
     # maximum number of heavy atoms
-    max_atoms: 200
+    max_atoms: 50
     # minimum number of heavy atoms
     min_atoms: 1
     # atoms to use when building the molecule
     atom_additions: ['C', 'N', 'O', 'S']
     # if set, don't construct molecules greater than a given Synthetic Accessibility (SA) score
     # see: https://github.com/rdkit/rdkit/blob/master/Contrib/SA_Score/sascorer.py
-    sa_score_threshold: 4
+    sa_score_threshold: 3.5
     # whether to consider stereoisomers different molecules
     stereoisomers: False
     # try to get a 3D embedding of the molecule, and if this fails, remote it.
@@ -31,7 +31,7 @@ train_config:
     # then it's a win. Otherwise, it's a loss.
     ranked_reward_alpha: 0.75
     # max/min number of games to consider 
-    reward_buffer_max_size: 50
+    reward_buffer_max_size: 500
     reward_buffer_min_size: 10
 
     # Learning options:
@@ -49,7 +49,7 @@ train_config:
 
     # AlphaZero problem options:
     # max/min number of games to consider (ordered by time) when training the policy
-    max_buffer_size: 200
+    max_buffer_size: 1000
     min_buffer_size: 15
     # number of training examples to use when updating model parameters
     batch_size: 32
@@ -75,7 +75,7 @@ mcts_config:
     # percentage to favor dirichlet noise vs. prior estimation. Smaller means less noise
     dirichlet_x: 0.25
     # number of samples to perform at each level of the MCTS search
-    num_mcts_samples: 50
+    num_mcts_samples: 500
     # the maximum search depth
     max_depth: 1000000
     #ucb_constant: math.sqrt(2)
