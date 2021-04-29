@@ -29,15 +29,15 @@ class GridWorldEnv(gym.Env):
                  grid: np.ndarray,
                  max_episode_steps: int = None,
                  sparse_rewards: bool = False,
-                 use_grayscale_obs: bool = False,
-                 use_index_obs: bool = True):
-        
+                 obs_type: str = "scalar"):
+
+        assert obs_type in ["rgb", "grayscale", "scalar", "index"]
+        self.obs_type = obs_type
+
         self.size = grid.shape[1]
         self.max_episode_steps = max_episode_steps if max_episode_steps is not None \
             else 4 * (self.size - 1)
         self.sparse_rewards = sparse_rewards
-        self.use_grayscale_obs = use_grayscale_obs
-        self.use_index_obs = use_index_obs
 
         self.episode_steps = None
         self.cumulative_reward = None
@@ -46,15 +46,22 @@ class GridWorldEnv(gym.Env):
         self.goal = tuple([x[0] for x in np.where(grid[:, :, GOAL_CHANNEL])])
         self.initial_grid = grid.copy()
 
-        if self.use_index_obs:
+        if self.obs_type == "index":
             self.obs_shape = [1]
             high = self.size * self.size - 1
             dtype = np.int64
-        else:
+        if self.obs_type == "scalar":
+            self.obs_shape = [2]
+            high = self.size
+            dtype = np.int64
+        if self.obs_type == "rgb":
             self.obs_shape = list(self.initial_grid.shape)
-            if self.use_grayscale_obs:
-                self.obs_shape[-1] = 1
-            high = 1
+            high = 1.
+            dtype = np.float64
+        if self.obs_type == "grayscale":
+            self.obs_shape = list(self.initial_grid.shape)
+            self.obs_shape[-1] = 1
+            high = 1.
             dtype = np.float64
         self.obs_shape = tuple(self.obs_shape)
 
@@ -74,15 +81,18 @@ class GridWorldEnv(gym.Env):
 
     def get_obs(self) -> np.ndarray:
         obs = self.grid.copy()
-        if self.use_index_obs:
+        if self.obs_type == "index":
             obs = np.where(obs[:, :, PLAYER_CHANNEL].squeeze())
             obs = np.array([obs[0]*self.size + obs[1]], dtype=np.int64).reshape(1)
-        elif self.use_grayscale_obs:
+        if self.obs_type == "scalar":
+            obs = np.where(obs[:, :, PLAYER_CHANNEL].squeeze())
+            obs = np.array([obs[0], obs[1]], dtype=np.int64).reshape(2)
+        if self.obs_type == "grayscale":
             obs[0, :, :] *= 1/3.
             obs[1, :, :] *= 2/3.
             obs = np.sum(obs, axis=-1).reshape(self.obs_shape)
         return obs.copy()
-
+        
 
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, dict]:
 
@@ -170,20 +180,21 @@ def policy(env):
 
 if __name__ == "__main__":
     
-    from tf_model import gridworld_image_embed_policy
-    model = gridworld_image_embed_policy(
-        size=32,
-        filters=[4, 8, 16],
-        kernel_size=[8, 2, 2],
-        strides=[8, 2, 1]
-    )
+    # from tf_model import gridworld_image_embed_policy
+    # model = gridworld_image_embed_policy(
+    #     size=32,
+    #     filters=[4, 8, 16],
+    #     kernel_size=[8, 2, 2],
+    #     strides=[8, 2, 1]
+    # )
 
-    grid = make_empty_grid(size=32)
-    env = GridWorldEnv(grid=grid, use_index_obs=True)
+    size = 64
+    grid = make_empty_grid(size=size)
+    env = GridWorldEnv(grid, obs_type="scalar", max_episode_steps=2*size+2)
     obs = env.reset()
-    
+
     print("obs", obs)
-    print("PREDICT", model.predict(obs.reshape(1, 1)))
+    #print("PREDICT", model.predict(obs.reshape(1, 1)))
     done, rew, step = False, 0., 0
     while not done:
         #action = env.action_space.sample()
@@ -195,6 +206,6 @@ if __name__ == "__main__":
         print("\nstep {}, reward {}, done {}".format(step, r, done))
         print("action", action)
         print("obs", obs)
-        print("policy", model.predict(obs.reshape(1, 1)))
+        #print("policy", model.predict(obs.reshape(1, 1)))
         
     print("final reward", rew)

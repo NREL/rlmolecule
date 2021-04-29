@@ -12,7 +12,7 @@ from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
 from rlmolecule.gym.gym_problem import GymProblem
 from rlmolecule.gym.gym_state import GymEnvState
 
-from tf_model import gridworld_image_embed_policy as policy
+from tf_model import gridworld_scalar_policy as policy
 from gridworld_env import GridWorldEnv as GridEnv
 from gridworld_env import make_empty_grid
 
@@ -33,14 +33,17 @@ class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
 
     def policy_model(self) -> "tf.keras.Model":
         size = self.env.size
-        return policy(
-            size=size,
-            filters=[4, 8, 16],
-            kernel_size=[int(size/4), 2, 3],
-            strides=[int(size/4), 1, 1],
-            hidden_layers=2,
-            hidden_dim=256
-        )
+        # last_filter = int(size/8)
+        # return policy(
+        #     size=size,
+        #     filters=[4, 8, 16, 32],
+        #     kernel_size=[2, 2, 2, last_filter],
+        #     strides=[2, 2, 2, 1],
+        #     hidden_layers=2,
+        #     hidden_dim=256
+        # )
+        return policy(size)
+
 
     def get_policy_inputs(self, state: GymEnvState) -> dict:
         return {
@@ -80,28 +83,29 @@ def construct_problem(size):
     engine_str = f'{drivername}://{user}:{passwd}@{host}:{port}/{dbname}'
     engine = create_engine(engine_str, execution_options={"isolation_level": "AUTOCOMMIT"})
 
-    run_id = "gridworld_{}".format(size)
-    policy_checkpoint_dir = "{}_policy_checkpoints".format(run_id)
-    logger.info("run_id={}, policy_checkpoint_dir={}".format(run_id, policy_checkpoint_dir))
+    grid = make_empty_grid(size=size)
+    env = GridEnv(grid, obs_type="scalar", max_episode_steps=2*size+2)
 
-    # ranked_reward = RankedRewardFactory(
+    # reward_class = RankedRewardFactory(
     #         engine=engine,
     #         run_id=run_id,
     #         reward_buffer_min_size=32,
-    #         reward_buffer_max_size=64,
-    #         ranked_reward_alpha=0.75
+    #         reward_buffer_max_size=100,
+    #         ranked_reward_alpha=0.9
     # )
-    grid = make_empty_grid(size=size)
-    env = GridEnv(grid, use_index_obs=True)
+    reward_class=LinearBoundedRewardFactory(min_reward=-env.size*2, max_reward=0.)
+
+    run_id = "gridworld_{}_{}".format(size, type(reward_class).__name__)
+    policy_checkpoint_dir = "{}_policy_checkpoints".format(run_id)
+    logger.info("run_id={}, policy_checkpoint_dir={}".format(run_id, policy_checkpoint_dir))
 
     problem = GridWorldProblem(
         env=env,
         engine=engine,
-        reward_class=LinearBoundedRewardFactory(min_reward=-env.size*4, max_reward=0.),
-        #reward_class=ranked_reward,
+        reward_class=reward_class,
         run_id=run_id,
         min_buffer_size=10,
-        max_buffer_size=64,
+        max_buffer_size=32,
         batch_size=32,
         policy_checkpoint_dir=policy_checkpoint_dir
     )
@@ -217,3 +221,5 @@ if __name__ == "__main__":
 
         for job in jobs:
             job.join(300)
+
+        
