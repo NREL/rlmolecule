@@ -27,6 +27,10 @@ train_config:
     # max/min number of games to consider 
     reward_buffer_max_size: 50
     reward_buffer_min_size: 10
+    # option to use a linear bounded reward instead:
+    linear_reward: True
+    min_reward: 0
+    max_reward: 20
 
     # Learning options:
     # some useful tips for selecting these parameter values:
