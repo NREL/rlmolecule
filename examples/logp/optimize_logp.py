@@ -32,22 +32,22 @@ logger = logging.getLogger(__name__)
 # copied from here: https://github.com/google-research/google-research/blob/master/mol_dqn/experimental/optimize_logp.py
 # Zhou et al., Optimization of Molecules via Deep Reinforcement Learning. Scientific Reports 2019
 def num_long_cycles(mol):
-  """Calculate the number of long cycles.
-  Args:
-    mol: Molecule. A molecule.
-  Returns:
-    negative cycle length.
-  """
-  cycle_list = nx.cycle_basis(nx.Graph(Chem.rdmolops.GetAdjacencyMatrix(mol)))
-  if not cycle_list:
-    cycle_length = 0
-  else:
-    cycle_length = max([len(j) for j in cycle_list])
-  if cycle_length <= 6:
-    cycle_length = 0
-  else:
-    cycle_length = cycle_length - 6
-  return -cycle_length
+    """Calculate the number of long cycles.
+    Args:
+      mol: Molecule. A molecule.
+    Returns:
+      negative cycle length.
+    """
+    cycle_list = nx.cycle_basis(nx.Graph(Chem.rdmolops.GetAdjacencyMatrix(mol)))
+    if len(cycle_list) == 0:
+        cycle_length = 0
+    else:
+        cycle_length = max([len(j) for j in cycle_list])
+    if cycle_length <= 6:
+        cycle_length = 0
+    else:
+        cycle_length = cycle_length - 6
+    return -cycle_length
 
 
 def penalized_logp(molecule):
@@ -75,21 +75,10 @@ def reward_penalized_log_p(mol):
     cycle_mean = -0.0485696876403053
     cycle_std = 0.2860212110245455
 
-    log_p = MolLogP(mol)
-    SA = -calculateScore(mol)
+    log_p = Descriptors.MolLogP(mol)
+    SA = -sascorer.calculateScore(mol)
 
-    # cycle score
-    cycle_list = nx.cycle_basis(nx.Graph(
-        Chem.rdmolops.GetAdjacencyMatrix(mol)))
-    if len(cycle_list) == 0:
-        cycle_length = 0
-    else:
-        cycle_length = max([len(j) for j in cycle_list])
-    if cycle_length <= 6:
-        cycle_length = 0
-    else:
-        cycle_length = cycle_length - 6
-    cycle_score = -cycle_length
+    cycle_score = num_long_cycles(mol)
 
     normalized_log_p = (log_p - logP_mean) / logP_std
     normalized_SA = (SA - SA_mean) / SA_std
@@ -104,6 +93,7 @@ def construct_problem(run_config):
     # import tensorflow, especially if there's a chance we'll use tf.serving to do the policy / reward evaluations on
     # the workers. Might require upstream changes to nfp as well.
     from rlmolecule.tree_search.reward import RankedRewardFactory
+    from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
     from rlmolecule.molecule.molecule_problem import MoleculeTFAlphaZeroProblem
     from rlmolecule.molecule.molecule_state import MoleculeState
     from rlmolecule.molecule.builder.builder import MoleculeBuilder
@@ -114,7 +104,7 @@ def construct_problem(run_config):
 
         def get_reward(self, state: MoleculeState) -> (float, {}):
             if state.forced_terminal:
-                return penalized_logp(state.molecule), {'forced_terminal': True, 'smiles': state.smiles}
+                return reward_penalized_log_p(state.molecule), {'forced_terminal': True, 'smiles': state.smiles}
             return 0.0, {'forced_terminal': False, 'smiles': state.smiles}
 
     prob_config = run_config.problem_config
@@ -132,13 +122,17 @@ def construct_problem(run_config):
     run_id = run_config.run_id
 
     train_config = run_config.train_config
-    reward_factory = RankedRewardFactory(
-        engine=engine,
-        run_id=run_id,
-        reward_buffer_min_size=train_config.get('reward_buffer_min_size', 10),
-        reward_buffer_max_size=train_config.get('reward_buffer_max_size', 50),
-        ranked_reward_alpha=train_config.get('ranked_reward_alpha', 0.75)
-    )
+    if train_config.get('linear_reward'):
+        reward_factory = LinearBoundedRewardFactory(min_reward=train_config.get('min_reward', 0),
+                                                    max_reward=train_config.get('max_reward', 20))
+    else:
+        reward_factory = RankedRewardFactory(
+            engine=engine,
+            run_id=run_id,
+            reward_buffer_min_size=train_config.get('reward_buffer_min_size', 10),
+            reward_buffer_max_size=train_config.get('reward_buffer_max_size', 50),
+            ranked_reward_alpha=train_config.get('ranked_reward_alpha', 0.75)
+        )
 
     problem = PenLogPOptimizationProblem(
         engine,
