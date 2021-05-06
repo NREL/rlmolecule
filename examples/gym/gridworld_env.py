@@ -13,7 +13,7 @@ PLAYER_CHANNEL = 2
 
 class GridEnv(gym.Env):
     
-    def __init__(self,
+    def __init__(self, *,
                  grid: np.ndarray,
                  max_episode_steps: int = 16):
         

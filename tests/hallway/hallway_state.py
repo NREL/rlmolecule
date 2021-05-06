@@ -1,3 +1,7 @@
+"""The HallwayState class implements the hallway example without the gym API.
+This provides a good starting example for those that don't want / can't 
+use gym."""
+
 from typing import Sequence
 
 from rlmolecule.tree_search.graph_search_state import GraphSearchState

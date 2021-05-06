@@ -18,5 +18,3 @@ class AlphaZeroGymEnv(gym.Wrapper):
         """Returns an observation from the environment, similar to env.reset but
         returning the observation of the current state."""
         pass
-
-    

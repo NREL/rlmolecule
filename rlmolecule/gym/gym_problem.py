@@ -18,4 +18,3 @@ class GymProblem(MCTSProblem):
 
     def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
         return state.cumulative_reward, {}
-        
