@@ -35,6 +35,10 @@ echo """#!/bin/bash
 #SBATCH hetjob
 #SBATCH -N 5
 
+# to track which version of the code generated this output:
+echo \"Current git branch & commit:\"
+git rev-parse --abbrev-ref HEAD
+git log -n 1 --oneline
 
 export WORKING_DIR=$WORKING_DIR
 mkdir -p $WORKING_DIR
@@ -66,8 +70,8 @@ srun --pack-group=0 \
 
 # there are 36 cores on each eagle node.
 srun --pack-group=1 \
-     --ntasks-per-node=9 \
-     --cpus-per-task=4 \
+     --ntasks-per-node=18 \
+     --cpus-per-task=2 \
      --job-name="az-rollout" \
      --output=$WORKING_DIR/%j-mcts.out \
      "\$START_ROLLOUT_SCRIPT"
