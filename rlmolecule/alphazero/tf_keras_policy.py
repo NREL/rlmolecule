@@ -29,8 +29,7 @@ class PolicyWrapper(layers.Layer):
         # Flatten the inputs for running individually through the policy model
         flattened_inputs = []
         for inp in inputs:
-            inp_shape = tf.shape(inp)
-            flattened_shape = [flattened_batch, *[inp_shape[k] for k in range(2, len(inp_shape))]]
+            flattened_shape = tf.concat([tf.expand_dims(flattened_batch, axis=-1), tf.shape(inp)[2:]], axis=-1)
             flattened_inputs += [tf.reshape(inp, flattened_shape)]
 
         # Get the flat value and prior_logit predictions

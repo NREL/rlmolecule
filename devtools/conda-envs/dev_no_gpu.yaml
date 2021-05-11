@@ -1,0 +1,20 @@
+name: rlmol
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.8
+  - rdkit
+  - pandas
+  - tqdm
+  - psycopg2
+  - sqlalchemy
+  - pytest
+  - pytest-cov
+  - jupyterlab
+  - seaborn
+  - pyyaml
+  - pip
+  - pip:
+    - nfp
+    - tensorflow
