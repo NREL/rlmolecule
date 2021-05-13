@@ -8,9 +8,11 @@ from rlmolecule.gym.gym_state import GymEnvState
 
 
 class GymProblem(MCTSProblem):
-    def __init__(self, *, reward_class: RewardFactory, env: AlphaZeroGymEnv):
+    def __init__(self, 
+                 env: AlphaZeroGymEnv,
+                 **kwargs):
         self.env = deepcopy(env)
-        super().__init__(reward_class=reward_class)
+        super().__init__(**kwargs)
 
     def get_initial_state(self) -> GymEnvState:
         _ = self.env.reset()
