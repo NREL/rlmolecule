@@ -99,7 +99,24 @@ class RankedRewardFactory(RewardFactory):
         self._reward_buffer_min_size = reward_buffer_min_size
         self._reward_buffer_max_size = reward_buffer_max_size
         self._ranked_reward_alpha = ranked_reward_alpha
-        self._has_enough_games = False
+        self._init_r_alpha()
+
+    def _init_r_alpha(self):
+        """Query the game database to determine a suitable r_alpha threshold and store the threshold for later use.
+        """
+        all_games = self._session.query(GameStore).filter_by(run_id=self.run_id)
+
+        n_games = all_games.count()
+        if n_games >= self._reward_buffer_min_size:
+            buffer_games = all_games.order_by(GameStore.time.desc()).limit(self._reward_buffer_max_size)
+            buffer_raw_rewards = self._session.query(buffer_games.subquery().c.raw_reward).all()
+            self.r_alpha = np.percentile(np.array(buffer_raw_rewards),
+                                         100 * self._ranked_reward_alpha,
+                                         interpolation='lower')
+
+        else:
+            logger.debug(f"ranked_reward: not enough games ({n_games})")
+            self.r_alpha = None
 
     def _scale(self, reward: float) -> float:
         """Convert the continuous reward value into either a win or loss based on the previous games played.
@@ -107,30 +124,18 @@ class RankedRewardFactory(RewardFactory):
         then this reward is a win. Otherwise, it's a loss.
         """
 
-        all_games = self._session.query(GameStore).filter_by(run_id=self.run_id)
+        logger.debug(f"ranked_reward: r_alpha={self.r_alpha}, reward={reward}")
 
-        if not self._has_enough_games:
-            n_games = all_games.count()
-            if n_games < self._reward_buffer_min_size:
-                # Here, we don't have enough of a game buffer
-                # to decide if the move is good or not
-                logger.debug(f"ranked_reward: not enough games ({n_games})")
-                return np.random.choice([0., 1.])
-            else:
-                self._has_enough_games = True  # todo: write tests?
-
-        buffer_games = all_games.order_by(GameStore.time.desc()).limit(self._reward_buffer_max_size)
-        buffer_raw_rewards = self._session.query(buffer_games.subquery().c.raw_reward).all()
-
-        r_alpha = np.percentile(np.array(buffer_raw_rewards), 100 * self._ranked_reward_alpha, interpolation='lower')
-
-        logger.debug(f"ranked_reward: r_alpha={r_alpha}, reward={reward}")
-
-        if np.isclose(reward, r_alpha):
+        if self.r_alpha is None:
+            # Here, we don't have enough of a game buffer
+            # to decide if the move is good or not
             return np.random.choice([0., 1.])
 
-        elif reward > r_alpha:
+        if np.isclose(reward, self.r_alpha):
+            return np.random.choice([0., 1.])
+
+        elif reward > self.r_alpha:
             return 1.
 
-        elif reward < r_alpha:
+        elif reward < self.r_alpha:
             return 0.
