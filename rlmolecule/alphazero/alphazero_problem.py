@@ -26,6 +26,7 @@ class AlphaZeroProblem(MCTSProblem):
                  run_id: Optional[str] = None,
                  max_buffer_size: int = 200,
                  min_buffer_size: int = 50,
+                 cache_policy_inputs: bool = True,
                  batch_size: int = 32):
 
         super(AlphaZeroProblem, self).__init__(reward_class=reward_class)
@@ -36,6 +37,7 @@ class AlphaZeroProblem(MCTSProblem):
         self.batch_size = batch_size
         self.max_buffer_size = max_buffer_size
         self.min_buffer_size = min_buffer_size
+        self._cache_policy_inputs = cache_policy_inputs
 
     @abstractmethod
     def get_value_and_policy(self, parent: AlphaZeroVertex) -> (float, {AlphaZeroVertex: float}):
@@ -97,15 +99,20 @@ class AlphaZeroProblem(MCTSProblem):
         return self.reward_class(raw_reward=reward)
 
     def policy_input_wrapper(self, vertex: AlphaZeroVertex) -> {str: np.ndarray}:
-        """ Cache policy inputs in the vertex class
+        """ Cache policy inputs in the vertex class. Skip this if we aren't caching policy inputs, i.e., for problems
+        where the memory requirements of doing so are problematic.
 
         :param vertex: A vertex for which policy inputs are desired
         :return: The policy input dictionary for the captive state
         """
-        if getattr(vertex, 'policy_inputs', None) is None:
-            vertex.policy_inputs = self.get_policy_inputs(vertex.state)
+        if self._cache_policy_inputs:
+            if getattr(vertex, 'policy_inputs', None) is None:
+                vertex.policy_inputs = self.get_policy_inputs(vertex.state)
 
-        return vertex.policy_inputs
+            return vertex.policy_inputs
+
+        else:
+            return self.get_policy_inputs(vertex.state)
 
     def _get_policy_inputs_and_digest(self, vertex: AlphaZeroVertex) -> (str, {str: np.ndarray}):
         """ Compute the policy inputs and the policy inputs digest for a given state in order to query the Reward or
@@ -115,7 +122,6 @@ class AlphaZeroProblem(MCTSProblem):
         :return: policy_inputs_digest, policy_inputs
         """
 
-        # todo: make this a function of the vertex, and cache the policy_inputs and digest
         policy_inputs = self.policy_input_wrapper(vertex)
         if getattr(vertex, 'policy_digest', None) is None:
             vertex.policy_digest = digest(serialize_ordered_numpy_dict(policy_inputs))
