@@ -3,6 +3,7 @@ from typing import Optional, Sequence
 from rdkit.Chem import Mol, MolToSmiles
 
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
+from rlmolecule.tree_search.metrics import collect_metrics
 
 
 class MoleculeState(GraphSearchState):
@@ -52,6 +53,7 @@ class MoleculeState(GraphSearchState):
         """
         return hash(self.__repr__()) ^ (13 * self._forced_terminal)
 
+    @collect_metrics
     def get_next_actions(self) -> Sequence['MoleculeState']:
         result = []
         if not self._forced_terminal:

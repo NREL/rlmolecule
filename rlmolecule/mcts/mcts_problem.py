@@ -1,10 +1,10 @@
 import uuid
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from rlmolecule.mcts.mcts_vertex import MCTSVertex
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
-from rlmolecule.tree_search.reward import RawRewardFactory, Reward, RewardFactory
+from rlmolecule.tree_search.metrics import call_metrics
+from rlmolecule.tree_search.reward import Reward, RewardFactory
 
 
 class MCTSProblem(ABC):
@@ -34,6 +34,7 @@ class MCTSProblem(ABC):
         before conducting the MCTS search every time AlphaZero.run() is called.
         """
         self.__id = uuid.uuid4()
+        call_metrics.reset()
 
     def reward_wrapper(self, vertex: MCTSVertex) -> Reward:
         reward, _ = self.get_reward(vertex.state)

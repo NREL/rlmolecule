@@ -8,9 +8,11 @@ from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from rlmolecule.molecule.molecule_problem import MoleculeProblem, MoleculeTFAlphaZeroProblem
 from rlmolecule.molecule.molecule_state import MoleculeState
+from rlmolecule.tree_search.metrics import collect_metrics
 
 
 class QEDOptimizationProblem(MoleculeProblem, AlphaZeroProblem, ABC):
+    @collect_metrics
     @functools.lru_cache(maxsize=None)
     def get_reward(self, state: MoleculeState) -> (float, {}):
         if state.forced_terminal:

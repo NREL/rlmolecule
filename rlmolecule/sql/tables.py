@@ -34,3 +34,4 @@ class GameStore(Base):
     raw_reward = Column(Float)
     scaled_reward = Column(Float)
     search_statistics = Column(JSON)
+    execution_statistics = Column(JSON)

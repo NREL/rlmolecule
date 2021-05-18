@@ -13,6 +13,7 @@ from rlmolecule.mcts.mcts_problem import MCTSProblem
 from rlmolecule.sql import Base, Session, digest, load_numpy_dict, serialize_ordered_numpy_dict
 from rlmolecule.sql.tables import GameStore, RewardStore, StateStore
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
+from rlmolecule.tree_search.metrics import call_metrics
 from rlmolecule.tree_search.reward import Reward, RewardFactory
 
 logger = logging.getLogger(__name__)
@@ -53,8 +54,6 @@ class AlphaZeroProblem(MCTSProblem):
         """
         A user-provided function to calculate inputs for a given search state for the policy model. These are cached
         in StateTable for faster access during model training.
-
-        todo: wrap this, make it a function of the vertex, and cache the results.
 
         :param state: A graph search state for which policy inputs are calculated
         :return: A dictionary of string keys and numpy array values
@@ -163,17 +162,17 @@ class AlphaZeroProblem(MCTSProblem):
         # path[-1] is the terminal state with no children
         search_statistics = []
         for parent, child_visits in path[:-1]:
-            search_statistics += [
-                (self.maybe_store_state(parent),
-                 [(self.maybe_store_state(child), visit_probability)
-                  for child, visit_probability in child_visits])
-            ]
+            search_statistics += [(self.maybe_store_state(parent), [(self.maybe_store_state(child), visit_probability)
+                                                                    for child, visit_probability in child_visits])]
 
-        record = GameStore(id=str(self.id),
-                           run_id=self.run_id,
-                           raw_reward=reward.raw_reward,
-                           scaled_reward=reward.scaled_reward,
-                           search_statistics=search_statistics)
+        record = GameStore(
+            id=str(self.id),
+            run_id=self.run_id,
+            raw_reward=reward.raw_reward,
+            scaled_reward=reward.scaled_reward,
+            search_statistics=search_statistics,
+            execution_statistics=call_metrics.data,
+        )
 
         self.session.add(record)
         self.session.commit()
@@ -190,8 +189,7 @@ class AlphaZeroProblem(MCTSProblem):
         for game in recent_games:
             parent_state_string, visit_probabilities = random.choice(game.search_statistics)
             policy_digests, visit_probs = zip(*visit_probabilities)
-            yield ([parent_state_string] + list(policy_digests),
-                   [game.scaled_reward] + list(visit_probs))
+            yield ([parent_state_string] + list(policy_digests), [game.scaled_reward] + list(visit_probs))
 
     def lookup_policy_inputs_from_digest(self, policy_digest: str) -> {str: np.ndarray}:
 
