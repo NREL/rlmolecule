@@ -62,6 +62,7 @@ class TestPolicyTraining:
         root = game._get_root()
 
         game.problem.get_reward = MagicMock(return_value=(1, {}))
+        game.problem.initialize_run()
 
         reward1 = game.problem.reward_wrapper(root).raw_reward
         reward2 = game.problem.reward_wrapper(root).raw_reward

@@ -46,6 +46,10 @@ class RewardFactory(ABC):
     def _scale(self, reward: float) -> float:
         pass
 
+    def initialize_run(self) -> None:
+        """Any pre-run initialization that might be required"""
+        pass
+
     def __call__(self, *, raw_reward: Optional[float] = None, scaled_reward: Optional[float] = None) -> Reward:
         """ Initialize a Reward class with raw and scaled rewards, scaling the raw reward if a scaled reward is not
         provided. Allows a pass-through of a scaled reward if scaled_reward is provided
@@ -99,9 +103,9 @@ class RankedRewardFactory(RewardFactory):
         self._reward_buffer_min_size = reward_buffer_min_size
         self._reward_buffer_max_size = reward_buffer_max_size
         self._ranked_reward_alpha = ranked_reward_alpha
-        self._init_r_alpha()
+        self.r_alpha = False
 
-    def _init_r_alpha(self):
+    def initialize_run(self):
         """Query the game database to determine a suitable r_alpha threshold and store the threshold for later use.
         """
         all_games = self._session.query(GameStore).filter_by(run_id=self.run_id)
@@ -113,7 +117,6 @@ class RankedRewardFactory(RewardFactory):
             self.r_alpha = np.percentile(np.array(buffer_raw_rewards),
                                          100 * self._ranked_reward_alpha,
                                          interpolation='lower')
-
         else:
             logger.debug(f"ranked_reward: not enough games ({n_games})")
             self.r_alpha = None
@@ -125,6 +128,8 @@ class RankedRewardFactory(RewardFactory):
         """
 
         logger.debug(f"ranked_reward: r_alpha={self.r_alpha}, reward={reward}")
+
+        assert self.r_alpha is not False, "ranked rewards not properly initialized"
 
         if self.r_alpha is None:
             # Here, we don't have enough of a game buffer

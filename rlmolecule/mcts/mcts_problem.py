@@ -34,6 +34,7 @@ class MCTSProblem(ABC):
         before conducting the MCTS search every time AlphaZero.run() is called.
         """
         self.__id = uuid.uuid4()
+        self.reward_class.initialize_run()
         call_metrics.reset()
 
     def reward_wrapper(self, vertex: MCTSVertex) -> Reward:
