@@ -153,7 +153,7 @@ class StereoEnumerator(UniqueMoleculeTransformer):
 
 
 class SAScoreFilter(MoleculeFilter):
-    def __init__(self, sa_score_threshold: float, min_atoms: int):
+    def __init__(self, sa_score_threshold: float, min_atoms: int = 1):
         self.min_atoms = min_atoms
         self.sa_score_threshold = sa_score_threshold
 
