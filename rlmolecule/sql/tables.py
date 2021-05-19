@@ -21,6 +21,7 @@ class StateStore(Base):
     digest = Column(String(128), primary_key=True)
     hash = Column(BigInteger, primary_key=True)
     run_id = Column(String(255), primary_key=True)
+    time = Column(DateTime, server_default=func.now())
     state = Column(LargeBinary)
     policy_inputs = Column(LargeBinary)
 
