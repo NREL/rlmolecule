@@ -1,14 +1,13 @@
-import base64
-from copy import deepcopy
 import logging
-import pickle
+from copy import deepcopy
 from typing import Sequence
 
-import numpy as np
 import gym
+import numpy as np
 
-from rlmolecule.tree_search.graph_search_state import GraphSearchState
 from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
+from rlmolecule.sql import hash_to_integer
+from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +15,7 @@ logger = logging.getLogger(__name__)
 class GymEnvState(GraphSearchState):
     """Gyn env state implementation that maps the gym API to the GraphSearchState
     interface.  Should work generically for any gym env."""
+
     def __init__(self,
                  env: AlphaZeroGymEnv,
                  step_count: int,
@@ -40,7 +40,7 @@ class GymEnvState(GraphSearchState):
         return are_close and same_time
 
     def hash(self) -> int:
-        return hash((self.env.get_obs().tobytes(), self.step_count))
+        return hash_to_integer(self.env.get_obs().tobytes()) ^ hash_to_integer(bytes(13 * self.step_count))
 
     def get_next_actions(self) -> Sequence[GraphSearchState]:
         next_actions = []

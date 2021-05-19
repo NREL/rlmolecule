@@ -3,11 +3,12 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.8
+  - python=3.9
   - rdkit
   - pymatgen
   - pandas
   - tqdm
+  - gym
   - psycopg2
   - sqlalchemy
   - pytest

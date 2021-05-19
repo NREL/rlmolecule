@@ -1,6 +1,7 @@
-from collections import defaultdict, Callable
+from collections import defaultdict
 from functools import wraps
 from time import time
+from typing import Callable
 
 
 class CallMetrics(object):

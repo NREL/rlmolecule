@@ -49,7 +49,7 @@ class MoleculeBuilder:
         ]
 
         if sa_score_threshold is not None:
-            self.transformation_stack += [SAScoreFilter(sa_score_threshold)]
+            self.transformation_stack += [SAScoreFilter(sa_score_threshold, min_atoms)]
 
         if stereoisomers:
             self.transformation_stack += [StereoEnumerator()]
@@ -153,11 +153,14 @@ class StereoEnumerator(UniqueMoleculeTransformer):
 
 
 class SAScoreFilter(MoleculeFilter):
-    def __init__(self, sa_score_threshold):
+    def __init__(self, sa_score_threshold: float, min_atoms: int = 1):
+        self.min_atoms = min_atoms
         self.sa_score_threshold = sa_score_threshold
 
     def filter(self, molecule: rdkit.Chem.Mol) -> bool:
-        return sascorer.calculateScore(molecule) <= self.sa_score_threshold
+        if molecule.GetNumAtoms() >= self.min_atoms:
+            return sascorer.calculateScore(molecule) <= self.sa_score_threshold
+        return True
 
 
 class EmbeddingFilter(MoleculeFilter):

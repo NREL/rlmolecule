@@ -2,6 +2,7 @@ from typing import Optional, Sequence
 
 from rdkit.Chem import Mol, MolToSmiles
 
+from rlmolecule.sql import hash_to_integer
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 from rlmolecule.tree_search.metrics import collect_metrics
 
@@ -51,7 +52,7 @@ class MoleculeState(GraphSearchState):
         """
         delegates to the SMILES string
         """
-        return hash(self.__repr__()) ^ (13 * self._forced_terminal)
+        return hash_to_integer(self.__repr__().encode())
 
     @collect_metrics
     def get_next_actions(self) -> Sequence['MoleculeState']:

@@ -40,3 +40,13 @@ def digest(binary_data: bytes) -> str:
     m = hashlib.sha256()
     m.update(binary_data)
     return m.hexdigest()
+
+
+def hash_to_integer(binary_data: bytes) -> int:
+    """Python's default hash returns different values depending on the process, so an alternative is needed.
+
+    :param binary_data: An input (in bytes). For a string, use string.encode()
+    :return: an integer hash
+    """
+    digest = hashlib.blake2s(binary_data, digest_size=8).hexdigest()
+    return int(digest, 16) % 2**63
