@@ -21,7 +21,7 @@ mkdir -p $WORKING_DIR
 # copy the config file with the rest of the results
 SCRIPT_CONFIG="$WORKING_DIR/run.yaml"
 cp $config_file $SCRIPT_CONFIG
-# also set the run_id in the config file
+# set the run_id in the new config file
 sed -i "s/stable_radical_optimization/$run_id/" $SCRIPT_CONFIG
 
 # create the submission script
@@ -63,7 +63,7 @@ source $HOME/.bashrc
 module use /nopt/nrel/apps/modules/test/modulefiles/
 module load cudnn/8.1.1/cuda-11.2
 conda activate rlmol
-python -u stable_radical_opt.py 
+python -u stable_radical_opt.py \
     --train-policy \
     --config $SCRIPT_CONFIG \
     --stability-model="$stability_model" \
