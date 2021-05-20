@@ -15,6 +15,7 @@ from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from rlmolecule.alphazero.tf_keras_policy import (KLWithLogits, PolicyWrapper, TimeCsvLogger, align_input_names)
+from rlmolecule.tree_search.metrics import collect_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,7 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
             for key in list_of_policy_inputs[0].keys()
         }
 
+    @collect_metrics
     def get_value_and_policy(self, parent: AlphaZeroVertex) -> Tuple[float, dict]:
 
         values, prior_logits = self.policy_evaluator(self._get_batched_policy_inputs(parent))
