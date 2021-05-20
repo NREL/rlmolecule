@@ -25,12 +25,11 @@ def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, 
     # import tensorflow, especially if there's a chance we'll use tf.serving to do the policy / reward evaluations on
     # the workers. Might require upstream changes to nfp as well.
     from rlmolecule.tree_search.reward import RankedRewardFactory
-    from rlmolecule.molecule.builder.builder import MoleculeBuilder
+    from rlmolecule.molecule.molecule_state import MoleculeState
     from rlmolecule.molecule.molecule_problem import MoleculeTFAlphaZeroProblem
     from rlmolecule.tree_search.metrics import collect_metrics
-    
-    #from rlmolecule.molecule.molecule_state import MoleculeState
-    from examples.stable_radical_optimization.stable_radical_molecule_state import StableRadMoleculeState
+
+    from examples.stable_radical_optimization.stable_radical_molecule_state import MoleculeBuilderProtectRadical, AddNewAtomsAndBondsProtectRadical
     import tensorflow as tf
 
     # TODO update/incorporate this code
@@ -56,23 +55,24 @@ def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, 
             self.bde_model = bde_model
             super(StableRadOptProblem, self).__init__(engine, builder, **kwargs)
 
-        def get_initial_state(self) -> StableRadMoleculeState:
-            return StableRadMoleculeState(rdkit.Chem.MolFromSmiles('C'), self._builder)
+        def get_initial_state(self) -> MoleculeState:
+            return MoleculeState(rdkit.Chem.MolFromSmiles('N[O]'), self._builder)
 
-        def get_reward(self, state: StableRadMoleculeState) -> Tuple[float, dict]:
+        def get_reward(self, state: MoleculeState) -> Tuple[float, dict]:
             # Node is outside the domain of validity
             policy_inputs = self.get_policy_inputs(state)
             if ((policy_inputs['atom'] == 1).any() | (policy_inputs['bond'] == 1).any()):
-                return 0.0, {'forced_terminal': False, 'smiles': state.smiles}
+                return 0.0, {'forced_terminal': False, 'smiles': state.smiles, 'status': 'outside_dov'}
 
             if state.forced_terminal:
                 reward, stats = self.calc_reward(state)
                 stats.update({'forced_terminal': True, 'smiles': state.smiles})
                 return reward, stats
+            
             return 0.0, {'forced_terminal': False, 'smiles': state.smiles}
 
         @collect_metrics
-        def calc_reward(self, state: StableRadMoleculeState) -> float:
+        def calc_reward(self, state: MoleculeState) -> float:
             """
             """
             model_inputs = {
@@ -122,7 +122,7 @@ def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, 
 
             return reward, stats
 
-        def calc_bde(self, state: StableRadMoleculeState):
+        def calc_bde(self, state: MoleculeState):
             """calculate the X-H bde, and the difference to the next-weakest X-H bde in kcal/mol"""
 
             bde_inputs = self.prepare_for_bde(state.molecule)
@@ -213,14 +213,15 @@ def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, 
     redox_model = tf.keras.models.load_model(redox_model, compile=False)
     bde_model = tf.keras.models.load_model(bde_model, compile=False)
 
-    builder = MoleculeBuilder(
+    builder = MoleculeBuilderProtectRadical(
         max_atoms=15,
         min_atoms=4,
         tryEmbedding=True,
-        sa_score_threshold=3.5,
+        sa_score_threshold=4.,
         stereoisomers=True,
         atom_additions=('C', 'N', 'O', 'S'),
     )
+
 
     #engine = create_engine(f'sqlite:///stable_radical.db',
     #                       connect_args={'check_same_thread': False},
@@ -238,7 +239,7 @@ def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, 
     engine_str = f'{drivername}://{user}:{passwd}@{host}:{port}/{dbname}'
     engine = create_engine(engine_str, execution_options={"isolation_level": "AUTOCOMMIT"})
 
-    run_id = 'stable_radical_optimization_psj_full_fixed_rr'
+    run_id = 'stable_radical_optimization_psj_NO_l'
 
     reward_factory = RankedRewardFactory(engine=engine,
                                          run_id=run_id,
@@ -260,7 +261,7 @@ def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, 
         batch_size=32,
         max_buffer_size=256,
         min_buffer_size=128,  # Don't start training the model until this many games have occurred
-        policy_checkpoint_dir='policy_checkpoints')
+        policy_checkpoint_dir=os.path.join('policy_checkpoints', run_id))
 
     return problem
 
@@ -275,7 +276,7 @@ def run_games(**kwargs):
         dirichlet_x=dirichlet_x,
     )
     while True:
-        path, reward = game.run(num_mcts_samples=50)
+        path, reward = game.run(num_mcts_samples=500)
         #logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
 

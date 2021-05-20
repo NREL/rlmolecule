@@ -29,7 +29,7 @@ source $HOME/.bashrc
 module use /nopt/nrel/apps/modules/test/modulefiles/
 module load cudnn/8.1.1/cuda-11.2
 conda activate rlmol
-python -u stable_radical_opt.py --train-policy \
+python -u stable_radical_opt_from_initial_center.py --train-policy \
     --stability-model="$stability_model" \
     --redox-model="$redox_model" \
     --bde-model="$bde_model" 
@@ -39,7 +39,7 @@ cat << EOF > "$START_ROLLOUT_SCRIPT"
 #!/bin/bash
 source $HOME/.bashrc
 conda activate rlmol
-python -u stable_radical_opt.py --rollout \
+python -u stable_radical_opt_from_initial_center.py --rollout \
     --stability-model="$stability_model" \
     --redox-model="$redox_model" \
     --bde-model="$bde_model" 
