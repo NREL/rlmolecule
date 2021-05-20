@@ -22,7 +22,7 @@ mkdir -p $WORKING_DIR
 SCRIPT_CONFIG="$WORKING_DIR/run.yaml"
 cp $config_file $SCRIPT_CONFIG
 # set the run_id in the new config file
-sed -i "s/stable_radical_optimization/$run_id/" $SCRIPT_CONFIG
+sed -i "s/test_stable_rad_opt/$run_id/" $SCRIPT_CONFIG
 
 # create the submission script
 echo """#!/bin/bash
@@ -53,34 +53,34 @@ export START_ROLLOUT_SCRIPT="\$WORKING_DIR/\$JOB/.rollout.sh"
 export PYTHONPATH="$(readlink -e ../../):\$PYTHONPATH"
 
 model_dir="/projects/rlmolecule/pstjohn/models/"; 
-stability_model="$model_dir/20210214_radical_stability_new_data/"
-redox_model="$model_dir/20210214_redox_new_data/"
-bde_model="$model_dir/20210216_bde_new_nfp/"
+stability_model="\$model_dir/20210214_radical_stability_new_data/"
+redox_model="\$model_dir/20210214_redox_new_data/"
+bde_model="\$model_dir/20210216_bde_new_nfp/"
 
 cat << EOF > "\$START_POLICY_SCRIPT"
 #!/bin/bash
 source $HOME/.bashrc
 module use /nopt/nrel/apps/modules/test/modulefiles/
 module load cudnn/8.1.1/cuda-11.2
-conda activate rlmol
-python -u stable_radical_opt.py \
+conda activate $HOME/.conda-envs/rlmol
+~/.conda-envs/rlmol/bin/python -u stable_radical_opt.py \
     --train-policy \
     --config $SCRIPT_CONFIG \
-    --stability-model="$stability_model" \
-    --redox-model="$redox_model" \
-    --bde-model="$bde_model" 
+    --stability-model="\$stability_model" \
+    --redox-model="\$redox_model" \
+    --bde-model="\$bde_model" 
 EOF
 
 cat << EOF > "\$START_ROLLOUT_SCRIPT"
 #!/bin/bash
 source $HOME/.bashrc
-conda activate rlmol
-python -u stable_radical_opt.py \
+conda activate $HOME/.conda-envs/rlmol
+~/.conda-envs/rlmol/bin/python -u stable_radical_opt.py \
     --rollout \
     --config $SCRIPT_CONFIG \
-    --stability-model="$stability_model" \
-    --redox-model="$redox_model" \
-    --bde-model="$bde_model" 
+    --stability-model="\$stability_model" \
+    --redox-model="\$redox_model" \
+    --bde-model="\$bde_model" 
 EOF
 
 chmod +x "\$START_POLICY_SCRIPT" "\$START_ROLLOUT_SCRIPT"

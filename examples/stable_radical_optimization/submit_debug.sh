@@ -8,7 +8,7 @@
 #SBATCH --ntasks=8
 #SBATCH --cpus-per-task=4
 
-export WORKING_DIR=/projects/rlmolecule/${USER}/stable_radical_opt/test_stable_radical_opt
+export WORKING_DIR=/projects/rlmolecule/${USER}/stable_radical_opt/test_stable_rad_opt
 mkdir -p $WORKING_DIR
 export START_POLICY_SCRIPT="$SLURM_SUBMIT_DIR/$JOB/.policy.sh"
 export START_ROLLOUT_SCRIPT="$SLURM_SUBMIT_DIR/$JOB/.rollout.sh"
