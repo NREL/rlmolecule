@@ -25,8 +25,8 @@ cat << EOF > "$START_POLICY_SCRIPT"
 source $HOME/.bashrc
 module use /nopt/nrel/apps/modules/test/modulefiles/
 module load cudnn/8.1.1/cuda-11.2
-conda activate $HOME/.conda-envs/rlmol
-~/.conda-envs/rlmol/bin/python -u stable_radical_opt.py \
+conda activate rlmol
+python -u stable_radical_opt.py \
     --train-policy \
     --config config/config_eagle.yaml \
     --stability-model="$stability_model" \
@@ -37,8 +37,8 @@ EOF
 cat << EOF > "$START_ROLLOUT_SCRIPT"
 #!/bin/bash
 source $HOME/.bashrc
-conda activate $HOME/.conda-envs/rlmol
-~/.conda-envs/rlmol/bin/python -u stable_radical_opt.py \
+conda activate rlmol
+python -u stable_radical_opt.py \
     --rollout \
     --config config/config_eagle.yaml \
     --stability-model="$stability_model" \
