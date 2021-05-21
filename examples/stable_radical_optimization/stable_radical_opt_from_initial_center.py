@@ -19,6 +19,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+run_id = 'stable_radical_optimization_psj_NS_l2'
+
+
 def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, bde_model: pathlib.Path, **kwargs):
     # We have to delay all importing of tensorflow until the child processes launch,
     # see https://github.com/tensorflow/tensorflow/issues/8220. We should be more careful about where / when we
@@ -56,7 +59,7 @@ def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, 
             super(StableRadOptProblem, self).__init__(engine, builder, **kwargs)
 
         def get_initial_state(self) -> MoleculeState:
-            return MoleculeState(rdkit.Chem.MolFromSmiles('N[O]'), self._builder)
+            return MoleculeState(rdkit.Chem.MolFromSmiles('S[NH]'), self._builder)
 
         def get_reward(self, state: MoleculeState) -> Tuple[float, dict]:
             # Node is outside the domain of validity
@@ -215,7 +218,7 @@ def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, 
 
     builder = MoleculeBuilderProtectRadical(
         max_atoms=15,
-        min_atoms=4,
+        min_atoms=6,  # 4 for other radicals, for S[NH] we need to increase this to prevent early termination from high QED scores
         tryEmbedding=True,
         sa_score_threshold=4.,
         stereoisomers=True,
@@ -238,8 +241,6 @@ def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, 
     drivername = "postgresql+psycopg2"
     engine_str = f'{drivername}://{user}:{passwd}@{host}:{port}/{dbname}'
     engine = create_engine(engine_str, execution_options={"isolation_level": "AUTOCOMMIT"})
-
-    run_id = 'stable_radical_optimization_psj_NO_l'
 
     reward_factory = RankedRewardFactory(engine=engine,
                                          run_id=run_id,
