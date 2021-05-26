@@ -14,5 +14,5 @@ module load conda
 module load cudnn/8.1.1/cuda-11.2
 
 conda env create -f ./conda-envs/dev.yaml
-source activate rlmol
+source activate rlmol39
 ```
