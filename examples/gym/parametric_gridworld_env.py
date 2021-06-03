@@ -13,7 +13,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-
 class ParametricGridWorldEnv(gym.Env):
     """
 
@@ -26,10 +25,19 @@ class ParametricGridWorldEnv(gym.Env):
         self.delegate: GridWorldEnv = delegate
 
         num_actions = len(self.delegate.action_map)
+        delegate_observation_space = delegate.observation_space
+
+        def get_repeated_bounds(bound):
+            if isinstance(bound, np.ndarray):
+                return np.reshape((1,) + bound.shape) + np.zeros((num_actions,) + tuple([1] * len(bound.shape)))
+            return bound
+
         self.observation_space = gym.spaces.Dict({
-            'action_mask': Box(0, 1, shape=(num_actions,)),
-            'available_actions': Box(-10, 10, shape=(num_actions, 2)),
-            'internal_observation': self.delegate.observation_space
+            'action_mask': Box(0, 1, shape=(num_actions,), dtype=np.int64),
+            'available_actions': Box(get_repeated_bounds(delegate_observation_space.high),
+                                     get_repeated_bounds(delegate_observation_space.low),
+                                     shape=(num_actions,) + delegate_observation_space.shape,
+                                     dtype=delegate_observation_space.dtype),
         })
         self.action_space = delegate.action_space
 
@@ -65,7 +73,6 @@ class ParametricGridWorldEnv(gym.Env):
             action_observations.append(action_observation)
 
         return {
-            'action_mask': action_mask,
-            'action_observations': action_observations,
+            'action_mask': np.array(action_mask, dtype=np.int64),
+            'action_observations': np.array(action_observations),
         }
-
