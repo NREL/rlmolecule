@@ -1,4 +1,7 @@
 import logging
+import random
+import sys
+from enum import IntEnum
 from typing import Tuple
 
 import numpy as np
@@ -8,18 +11,20 @@ import gym
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+ACTION_MAP = [np.array(delta) for delta in [(0, 1), (1, 0), (0, -1), (-1, 0)]]
 
-ACTION_MAP = {0: (0, 1), 1: (1, 0), 2: (0, -1), 3: (-1, 0)}
-OBSTACLE_CHANNEL = 0
-GOAL_CHANNEL = 1
-PLAYER_CHANNEL = 2
+
+class CellType(IntEnum):
+    OPEN = 0
+    GOAL = 1
+    START = 2
+    OBSTACLE = 3
 
 
 class GridWorldEnv(gym.Env):
-    
     """Class implementing a square gridworld with 4-d discrete action space.
 
-    The obs is modeled as an 3-channel array with separate channels for 
+    The observation is modeled as an 3-channel array with separate channels for 
     obstacles (0), goal (1), and player (2).  The env is instantiated by 
     passing a size x size x 3 numpy array with 1 indicating presence of the
     object, and 0 otherwise.
@@ -29,88 +34,109 @@ class GridWorldEnv(gym.Env):
                  grid: np.ndarray,
                  max_episode_steps: int = None,
                  sparse_rewards: bool = False,
-                 obs_type: str = "scalar"):
+                 observation_type: str = 'scalar'):
+        self.observation_type = observation_type
 
-        assert obs_type in ["rgb", "grayscale", "scalar", "index"]
-        self.obs_type = obs_type
+        self.grid: np.ndarray = grid.copy()
+        self.goals: [(int, ...)] = tuple(np.argwhere(self.grid == CellType.GOAL))
 
-        self.size = grid.shape[1]
         self.max_episode_steps = max_episode_steps if max_episode_steps is not None \
-            else 4 * (self.size - 1)
+            else 4 * (np.prod(self.shape) - 1)
         self.sparse_rewards = sparse_rewards
 
         self.episode_steps = None
         self.cumulative_reward = None
 
-        self.start = tuple([x[0] for x in np.where(grid[:, :, PLAYER_CHANNEL])])
-        self.goal = tuple([x[0] for x in np.where(grid[:, :, GOAL_CHANNEL])])
-        self.initial_grid = grid.copy()
+        self.player_position: np.ndarray = np.zeros(len(self.shape))
+        # self.goal = tuple([x[0] for x in np.where(grid == CellType.GOAL)])
 
-        if self.obs_type == "index":
-            self.obs_shape = [1]
-            high = self.size * self.size - 1
-            dtype = np.int64
-        if self.obs_type == "scalar":
-            self.obs_shape = [2]
-            high = self.size
-            dtype = np.int64
-        if self.obs_type == "rgb":
-            self.obs_shape = list(self.initial_grid.shape)
-            high = 1.
+        low = 0
+        high = 1
+        dtype = np.int64
+        if self.observation_type == 'index':  # a single flattened index of the position
+            self.obs_shape = (1,)
+            high = np.prod(self.shape) - 1
+        elif self.observation_type == 'scalar':  # (row, col)
+            num_dims = len(self.shape)
+            self.obs_shape = (num_dims,)
+            low = np.array([0] * num_dims)
+            high = np.array([d - 1 for d in self.shape])
+        elif self.observation_type == 'rgb':  # binary matrices of [obstacle, goal, start]
+            self.obs_shape = tuple(list(self.shape) + [3])
             dtype = np.float64
-        if self.obs_type == "grayscale":
-            self.obs_shape = list(self.initial_grid.shape)
-            self.obs_shape[-1] = 1
-            high = 1.
+        elif self.observation_type == 'grayscale':  # float matrix, 0 for open, 1/3 for obstacle, 2/3 for goal and 1 for player
+            self.obs_shape = self.shape
             dtype = np.float64
-        self.obs_shape = tuple(self.obs_shape)
+        else:
+            assert False, f'Unknown observation_type {observation_type}.'
 
         self.observation_space = gym.spaces.Box(
-            low=0, high=high, shape=self.obs_shape, dtype=dtype)
+            low=low, high=high, shape=self.obs_shape, dtype=dtype)
 
         self.action_space = gym.spaces.Discrete(4)
 
+    @property
+    def shape(self) -> tuple:
+        return self.grid.shape
 
     def reset(self) -> np.ndarray:
         self.episode_steps = 0
         self.cumulative_reward = 0.
-        self.player = list(self.start)
-        self.grid = self.initial_grid.copy()
-        return self.get_obs()
+        self.player_position = np.array(random.choice(list(np.argwhere(self.grid == CellType.START))))
+        return self.make_observation()
 
+    def make_observation(self) -> np.ndarray:
+        shape = self.shape
+        observation = None
+        observation_type = self.observation_type
+        if observation_type == 'index':
+            idx = 0
+            for i, p in enumerate(self.player_position):
+                idx = idx * shape[i] + p
+            observation = [idx]
+        elif observation_type == 'scalar':
+            observation = list(self.player_position)
+        elif observation_type == 'grayscale':
+            observation = np.zeros(shape)
+            observation += (1.0 / 3.0) * (self.grid == CellType.OBSTACLE)
+            observation += (2.0 / 3.0) * (self.grid == CellType.GOAL)
+            observation[tuple(self.player_position)] = 1.0
+        elif observation_type == 'rgb':
+            player_location_grid = np.zeros(self.shape)
+            player_location_grid[tuple(self.player_position)] = 1.0
+            observation = np.stack([
+                self.grid == CellType.OBSTACLE,
+                self.grid == CellType.GOAL,
+                player_location_grid
+            ])
+        else:
+            assert False, f'Unknown observation_type {observation_type}.'
 
-    def get_obs(self) -> np.ndarray:
-        obs = self.grid.copy()
-        if self.obs_type == "index":
-            obs = np.where(obs[:, :, PLAYER_CHANNEL].squeeze())
-            obs = np.array([obs[0]*self.size + obs[1]], dtype=np.int64).reshape(1)
-        if self.obs_type == "scalar":
-            obs = np.where(obs[:, :, PLAYER_CHANNEL].squeeze())
-            obs = np.array([obs[0], obs[1]], dtype=np.int64).reshape(2)
-        if self.obs_type == "grayscale":
-            obs[0, :, :] *= 1/3.
-            obs[1, :, :] *= 2/3.
-            obs = np.sum(obs, axis=-1).reshape(self.obs_shape)
-        return obs.copy()
-        
+        return observation
+
+    def get_next_position(
+            self,
+            player_position: np.ndarray,
+            grid: np.ndarray,
+            action: int,
+    ) -> (np.ndarray, bool):
+        new_position: np.ndarray = player_position + ACTION_MAP[action]
+
+        for i, p in enumerate(new_position):
+            if p < 0 or p >= grid.shape[i]:
+                return player_position, False
+
+        if grid[tuple(new_position)] == CellType.OBSTACLE:
+            return player_position, False
+
+        return new_position, True
 
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, dict]:
 
-        # Zero out the previous player cell
-        self.grid[self.player[0], self.player[1], PLAYER_CHANNEL] = 0.
-        
-        # Update the new player cell, keeping it within the grid boundaries
-        action = ACTION_MAP[action]
-        _row = min(self.size-1, max(0, self.player[0] + action[0]))
-        _col = min(self.size-1, max(0, self.player[1] + action[1]))
-
-        # If the new position is open, update player position, else do nothing
-        if self.grid[_row, _col, OBSTACLE_CHANNEL] == 0:
-            self.player = (_row, _col)
-        self.grid[self.player[0], self.player[1], PLAYER_CHANNEL] = 1.
+        self.player_position, valid_move = self.get_next_position(self.player_position, self.grid, action)
 
         # Look for termination
-        goal_reached = tuple(self.player) == self.goal        
+        goal_reached = self.grid[tuple(self.player_position)] == CellType.GOAL
         self.episode_steps += 1
         max_steps_reached = self.episode_steps == self.max_episode_steps
         done = goal_reached or max_steps_reached
@@ -125,39 +151,38 @@ class GridWorldEnv(gym.Env):
         if self.sparse_rewards:
             reward = self.cumulative_reward if done else 0.
 
-        return self.get_obs(), reward, done, {}
-
+        return self.make_observation(), reward, done, {}
 
     def get_terminal_reward(self) -> float:
         # Terminal reward results in max cumulative reward being 0.
-        return -self._tuple_distance(self.player, self.goal) + 2 * (self.size - 1)
+        distance = min((self.distance_between_cells(self.player_position, goal) for goal in self.goals))
+        return -distance + 2 * (np.prod(self.shape) - 1)
 
-    def _tuple_distance(self, t1, t2) -> float:
-        """Compute the manhattan distance between two tuples."""
-        return np.sum(np.abs((np.array(t1) - np.array(t2))))
+    @staticmethod
+    def distance_between_cells(a: np.ndarray, b: np.ndarray) -> int:
+        return int(np.sum(np.abs(a - b)))
 
 
 def make_empty_grid(size=5):
     """Helper function for creating empty (no obstacles) of given size."""
-    grid = np.zeros((size, size, 3))
-    grid[0, 0, PLAYER_CHANNEL] = 1
-    grid[-1, -1, GOAL_CHANNEL] = 1
+    grid = np.zeros((size, size))
+    grid[0, 0] = CellType.START
+    grid[-1, -1] = CellType.GOAL
     return grid
 
 
 def make_doorway_grid():
     """Example where wall blocks all but 2 pixels for the player to pass through."""
     size = 10
-    grid = np.zeros((size, size, 3))
+    wall_offset = 4
+    grid = np.zeros((size, size))
 
-    obstacle_idx = np.ones((8, 3), dtype=int)
-    obstacle_idx[:, 0] = 4
-    obstacle_idx[:, 1] = [x for x in range(10) if x not in [4, 5]]
-    obstacle_idx[:, 2] = OBSTACLE_CHANNEL
+    grid[wall_offset, :] = CellType.OBSTACLE
+    grid[wall_offset, 4] = CellType.OPEN
+    grid[wall_offset, 5] = CellType.OPEN
 
-    grid[obstacle_idx[:, 0], obstacle_idx[:, 1], obstacle_idx[:, 2]] = 1
-    grid[0, 0, PLAYER_CHANNEL] = 1
-    grid[-1, -1, GOAL_CHANNEL] = 1
+    grid[0, 0] = CellType.START
+    grid[-1, -1] = CellType.GOAL
 
     return grid
 
@@ -166,7 +191,17 @@ def policy(env):
     """An optimal policy for empty gridworld: find the vector pointing towards
     the goal, and choose the first non-zero direction.  Total episode reward
     should be 0 when running this."""
-    goal_direction = np.array(env.goal) - np.array(env.player)
+    goals = env.goals
+
+    distance = sys.maxsize
+    nearest_goal = (0, 0)
+    for goal in goals:
+        d = env.distance_between_cells(goal, env.player_position)
+        if d < distance:
+            distance = d
+            nearest_goal = goal
+
+    goal_direction = nearest_goal - env.player_position
     print("goal direction", goal_direction)
     action = np.where(goal_direction.squeeze() != 0)[0][0]
     if action == 0:
@@ -179,7 +214,7 @@ def policy(env):
 
 
 if __name__ == "__main__":
-    
+
     # from tf_model import gridworld_image_embed_policy
     # model = gridworld_image_embed_policy(
     #     size=32,
@@ -190,22 +225,22 @@ if __name__ == "__main__":
 
     size = 64
     grid = make_empty_grid(size=size)
-    env = GridWorldEnv(grid, obs_type="scalar", max_episode_steps=2*size+2)
-    obs = env.reset()
+    env = GridWorldEnv(grid, observation_type="scalar", max_episode_steps=2 * size + 2)
+    observation = env.reset()
 
-    print("obs", obs)
-    #print("PREDICT", model.predict(obs.reshape(1, 1)))
+    print("observation", observation)
+    # print("PREDICT", model.predict(observation.reshape(1, 1)))
     done, rew, step = False, 0., 0
     while not done:
-        #action = env.action_space.sample()
-        #action = 2
+        # action = env.action_space.sample()
+        # action = 2
         action = policy(env)
-        obs, r, done, _ = env.step(action)
+        observation, r, done, _ = env.step(action)
         rew += r
         step += 1
         print("\nstep {}, reward {}, done {}".format(step, r, done))
         print("action", action)
-        print("obs", obs)
-        #print("policy", model.predict(obs.reshape(1, 1)))
-        
+        print("observation", observation)
+        # print("policy", model.predict(observation.reshape(1, 1)))
+
     print("final reward", rew)

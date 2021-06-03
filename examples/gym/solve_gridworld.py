@@ -26,7 +26,7 @@ class GridWorldEnv(AlphaZeroGymEnv):
         return self.env.reset()
 
     def get_obs(self) -> np.ndarray:
-        return self.env.get_obs()
+        return self.env.make_observation()
 
 
 class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
@@ -47,7 +47,7 @@ class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
 
     def get_policy_inputs(self, state: GymEnvState) -> dict:
         return {
-            "obs": state.env.get_obs(),
+            "obs": state.env.make_observation(),
             #"steps": np.array([np.float64(self.env.episode_steps / self.env.max_episode_steps)])
         }
 

@@ -29,7 +29,7 @@ class HallwayAlphaZeroEnv(AlphaZeroGymEnv):
         super().__init__(env)
 
     def get_obs(self) -> np.ndarray:
-        return self.env.get_obs()
+        return self.env.make_observation()
 
 
 class HallwayProblem(GymProblem, TFAlphaZeroProblem):
@@ -42,7 +42,7 @@ class HallwayProblem(GymProblem, TFAlphaZeroProblem):
                             input_dtype="int64")  # make sure your input dtypes match!
 
     def get_policy_inputs(self, state: GymEnvState) -> dict:
-        return {"obs": self.env.get_obs()}
+        return {"obs": self.env.make_observation()}
 
 
 def construct_problem():
