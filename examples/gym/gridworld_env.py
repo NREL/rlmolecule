@@ -1,6 +1,7 @@
 import logging
 import random
 import sys
+from copy import copy
 from enum import IntEnum
 from typing import Tuple
 
@@ -31,24 +32,25 @@ class GridWorldEnv(gym.Env):
                  grid: np.ndarray,
                  max_episode_steps: int = None,
                  sparse_rewards: bool = False,
-                 observation_type: str = 'scalar'):
-        self.observation_type = observation_type
+                 observation_type: str = 'scalar',
+                 ) -> None:
+        self.observation_type: str = observation_type
 
         self.grid: np.ndarray = grid.copy()
         self.goals: [(int, ...)] = tuple(np.argwhere(self.grid == CellType.GOAL))
 
-        self.max_episode_steps = max_episode_steps if max_episode_steps is not None \
+        self.max_episode_steps: int = max_episode_steps if max_episode_steps is not None \
             else 4 * (np.prod(self.shape) - 1)
-        self.sparse_rewards = sparse_rewards
+        self.sparse_rewards: bool = sparse_rewards
 
-        self.episode_steps = None
-        self.cumulative_reward = None
+        self.episode_steps: int = 0
+        self.cumulative_reward: float = 0.0
 
         self.player_position: np.ndarray = np.zeros(len(self.shape))
 
         num_dims = len(self.shape)
 
-        self.action_map = []
+        self.action_map: [(int, ...)] = []
         for d in range(num_dims):
             self.action_map.append(tuple((1 * (i == d) for i in range(num_dims))))
             self.action_map.append(tuple((-1 * (i == d) for i in range(num_dims))))
@@ -56,26 +58,32 @@ class GridWorldEnv(gym.Env):
         low = 0
         high = 1
         dtype = np.int64
+        obs_shape: (int, ...) = (1,)
         if self.observation_type == 'index':  # a single flattened index of the position
-            self.obs_shape = (1,)
+            obs_shape = (1,)
             high = np.prod(self.shape) - 1
         elif self.observation_type == 'scalar':  # (row, col)
-            self.obs_shape = (num_dims,)
+            obs_shape = (num_dims,)
             low = np.array([0] * num_dims)
             high = np.array([d - 1 for d in self.shape])
         elif self.observation_type == 'rgb':  # binary matrices of [obstacle, goal, start]
-            self.obs_shape = tuple(list(self.shape) + [3])
+            obs_shape = tuple(list(self.shape) + [3])
             dtype = np.float64
         elif self.observation_type == 'grayscale':  # float matrix, 0 for open, 1/3 for obstacle, 2/3 for goal and 1 for player
-            self.obs_shape = self.shape
+            obs_shape = self.shape
             dtype = np.float64
         else:
             assert False, f'Unknown observation_type {observation_type}.'
 
-        self.observation_space = gym.spaces.Box(
-            low=low, high=high, shape=self.obs_shape, dtype=dtype)
+        self.observation_space: gym.spaces.Box = gym.spaces.Box(
+            low=low, high=high, shape=obs_shape, dtype=dtype)
 
-        self.action_space = gym.spaces.Discrete(4)
+        self.action_space: gym.spaces.Discrete = gym.spaces.Discrete(4)
+
+    def make_next(self, action: int) -> ('GridWorldEnv', bool):
+        next = copy(self)
+        valid_position = next.apply_action(action)
+        return next, valid_position
 
     @property
     def shape(self) -> tuple:
@@ -86,6 +94,40 @@ class GridWorldEnv(gym.Env):
         self.cumulative_reward = 0.
         self.player_position = np.array(random.choice(list(np.argwhere(self.grid == CellType.START))))
         return self.make_observation()
+
+    def step(self, action: int) -> (np.ndarray, float, bool, {}):
+        self.apply_action(action)
+
+        # Look for termination
+        goal_reached = self.grid[tuple(self.player_position)] == CellType.GOAL
+        self.episode_steps += 1
+        max_steps_reached = self.episode_steps == self.max_episode_steps
+        done = goal_reached or max_steps_reached
+
+        # Compute reward
+        reward = -1
+        if done:
+            reward += self.get_terminal_reward()
+        self.cumulative_reward += reward
+
+        # If using sparse rewards, only return cumulative reward if done, else 0.
+        if self.sparse_rewards:
+            reward = self.cumulative_reward if done else 0.
+
+        return self.make_observation(), reward, done, {}
+
+    def get_terminal_reward(self) -> float:
+        # Terminal reward results in max cumulative reward being 0.
+        distance = min((self.distance_between_cells(self.player_position, goal) for goal in self.goals))
+        return -distance + 2 * (np.prod(self.shape) - 1)
+
+    @staticmethod
+    def distance_between_cells(a: np.ndarray, b: np.ndarray) -> int:
+        return int(np.sum(np.abs(a - b)))
+
+    def nearest_goal(self, position: np.ndarray) -> (int, np.ndarray):
+        return max([(env.distance_between_cells(goal, position), goal) for goal in self.goals],
+                   key=lambda tup: tup[0])
 
     def make_observation(self) -> np.ndarray:
         shape = self.shape
@@ -122,6 +164,7 @@ class GridWorldEnv(gym.Env):
             grid: np.ndarray,
             action: int,
     ) -> (np.ndarray, bool):
+        # for make_next to work without additional trickery, this needs to be a new object
         new_position: np.ndarray = player_position + self.action_map[action]
 
         for i, p in enumerate(new_position):
@@ -133,40 +176,9 @@ class GridWorldEnv(gym.Env):
 
         return new_position, True
 
-    def step(self, action: int) -> Tuple[np.ndarray, float, bool, dict]:
-
+    def apply_action(self, action: int) -> bool:
         self.player_position, valid_move = self.get_next_position(self.player_position, self.grid, action)
-
-        # Look for termination
-        goal_reached = self.grid[tuple(self.player_position)] == CellType.GOAL
-        self.episode_steps += 1
-        max_steps_reached = self.episode_steps == self.max_episode_steps
-        done = goal_reached or max_steps_reached
-
-        # Compute reward
-        reward = -1
-        if done:
-            reward += self.get_terminal_reward()
-        self.cumulative_reward += reward
-
-        # If using sparse rewards, only return cumulative reward if done, else 0.
-        if self.sparse_rewards:
-            reward = self.cumulative_reward if done else 0.
-
-        return self.make_observation(), reward, done, {}
-
-    def get_terminal_reward(self) -> float:
-        # Terminal reward results in max cumulative reward being 0.
-        distance = min((self.distance_between_cells(self.player_position, goal) for goal in self.goals))
-        return -distance + 2 * (np.prod(self.shape) - 1)
-
-    @staticmethod
-    def distance_between_cells(a: np.ndarray, b: np.ndarray) -> int:
-        return int(np.sum(np.abs(a - b)))
-
-    def nearest_goal(self, position: np.ndarray) -> (int, np.ndarray):
-        return max([(env.distance_between_cells(goal, position), goal) for goal in self.goals],
-                   key=lambda tup: tup[0])
+        return valid_move
 
 
 def make_empty_grid(size=5):

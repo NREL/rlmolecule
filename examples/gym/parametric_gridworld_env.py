@@ -25,8 +25,8 @@ class ParametricGridWorldEnv(gym.Env):
 
         self.delegate: GridWorldEnv = delegate
 
-        num_actions = len(ACTION_MAP)
-        self.observation_space = ray.utils.Dict({
+        num_actions = len(self.delegate.action_map)
+        self.observation_space = gym.spaces.Dict({
             'action_mask': Box(0, 1, shape=(num_actions,)),
             'available_actions': Box(-10, 10, shape=(num_actions, 2)),
             'internal_observation': self.delegate.observation_space
@@ -34,33 +34,38 @@ class ParametricGridWorldEnv(gym.Env):
         self.action_space = delegate.action_space
 
     def reset(self) -> {str: np.ndarray}:
-        return self._make_observation(self.delegate.reset())
-
+        self.delegate.reset()
+        return self.make_observation()
 
     def step(self, action: int) -> Tuple[Union[np.ndarray, {str: np.ndarray}], float, bool, dict]:
+        # this could be more efficient if we cached or elided delegate observation generation
+        delegate_observation, reward, is_terminal, info = self.delegate.step(action)
+        return self.make_observation(), reward, is_terminal, info
 
-        return self.get_obs(), reward, done, {}
+    def make_observation(self) -> {str: np.ndarray}:
+        delegate = self.delegate
+        successors = []
+        for action in range(delegate.action_map):
+            next, valid_action = delegate.make_next(action)
+            successors.append(next if valid_action else None)
 
-    def get_terminal_reward(self) -> float:
-        # Terminal reward results in max cumulative reward being 0.
-        return -self._tuple_distance(self.player, self.goal) + 2 * (self.size - 1)
-
-    def _tuple_distance(self, t1, t2) -> float:
-        """Compute the manhattan distance between two tuples."""
-        return np.sum(np.abs((np.array(t1) - np.array(t2))))
-
-
-    def _make_observation(self, internal_observation : np.ndarray) -> {str: np.ndarray}:
-        grid = self.delegate.grid
-
+        # I split this out for clarity and modularity...
+        delegate_observation_space = delegate.observation_space
         action_mask = []
         action_observations = []
-        for action in gridworld_env.ACTION_MAP:
-            new_grid = grid.copy()
+        for next in successors:
+            mask = 0
+            action_observation = None
+            if next is None:
+                action_observation = np.zeros(delegate_observation_space.shape, dtype=delegate_observation_space.dtype)
+            else:
+                mask = 1
+                action_observation = next.make_observation()
+            action_mask.append(mask)
+            action_observations.append(action_observation)
 
-        return gym.spaces.Dict({
-            'action_mask': Box(0, 1, shape=(num_actions,)),
-            'available_actions': Box(-10, 10, shape=(num_actions, 2)),
-            'internal_observation': internal_observation
-        })
+        return {
+            'action_mask': action_mask,
+            'action_observations': action_observations,
+        }
 
