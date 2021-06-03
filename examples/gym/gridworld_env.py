@@ -11,8 +11,6 @@ import gym
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-ACTION_MAP = [np.array(delta) for delta in [(0, 1), (1, 0), (0, -1), (-1, 0)]]
-
 
 class CellType(IntEnum):
     OPEN = 0
@@ -22,12 +20,11 @@ class CellType(IntEnum):
 
 
 class GridWorldEnv(gym.Env):
-    """Class implementing a square gridworld with 4-d discrete action space.
+    """Class implementing an n-dimensional gridworld with 2n discrete action space.
 
     The observation is modeled as an 3-channel array with separate channels for 
     obstacles (0), goal (1), and player (2).  The env is instantiated by 
-    passing a size x size x 3 numpy array with 1 indicating presence of the
-    object, and 0 otherwise.
+    passing a n-dimensional numpy array of CellType integer codes.
     """
 
     def __init__(self,
@@ -48,7 +45,13 @@ class GridWorldEnv(gym.Env):
         self.cumulative_reward = None
 
         self.player_position: np.ndarray = np.zeros(len(self.shape))
-        # self.goal = tuple([x[0] for x in np.where(grid == CellType.GOAL)])
+
+        num_dims = len(self.shape)
+
+        self.action_map = []
+        for d in range(num_dims):
+            self.action_map.append(tuple((1 * (i == d) for i in range(num_dims))))
+            self.action_map.append(tuple((-1 * (i == d) for i in range(num_dims))))
 
         low = 0
         high = 1
@@ -57,7 +60,6 @@ class GridWorldEnv(gym.Env):
             self.obs_shape = (1,)
             high = np.prod(self.shape) - 1
         elif self.observation_type == 'scalar':  # (row, col)
-            num_dims = len(self.shape)
             self.obs_shape = (num_dims,)
             low = np.array([0] * num_dims)
             high = np.array([d - 1 for d in self.shape])
@@ -120,7 +122,7 @@ class GridWorldEnv(gym.Env):
             grid: np.ndarray,
             action: int,
     ) -> (np.ndarray, bool):
-        new_position: np.ndarray = player_position + ACTION_MAP[action]
+        new_position: np.ndarray = player_position + self.action_map[action]
 
         for i, p in enumerate(new_position):
             if p < 0 or p >= grid.shape[i]:
@@ -162,6 +164,10 @@ class GridWorldEnv(gym.Env):
     def distance_between_cells(a: np.ndarray, b: np.ndarray) -> int:
         return int(np.sum(np.abs(a - b)))
 
+    def nearest_goal(self, position: np.ndarray) -> (int, np.ndarray):
+        return max([(env.distance_between_cells(goal, position), goal) for goal in self.goals],
+                   key=lambda tup: tup[0])
+
 
 def make_empty_grid(size=5):
     """Helper function for creating empty (no obstacles) of given size."""
@@ -191,15 +197,7 @@ def policy(env):
     """An optimal policy for empty gridworld: find the vector pointing towards
     the goal, and choose the first non-zero direction.  Total episode reward
     should be 0 when running this."""
-    goals = env.goals
-
-    distance = sys.maxsize
-    nearest_goal = (0, 0)
-    for goal in goals:
-        d = env.distance_between_cells(goal, env.player_position)
-        if d < distance:
-            distance = d
-            nearest_goal = goal
+    distance, nearest_goal = env.nearest_goal(env.player_position)
 
     goal_direction = nearest_goal - env.player_position
     print("goal direction", goal_direction)
