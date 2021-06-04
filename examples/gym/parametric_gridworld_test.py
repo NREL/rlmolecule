@@ -114,9 +114,8 @@ if __name__ == "__main__":
             'model': {
                 'custom_model': 'parametric_gridworld_model',
             },
-            # Use GPUs iff `RLLIB_NUM_GPUS` env var set to > 0.
-            'num_gpus': .01,
-            'num_gpus_per_worker': (1.0-.01) / 6,
+            'num_gpus': 0.0,
+            'num_gpus_per_worker': 0.0,
             'num_workers': 6,
             'framework': 'tf2',
             'rollout_fragment_length': int(1e2),
