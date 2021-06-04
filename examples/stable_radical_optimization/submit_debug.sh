@@ -23,8 +23,10 @@ bde_model="$model_dir/20210216_bde_new_nfp/"
 cat << EOF > "$START_POLICY_SCRIPT"
 #!/bin/bash
 source $HOME/.bashrc
-conda activate rlmol
-python -u stable_radical_opt.py --train-policy \
+conda activate rlmol39
+python -u stable_radical_opt.py \
+    --train-policy \
+    --config config/config_eagle.yaml \
     --stability-model="$stability_model" \
     --redox-model="$redox_model" \
     --bde-model="$bde_model" 
@@ -33,8 +35,10 @@ EOF
 cat << EOF > "$START_ROLLOUT_SCRIPT"
 #!/bin/bash
 source $HOME/.bashrc
-conda activate rlmol
-python -u stable_radical_opt.py --rollout \
+conda activate rlmol39
+python -u stable_radical_opt.py
+    --rollout \
+    --config config/config_eagle.yaml \
     --stability-model="$stability_model" \
     --redox-model="$redox_model" \
     --bde-model="$bde_model" 
@@ -49,7 +53,7 @@ srun --gres=gpu:1 --ntasks=1 --cpus-per-task=4 \
     --output=$WORKING_DIR/gpu.%j.out \
     "$START_POLICY_SCRIPT" &
 
-# and run 16 cpu rollout jobs
+# and run 7 cpu rollout jobs
 srun --gres=gpu:0 --ntasks=7 --cpus-per-task=4 \
     --output=$WORKING_DIR/mcts.%j.out \
     "$START_ROLLOUT_SCRIPT"

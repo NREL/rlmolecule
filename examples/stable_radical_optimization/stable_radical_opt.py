@@ -2,12 +2,11 @@ import os, sys
 import argparse
 import pathlib
 import logging
+import math
 import time
 from typing import Tuple
 
 import sqlalchemy
-from sqlalchemy import create_engine
-
 import numpy as np
 import pandas as pd
 
@@ -15,11 +14,18 @@ import rdkit
 from rdkit import Chem
 from rdkit.Chem import Mol, MolToSmiles
 
+from examples.run_config import RunConfig
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, bde_model: pathlib.Path, **kwargs):
+def construct_problem(
+        run_config: RunConfig,
+        stability_model: pathlib.Path,
+        redox_model: pathlib.Path,
+        bde_model: pathlib.Path,
+        **kwargs):
     # We have to delay all importing of tensorflow until the child processes launch,
     # see https://github.com/tensorflow/tensorflow/issues/8220. We should be more careful about where / when we
     # import tensorflow, especially if there's a chance we'll use tf.serving to do the policy / reward evaluations on
@@ -28,7 +34,7 @@ def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, 
     from rlmolecule.molecule.builder.builder import MoleculeBuilder
     from rlmolecule.molecule.molecule_problem import MoleculeTFAlphaZeroProblem
     from rlmolecule.tree_search.metrics import collect_metrics
-    
+
     #from rlmolecule.molecule.molecule_state import MoleculeState
     from examples.stable_radical_optimization.stable_radical_molecule_state import StableRadMoleculeState
     import tensorflow as tf
@@ -213,38 +219,26 @@ def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, 
     redox_model = tf.keras.models.load_model(redox_model, compile=False)
     bde_model = tf.keras.models.load_model(bde_model, compile=False)
 
+    prob_config = run_config.problem_config
     builder = MoleculeBuilder(
-        max_atoms=15,
-        min_atoms=4,
-        tryEmbedding=True,
-        sa_score_threshold=3.5,
-        stereoisomers=True,
-        atom_additions=('C', 'N', 'O', 'S'),
+        max_atoms=prob_config.get('max_atoms', 15),
+        min_atoms=prob_config.get('min_atoms', 4),
+        tryEmbedding=prob_config.get('tryEmbedding', True),
+        sa_score_threshold=prob_config.get('sa_score_threshold', 3.5),
+        stereoisomers=prob_config.get('stereoisomers', True),
+        atom_additions=prob_config.get('atom_additions', ('C', 'N', 'O', 'S'))
     )
 
-    #engine = create_engine(f'sqlite:///stable_radical.db',
-    #                       connect_args={'check_same_thread': False},
-    #                       execution_options = {"isolation_level": "AUTOCOMMIT"})
-    dbname = "bde"
-    port = "5432"
-    host = "yuma.hpc.nrel.gov"
-    user = "rlops"
-    # read the password from a file
-    passwd_file = '/projects/rlmolecule/rlops_pass'
-    with open(passwd_file, 'r') as f:
-        passwd = f.read().strip()
+    engine = run_config.start_engine()
 
-    drivername = "postgresql+psycopg2"
-    engine_str = f'{drivername}://{user}:{passwd}@{host}:{port}/{dbname}'
-    engine = create_engine(engine_str, execution_options={"isolation_level": "AUTOCOMMIT"})
-
-    run_id = 'stable_radical_optimization_psj_full_fixed_rr'
-
-    reward_factory = RankedRewardFactory(engine=engine,
-                                         run_id=run_id,
-                                         reward_buffer_max_size=250,
-                                         reward_buffer_min_size=50,
-                                         ranked_reward_alpha=0.75)
+    run_id = run_config.run_id
+    train_config = run_config.train_config
+    reward_factory = RankedRewardFactory(
+        engine=engine,
+        run_id=run_id,
+        reward_buffer_min_size=train_config.get('reward_buffer_min_size', 50),
+        reward_buffer_max_size=train_config.get('reward_buffer_max_size', 250),
+        ranked_reward_alpha=train_config.get('ranked_reward_alpha', 0.75))
 
     problem = StableRadOptProblem(
         engine,
@@ -254,40 +248,58 @@ def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, 
         bde_model,
         run_id=run_id,
         reward_class=reward_factory,
-        features=64,
-        num_heads=4,  # Number of attention heads
-        num_messages=3,
-        batch_size=32,
-        max_buffer_size=256,
-        min_buffer_size=128,  # Don't start training the model until this many games have occurred
-        policy_checkpoint_dir='policy_checkpoints')
+        features=train_config.get('features', 64),
+        # Number of attention heads
+        num_heads=train_config.get('num_heads', 4),
+        num_messages=train_config.get('num_messages', 3),
+        max_buffer_size=train_config.get('max_buffer_size', 200),
+        # Don't start training the model until this many games have occurred
+        min_buffer_size=train_config.get('min_buffer_size', 15),
+        batch_size=train_config.get('batch_size', 32),
+        policy_checkpoint_dir=train_config.get('policy_checkpoint_dir',
+                                               'policy_checkpoints'))
 
     return problem
 
 
-def run_games(**kwargs):
+def run_games(run_config, **kwargs):
     from rlmolecule.alphazero.alphazero import AlphaZero
-    dirichlet_alpha = 1.0
-    dirichlet_x = 0.5
+    config = run_config.mcts_config
     game = AlphaZero(
-        construct_problem(**kwargs),
-        dirichlet_alpha=dirichlet_alpha,
-        dirichlet_x=dirichlet_x,
+        construct_problem(run_config, **kwargs),
+        min_reward=config.get('min_reward', 0.0),
+        pb_c_base=config.get('pb_c_base', 1.0),
+        pb_c_init=config.get('pb_c_init', 1.25),
+        dirichlet_noise=config.get('dirichlet_noise', True),
+        dirichlet_alpha=config.get('dirichlet_alpha', 1.0),
+        dirichlet_x=config.get('dirichlet_x', 0.25),
+        # MCTS parameters
+        ucb_constant=config.get('ucb_constant', math.sqrt(2)),
     )
     while True:
-        path, reward = game.run(num_mcts_samples=50)
-        #logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
+        path, reward = game.run(
+            num_mcts_samples=config.get('num_mcts_samples', 50),
+            max_depth=config.get('max_depth', 1000000),
+        )
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
 
 
-def train_model(**kwargs):
-    construct_problem(**kwargs).train_policy_model(steps_per_epoch=100, game_count_delay=20, verbose=2)
+def train_model(run_config, **kwargs):
+    config = run_config.train_config
+    construct_problem(run_config, **kwargs).train_policy_model(
+        steps_per_epoch=config.get('steps_per_epoch', 100),
+        lr=float(config.get('lr', 1E-3)),
+        epochs=int(float(config.get('epochs', 1E4))),
+        game_count_delay=config.get('game_count_delay', 20),
+        verbose=config.get('verbose', 2)
+    )
 
 
 def setup_argparser():
     parser = argparse.ArgumentParser(
-        description='Optimize stable radicals to work as both the anode and caathode of a redox-flow battery.')
+        description='Optimize stable radicals to work as both the anode and cathode of a redox-flow battery.')
 
+    parser.add_argument('--config', type=str, help='Configuration file')
     parser.add_argument('--train-policy',
                         action="store_true",
                         default=False,
@@ -323,12 +335,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
     kwargs = vars(args)
 
+    run_config = RunConfig(args.config)
+
     if args.train_policy:
-        train_model(**kwargs)
+        train_model(run_config, **kwargs)
     elif args.rollout:
         # make sure the rollouts do not use the GPU
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-        run_games(**kwargs)
+        run_games(run_config, **kwargs)
     else:
         print("Must specify either --train-policy or --rollout")
     # else:
