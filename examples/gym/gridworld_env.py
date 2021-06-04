@@ -78,6 +78,8 @@ class GridWorldEnv(gym.Env):
         self.observation_space: gym.spaces.Box = gym.spaces.Box(
             low=low, high=high, shape=obs_shape, dtype=dtype)
 
+        print(f'ospace: {self.observation_space} dims: {num_dims} mode: {self.observation_type}, low {low}, high {high}')
+
         self.action_space: gym.spaces.Discrete = gym.spaces.Discrete(4)
 
     def make_next(self, action: int) -> ('GridWorldEnv', bool):
