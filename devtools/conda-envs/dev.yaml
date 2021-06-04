@@ -24,4 +24,4 @@ dependencies:
     - nfp
     - tensorflow
     - tensorflow-addons
-    - "ray[rllib]"
+    - "ray[default]"
