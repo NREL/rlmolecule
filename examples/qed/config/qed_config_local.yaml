@@ -23,7 +23,7 @@ problem_config:
     # try to get a 3D embedding of the molecule, and if this fails, remote it.
     try_embedding: True
     # Amount of time (in seconds) to run the multiprocessing jobs
-    timeout: 30
+    timeout: 300
 
 # Parameters for training the policy model
 train_config:
