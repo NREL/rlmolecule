@@ -5,7 +5,7 @@
 #   - state: molecule state
 #   - reward: 0, unless a terminal state is reached, then the qed estimate of the molecule
 
-run_id: 'qed_example_local'
+run_id: 'qed_example_debug'
 
 # Parameters for setting up the problem
 problem_config:
