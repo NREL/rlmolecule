@@ -7,7 +7,7 @@ import numpy as np
 from sqlalchemy import create_engine
 
 from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
-from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
+from rlmolecule.alphazero.tensorflow.tfalphazero_problem import TFAlphaZeroProblem
 from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
 from rlmolecule.gym.gym_problem import GymProblem
 from rlmolecule.gym.gym_state import GymEnvState
@@ -65,8 +65,6 @@ class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
 
 
 def construct_problem(size):
-    from rlmolecule.tree_search.reward import RankedRewardFactory
-
     # engine = create_engine(f'sqlite:///gridworld_data.db',
     #                        connect_args={'check_same_thread': False},
     #                        execution_options = {"isolation_level": "AUTOCOMMIT"})

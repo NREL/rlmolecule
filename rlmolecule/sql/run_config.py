@@ -63,8 +63,8 @@ class RunConfig:
     def start_server_db_engine(drivername="postgresql+psycopg2",
                                dbname='bde',
                                port=None,
-                               host="yuma.hpc.nrel.gov",
-                               user="rlops",
+                               host=None,
+                               user=None,
                                passwd_file=None,
                                passwd=None,
                                **kwargs):
