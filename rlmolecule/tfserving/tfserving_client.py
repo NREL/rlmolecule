@@ -22,7 +22,7 @@ class TFServingClient(object):
         self.model_name = model_name
         
         # Handle the case where port isn't specified
-        if ~((":" in endpoint) and (endpoint.split(":")[-1].isnumeric()))
+        if ~((":" in endpoint) and (endpoint.split(":")[-1].isnumeric())):
             endpoint = "%s:%d" % (endpoint, default_port)
  
         self.endpoint = endpoint
@@ -32,9 +32,9 @@ class TFServingClient(object):
         
         # The following needs to match <name> from "SINGULARITYENV_MODEL_NAME=<name>..."
         # used when singularity container running tfserving is launched  
-        grpc_request.model_spec.name = self.model_name
+        self.grpc_request.model_spec.name = self.model_name
        
-        grpc_request.model_spec.signature_name = signature_name
+        self.grpc_request.model_spec.signature_name = signature_name
 
     def predict(self, query_input, tensorize=True, timeout_s=10.0, layer_name="dense"):
         """ Query tfserving endpoint with specific input.
@@ -48,15 +48,20 @@ class TFServingClient(object):
         """ 
 
         if tensorize:
-            query_input['atom'] = tf.make_tensor_proto(query_input['atom'], 
+            preprocessed_input = {} 
+            preprocessed_input['atom'] = tf.make_tensor_proto(query_input['atom'], 
                                                        shape=[1, len(query_input['atom'])])
-            query_input['bond'] = tf.make_tensor_proto(query_input['bond'], 
+            preprocessed_input['bond'] = tf.make_tensor_proto(query_input['bond'], 
                                                        shape=[1, len(query_input['bond'])])
-            query_input['connectivity'] = tf.make_tensor_proto(query_input['connectivity'], 
+            preprocessed_input['connectivity'] = tf.make_tensor_proto(query_input['connectivity'], 
                                                                shape=[1] + list(np.array(query_input['connectivity']).shape))
-        for c in ['atom', 'bond', 'connectivity']:
-            self.grpc_request.inputs[c].CopyFrom(query_input[c]) 
+        else:
+            preprocessed_input = query_input
 
-        result = self.stub.Predict.future(self.grpc_request, timeout_s) 
+        for c in ['atom', 'bond', 'connectivity']:
+            self.grpc_request.inputs[c].CopyFrom(preprocessed_input[c]) 
+
+        result_future = self.stub.Predict.future(self.grpc_request, timeout_s) 
+        result = result_future.result()
         return result.outputs[layer_name]
 

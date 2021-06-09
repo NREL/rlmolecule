@@ -59,9 +59,9 @@ hostname > $TFSERVING_HOSTNAME_PATH
 source /nopt/nrel/apps/anaconda/5.3/etc/profile.d/conda.sh
 conda activate /projects/rlmolecule/pstjohn/envs/tf2_gpu
 module load singularity-container
-SINGULARITYENV_MODEL_NAME=policy \
+SINGULARITYENV_MODEL_NAME=reward \
       singularity exec --nv \
-      -B "$tfserving_redox_model":/models/policy \
+      -B "$tfserving_redox_model":/models/reward \
       -B "$batch_config":/models/tfserving_batch.config \
       "$tfserving_img" \
       tf_serving_entrypoint.sh \
