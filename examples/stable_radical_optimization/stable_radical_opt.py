@@ -36,7 +36,7 @@ def construct_problem(
     from rlmolecule.tree_search.metrics import collect_metrics
 
     #from rlmolecule.molecule.molecule_state import MoleculeState
-    from examples.stable_radical_optimization.stable_radical_molecule_state import StableRadMoleculeState
+    from examples.stable_radical_optimization.stable_radical_molecule_state import StableRadMoleculeState, MoleculeBuilderProtectRadical
     import tensorflow as tf
 
     # TODO update/incorporate this code

@@ -15,6 +15,7 @@ if [ "$2" == "" ]; then
     exit
 fi
 
+CONDA_ENV='rlmol39'
 WORKING_DIR="/projects/rlmolecule/$USER/stable_radical_opt/${run_id}"
 mkdir -p $WORKING_DIR
 
@@ -62,7 +63,7 @@ cat << EOF > "\$START_POLICY_SCRIPT"
 source $HOME/.bashrc
 module use /nopt/nrel/apps/modules/test/modulefiles/
 module load cudnn/8.1.1/cuda-11.2
-conda activate rlmol
+conda activate $CONDA_ENV
 python -u stable_radical_opt.py \
     --train-policy \
     --config $SCRIPT_CONFIG \
@@ -74,7 +75,7 @@ EOF
 cat << EOF > "\$START_ROLLOUT_SCRIPT"
 #!/bin/bash
 source $HOME/.bashrc
-conda activate rlmol
+conda activate $CONDA_ENV
 python -u stable_radical_opt.py \
     --rollout \
     --config $SCRIPT_CONFIG \
