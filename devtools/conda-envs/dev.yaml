@@ -3,9 +3,10 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.9
+  - python=3.8
+  - numpy=1.19.*
   - rdkit
-  - pymatgen
+  - pymatgen<=2021.2.13
   - pandas
   - tqdm
   - gym
@@ -16,8 +17,11 @@ dependencies:
   - jupyterlab
   - seaborn
   - pyyaml
+  - cclib
+  - openbabel
   - pip
   - pip:
     - nfp
     - tensorflow
     - tensorflow-addons
+    - "ray[default]"

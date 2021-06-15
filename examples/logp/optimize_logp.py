@@ -22,8 +22,8 @@ sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
 # noinspection PyUnresolvedReferences
 import sascorer
 
-from examples.run_config import RunConfig
-from examples.qed.optimize_qed import construct_problem, run_games
+from rlmolecule.sql.run_config import RunConfig
+from examples.qed.optimize_qed import construct_problem
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

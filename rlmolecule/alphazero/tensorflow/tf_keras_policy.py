@@ -15,7 +15,7 @@ class PolicyWrapper(layers.Layer):
         self.single_position_policy = single_position_policy
         self.supports_masking = False  # todo: find out why keras doesn't like passing masks to the losses?
 
-    def call(self, inputs, mask=None):
+    def call(self, inputs, mask=None, **kwargs):
 
         # print("INPUTS", inputs)
 

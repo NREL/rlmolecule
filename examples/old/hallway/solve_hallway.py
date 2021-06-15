@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def construct_problem(ranked_reward=True):
 
     from rlmolecule.tree_search.reward import RankedRewardFactory
-    from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
+    from rlmolecule.alphazero.tensorflow.tfalphazero_problem import TFAlphaZeroProblem
 
     from tf_model import policy_model  #todo: this looks broken? (psj)
     from hallway_config import HallwayConfig
