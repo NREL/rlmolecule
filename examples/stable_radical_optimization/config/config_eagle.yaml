@@ -1,6 +1,6 @@
 # Config file for stable_radical_opt.py
 
-run_id: 'test_stable_rad_opt'
+run_id: 'stable_rad_c_debug'
 
 # Parameters for setting up the problem
 problem_config:
@@ -50,7 +50,7 @@ train_config:
   # number of training examples to use when updating model parameters
   batch_size: 32
   # folder in which to store the trained models
-  policy_checkpoint_dir: '/projects/rlmolecule/$USER/stable_radical_opt/test_stable_rad_opt/policy_checkpoints'
+  policy_checkpoint_dir: '/projects/rlmolecule/$USER/stable_radical_opt/policy_checkpoints'
 
   # MoleculeTFAlphaZeroProblem options:
   # size of network hidden layers

@@ -1,8 +1,10 @@
 import pathlib
+import os
 from typing import Tuple
 
 import rdkit
 import tensorflow as tf
+import numpy as np
 from rdkit import Chem
 
 from bde_utils import bde_get_inputs, prepare_for_bde
@@ -189,6 +191,6 @@ def construct_problem(run_config: RunConfig, stability_model: pathlib.Path, redo
         # Don't start training the model until this many games have occurred
         min_buffer_size=train_config.get('min_buffer_size', 15),
         batch_size=train_config.get('batch_size', 32),
-        policy_checkpoint_dir=train_config.get('policy_checkpoint_dir', 'policy_checkpoints'))
+        policy_checkpoint_dir=os.path.join(train_config.get('policy_checkpoint_dir', 'policy_checkpoints'), run_id))
 
     return problem

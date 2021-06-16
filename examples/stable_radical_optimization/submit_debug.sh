@@ -19,14 +19,17 @@ model_dir="/projects/rlmolecule/pstjohn/models/";
 stability_model="$model_dir/20210214_radical_stability_new_data/"
 redox_model="$model_dir/20210214_redox_new_data/"
 bde_model="$model_dir/20210216_bde_new_nfp/"
+config="config/config_eagle.yaml"
 
 cat << EOF > "$START_POLICY_SCRIPT"
 #!/bin/bash
 source $HOME/.bashrc
-conda activate rlmol39
+module use /nopt/nrel/apps/modules/test/modulefiles/
+module load cudnn/8.1.1/cuda-11.2
+conda activate rlmol
 python -u stable_radical_opt.py \
     --train-policy \
-    --config config/config_eagle.yaml \
+    --config="$config" \
     --stability-model="$stability_model" \
     --redox-model="$redox_model" \
     --bde-model="$bde_model" 
@@ -35,10 +38,10 @@ EOF
 cat << EOF > "$START_ROLLOUT_SCRIPT"
 #!/bin/bash
 source $HOME/.bashrc
-conda activate rlmol39
-python -u stable_radical_opt.py
+conda activate rlmol
+python -u stable_radical_opt.py \
     --rollout \
-    --config config/config_eagle.yaml \
+    --config="$config" \
     --stability-model="$stability_model" \
     --redox-model="$redox_model" \
     --bde-model="$bde_model" 
