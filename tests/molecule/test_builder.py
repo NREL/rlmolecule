@@ -21,7 +21,7 @@ def test_stereo_enumerator():
         for bond in mol.GetBonds():
             assert bond.GetStereo() is not rdkit.Chem.rdchem.BondStereo.STEREOANY
 
-    next_mols = to_smiles(StereoEnumerator()([MolFromSmiles('C(C)(O)(Cl)')]))
+    next_mols = to_smiles(StereoEnumerator()([MolFromSmiles('CC(O)(Cl)')]))
     assert 'C[C@H](O)Cl' in next_mols
     assert 'C[C@@H](O)Cl' in next_mols
     assert len(next_mols) == 2
