@@ -1,14 +1,15 @@
-import pathlib
 import os
+import pathlib
 from typing import Tuple
 
+import numpy as np
 import rdkit
 import tensorflow as tf
-import numpy as np
 from rdkit import Chem
 
 from bde_utils import bde_get_inputs, prepare_for_bde
-from examples.stable_radical_optimization.stable_radical_molecule_state import StableRadMoleculeState
+from examples.stable_radical_optimization.stable_radical_molecule_state import StableRadMoleculeState, \
+    MoleculeBuilderProtectRadical
 from rlmolecule.molecule.builder.builder import MoleculeBuilder
 from rlmolecule.molecule.molecule_problem import MoleculeTFAlphaZeroProblem
 from rlmolecule.molecule.molecule_state import MoleculeState
@@ -157,12 +158,18 @@ def construct_problem(run_config: RunConfig, stability_model: pathlib.Path, redo
     bde_model = tf.keras.models.load_model(bde_model, compile=False)
 
     prob_config = run_config.problem_config
-    builder = MoleculeBuilder(max_atoms=prob_config.get('max_atoms', 15),
-                              min_atoms=prob_config.get('min_atoms', 4),
-                              tryEmbedding=prob_config.get('tryEmbedding', True),
-                              sa_score_threshold=prob_config.get('sa_score_threshold', 3.5),
-                              stereoisomers=prob_config.get('stereoisomers', True),
-                              atom_additions=prob_config.get('atom_additions', ('C', 'N', 'O', 'S')))
+    initial_state = prob_config.get('initial_state', 'C')
+    if initial_state == 'C':
+        builder_class = MoleculeBuilder
+    else:
+        builder_class = MoleculeBuilderProtectRadical
+
+    builder = builder_class(max_atoms=prob_config.get('max_atoms', 15),
+                            min_atoms=prob_config.get('min_atoms', 4),
+                            tryEmbedding=prob_config.get('tryEmbedding', True),
+                            sa_score_threshold=prob_config.get('sa_score_threshold', 3.5),
+                            stereoisomers=prob_config.get('stereoisomers', True),
+                            atom_additions=prob_config.get('atom_additions', ('C', 'N', 'O', 'S')))
 
     engine = run_config.start_engine()
 
@@ -181,7 +188,7 @@ def construct_problem(run_config: RunConfig, stability_model: pathlib.Path, redo
         redox_model,
         bde_model,
         run_id=run_id,
-        initial_state=prob_config.get('initial_state', 'C'),
+        initial_state=initial_state,
         reward_class=reward_factory,
         features=train_config.get('features', 64),
         # Number of attention heads
