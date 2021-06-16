@@ -5,7 +5,7 @@ from typing import Dict, Optional
 import rdkit
 import sqlalchemy
 
-from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
+from rlmolecule.alphazero.tensorflow.tfalphazero_problem import TFAlphaZeroProblem
 from rlmolecule.mcts.mcts_problem import MCTSProblem
 from rlmolecule.molecule.molecule_state import MoleculeState
 from rlmolecule.molecule.policy.model import policy_model

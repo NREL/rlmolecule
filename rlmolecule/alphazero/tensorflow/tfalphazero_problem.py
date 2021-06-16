@@ -14,8 +14,8 @@ from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 
 from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
-from rlmolecule.alphazero.tf_keras_policy import (KLWithLogits, PolicyWrapper, TimeCsvLogger, align_input_names)
 from rlmolecule.tree_search.metrics import collect_metrics
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,7 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
                  engine: sqlalchemy.engine.Engine,
                  policy_checkpoint_dir: str = 'policy_checkpoints',
                  **kwargs) -> None:
+        from rlmolecule.alphazero.tensorflow.tf_keras_policy import PolicyWrapper, align_input_names
 
         super(TFAlphaZeroProblem, self).__init__(engine=engine, **kwargs)
         self.mask_dict = self.get_policy_mask()
@@ -101,7 +102,7 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
 
         return value, children_priors
 
-    def _get_policy_inputs_from_digests(self, digests: tf.Tensor) -> Tuple[np.ndarray, ...]:
+    def _get_policy_inputs_from_digests(self, digests: 'tf.Tensor') -> Tuple[np.ndarray, ...]:
         """ Get a batched dictionary of policy inputs for the given list of digests
 
         :param digests: A tf.Tensor(dtype=tf.string) containing the (parent, children) policy digests
@@ -112,7 +113,7 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
         sorted_policy_inputs = tuple([batched_policy_inputs[input_name] for input_name in self.input_names])
         return sorted_policy_inputs
 
-    def _create_dataset(self) -> tf.data.Dataset:
+    def _create_dataset(self) -> 'tf.data.Dataset':
         """
         Creates a tensorflow dataset pipeline to batch game positions from the replay buffer into
         """
@@ -157,6 +158,8 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
                            epochs: int = int(1E4),
                            game_count_delay: int = 30,
                            **kwargs) -> tf.keras.callbacks.History:
+
+        from rlmolecule.alphazero.tensorflow.tf_keras_policy import TimeCsvLogger, KLWithLogits
 
         # wait to start training until enough games have occurred
         while len(list(self.iter_recent_games())) < self.min_buffer_size:
