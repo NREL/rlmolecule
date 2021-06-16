@@ -1,10 +1,11 @@
 from typing import Optional, Sequence
+
 import rdkit
 from rdkit import Chem
-from rdkit.Chem import Mol, MolToSmiles
+from rdkit.Chem import Mol
 
-from rlmolecule.molecule.molecule_state import MoleculeState
 from rlmolecule.molecule.builder.builder import MoleculeBuilder, AddNewAtomsAndBonds
+from rlmolecule.molecule.molecule_state import MoleculeState
 from rlmolecule.tree_search.metrics import collect_metrics
 
 
@@ -29,12 +30,13 @@ class StableRadMoleculeState(MoleculeState):
     Molecules are stored as rdkit Mol instances, and the rdkit-generated SMILES string is also stored for
     efficient hashing.
     """
+
     def __init__(
-        self,
-        molecule: Mol,
-        builder: any,
-        force_terminal: bool = False,
-        smiles: Optional[str] = None,
+            self,
+            molecule: Mol,
+            builder: any,
+            force_terminal: bool = False,
+            smiles: Optional[str] = None,
     ) -> None:
         super(StableRadMoleculeState, self).__init__(molecule, builder, force_terminal, smiles)
 

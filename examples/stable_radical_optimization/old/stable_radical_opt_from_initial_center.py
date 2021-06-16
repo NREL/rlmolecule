@@ -1,23 +1,19 @@
-import os, sys
 import argparse
-import pathlib
 import logging
-import time
+import os
+import pathlib
+import sys
 from typing import Tuple
-
-import sqlalchemy
-from sqlalchemy import create_engine
 
 import numpy as np
 import pandas as pd
-
 import rdkit
+import sqlalchemy
 from rdkit import Chem
-from rdkit.Chem import Mol, MolToSmiles
+from sqlalchemy import create_engine
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 run_id = 'stable_radical_optimization_psj_NS_l2'
 
@@ -32,16 +28,17 @@ def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, 
     from rlmolecule.molecule.molecule_problem import MoleculeTFAlphaZeroProblem
     from rlmolecule.tree_search.metrics import collect_metrics
 
-    from examples.stable_radical_optimization.stable_radical_molecule_state import MoleculeBuilderProtectRadical, AddNewAtomsAndBondsProtectRadical
+    from examples.stable_radical_optimization.stable_radical_molecule_state import MoleculeBuilderProtectRadical
     import tensorflow as tf
 
     # TODO update/incorporate this code
     sys.path.append('/projects/rlmolecule/pstjohn/models/20201031_bde/')
     from preprocess_inputs import preprocessor as bde_preprocessor
     bde_preprocessor.from_json('/projects/rlmolecule/pstjohn/models/20201031_bde/preprocessor.json')
+
     # TODO make this into a command-line argument(?)
     # or just store it in this directory
-    #bde_preprocessor = preprocessor.load_preprocessor(saved_preprocessor_file="/projects/rlmolecule/pstjohn/models/20201031_bde/preprocessor.json")
+    # bde_preprocessor = preprocessor.load_preprocessor(saved_preprocessor_file="/projects/rlmolecule/pstjohn/models/20201031_bde/preprocessor.json")
 
     @tf.function(experimental_relax_shapes=True)
     def predict(model: 'tf.keras.Model', inputs):
@@ -71,7 +68,7 @@ def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, 
                 reward, stats = self.calc_reward(state)
                 stats.update({'forced_terminal': True, 'smiles': state.smiles})
                 return reward, stats
-            
+
             return 0.0, {'forced_terminal': False, 'smiles': state.smiles}
 
         @collect_metrics
@@ -106,12 +103,12 @@ def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, 
             # This is a bit of a placeholder; but the range for spin is about 1/50th that
             # of buried volume.
             reward = (
-                (1 - max_spin) * 50 + spin_buried_vol + 100 *
-                (self.windowed_loss(electron_affinity, ea_range) + self.windowed_loss(ionization_energy, ie_range) +
-                 self.windowed_loss(v_diff, v_range) + self.windowed_loss(bde, bde_range)) / 4)
+                    (1 - max_spin) * 50 + spin_buried_vol + 100 *
+                    (self.windowed_loss(electron_affinity, ea_range) + self.windowed_loss(ionization_energy, ie_range) +
+                     self.windowed_loss(v_diff, v_range) + self.windowed_loss(bde, bde_range)) / 4)
             # the addition of bde_diff was to help ensure that
             # the stable radical had the lowest bde in the molecule
-            #+ 25 / (1 + np.exp(-(bde_diff - 10)))
+            # + 25 / (1 + np.exp(-(bde_diff - 10)))
 
             stats = {
                 'max_spin': max_spin,
@@ -129,7 +126,7 @@ def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, 
             """calculate the X-H bde, and the difference to the next-weakest X-H bde in kcal/mol"""
 
             bde_inputs = self.prepare_for_bde(state.molecule)
-            #model_inputs = self.bde_get_inputs(state.molecule)
+            # model_inputs = self.bde_get_inputs(state.molecule)
             model_inputs = self.bde_get_inputs(bde_inputs.mol_smiles)
 
             pred_bdes = predict(self.bde_model, model_inputs)
@@ -218,15 +215,15 @@ def construct_problem(stability_model: pathlib.Path, redox_model: pathlib.Path, 
 
     builder = MoleculeBuilderProtectRadical(
         max_atoms=15,
-        min_atoms=6,  # 4 for other radicals, for S[NH] we need to increase this to prevent early termination from high QED scores
+        min_atoms=6,
+        # 4 for other radicals, for S[NH] we need to increase this to prevent early termination from high QED scores
         tryEmbedding=True,
         sa_score_threshold=4.,
         stereoisomers=True,
         atom_additions=('C', 'N', 'O', 'S'),
     )
 
-
-    #engine = create_engine(f'sqlite:///stable_radical.db',
+    # engine = create_engine(f'sqlite:///stable_radical.db',
     #                       connect_args={'check_same_thread': False},
     #                       execution_options = {"isolation_level": "AUTOCOMMIT"})
     dbname = "bde"
@@ -278,7 +275,7 @@ def run_games(**kwargs):
     )
     while True:
         path, reward = game.run(num_mcts_samples=500)
-        #logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
+        # logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
 
 
