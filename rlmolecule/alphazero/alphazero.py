@@ -12,6 +12,7 @@ from rlmolecule.tree_search.metrics import collect_metrics
 from rlmolecule.tree_search.reward import Reward
 
 logger = logging.getLogger(__name__)
+random_state = np.random.RandomState()
 
 
 class AlphaZero(MCTS):
@@ -84,7 +85,6 @@ class AlphaZero(MCTS):
         prior_array: np.ndarray = np.array([child_priors[child] for child in children])
 
         if self._dirichlet_noise:
-            random_state = np.random.RandomState()
             noise = random_state.dirichlet(np.ones_like(prior_array) * self._dirichlet_alpha)
             prior_array = prior_array * (1 - self._dirichlet_x) + (noise * self._dirichlet_x)
 

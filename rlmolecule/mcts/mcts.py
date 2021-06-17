@@ -10,7 +10,6 @@ from rlmolecule.mcts.mcts_vertex import MCTSVertex
 from rlmolecule.tree_search.dfs import dfs
 from rlmolecule.tree_search.graph_search import GraphSearch
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
-from rlmolecule.tree_search.metrics import collect_metrics
 from rlmolecule.tree_search.reward import Reward
 
 logger = logging.getLogger(__name__)
@@ -30,7 +29,6 @@ class MCTS(GraphSearch[MCTSVertex]):
     def problem(self) -> MCTSProblem:
         return self._problem
 
-    @collect_metrics
     def run(
             self,
             state: Optional[GraphSearchState] = None,
@@ -76,7 +74,6 @@ class MCTS(GraphSearch[MCTSVertex]):
         logger.warning(f"{self} reached max_depth.")
         return path, math.nan  # todo: make sure this returns a reward class
 
-    @collect_metrics
     def sample(
             self,
             vertex: MCTSVertex,
@@ -94,7 +91,6 @@ class MCTS(GraphSearch[MCTSVertex]):
     def _accumulate_path_data(self, vertex: MCTSVertex, path: []):
         path.append(vertex)
 
-    @collect_metrics
     def _select(
             self,
             root: MCTSVertex,
@@ -115,7 +111,6 @@ class MCTS(GraphSearch[MCTSVertex]):
                 return search_path
             search_path.append(max(children, key=lambda child: self._ucb_score(current, child)))
 
-    @collect_metrics
     def _expand(self, leaf: MCTSVertex) -> None:
         """
         Expansion step of MCTS
@@ -139,7 +134,6 @@ class MCTS(GraphSearch[MCTSVertex]):
                 if child.children is not None:
                     dfs(set(), child, leaf)
 
-    @collect_metrics
     def _evaluate(
             self,
             search_path: [MCTSVertex],
@@ -168,7 +162,6 @@ class MCTS(GraphSearch[MCTSVertex]):
             state = random.choice(children)
 
     @staticmethod
-    @collect_metrics
     def _backpropagate(search_path: [MCTSVertex], value: Reward):
         """
         Backpropagation step of MCTS
