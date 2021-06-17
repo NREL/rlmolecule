@@ -6,16 +6,20 @@ from typing import Callable
 
 class CallMetrics(object):
     def __init__(self):
+        self.start_time = time()
         self.execution_time = defaultdict(lambda: 0.)
         self.execution_count = defaultdict(lambda: 0)
 
     def reset(self):
+        self.start_time = time()
         self.execution_time = defaultdict(lambda: 0.)
         self.execution_count = defaultdict(lambda: 0)
 
     @property
     def data(self):
-        return {'execution_time': dict(self.execution_time), 'execution_count': dict(self.execution_count)}
+        return {'total_time': time() - self.start_time,
+                'execution_time': dict(self.execution_time),
+                'execution_count': dict(self.execution_count)}
 
 
 call_metrics = CallMetrics()
