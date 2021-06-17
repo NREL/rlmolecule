@@ -8,6 +8,7 @@ from typing import Iterable, List, Optional
 
 import numpy as np
 import rdkit
+from diskcache import FanoutCache, Cache
 from joblib import Memory
 from rdkit import Chem, RDConfig
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
@@ -32,7 +33,8 @@ class MoleculeBuilder:
                  stereoisomers: bool = True,
                  sa_score_threshold: Optional[float] = 3.5,
                  tryEmbedding: bool = True,
-                 cache_dir: Optional[pathlib.Path] = None) -> None:
+                 cache_dir: Optional[str] = None,
+                 num_shards: int = 1) -> None:
         """A class to build molecules according to a number of different options
 
         :param max_atoms: Maximum number of heavy atoms
@@ -48,13 +50,16 @@ class MoleculeBuilder:
         self.min_atoms = min_atoms
 
         if cache_dir is not None:
-            self.mem = Memory(cachedir=cache_dir)
-            self.cached_call = self.mem.cache(self.call_list)
+            if num_shards == 1:
+                cache = Cache(directory=cache_dir)
+            else:
+                cache = FanoutCache(directory=cache_dir, shards=num_shards)
+
+            self.cached_call = cache.memoize()(self.call_list)
 
         else:
             self.mem = None
             self.cached_call = None
-
 
         self.transformation_stack = [
             AddNewAtomsAndBonds(atom_additions),

@@ -57,4 +57,6 @@ def test_cache():
     from rlmolecule.molecule.builder.builder import MoleculeBuilder
     with TemporaryDirectory() as tempdir:
         next_mols = to_smiles(MoleculeBuilder(cache_dir=tempdir)(MolFromSmiles('C=CC')))
+        next_mols = to_smiles(MoleculeBuilder(cache_dir=tempdir, num_shards=2)(MolFromSmiles('C=CC')))
+
     assert next_mols
