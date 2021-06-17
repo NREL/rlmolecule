@@ -211,7 +211,7 @@ class EmbeddingFilter(MoleculeFilter):
         molH = Chem.AddHs(molecule)
 
         try:
-            assert EmbedMolecule(molH) >= 0
+            assert EmbedMolecule(molH, maxAttempts=30, randomSeed=42) >= 0
             return True
 
         except (AssertionError, RuntimeError):
