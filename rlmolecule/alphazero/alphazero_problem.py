@@ -13,7 +13,7 @@ from rlmolecule.mcts.mcts_problem import MCTSProblem
 from rlmolecule.sql import Base, Session, digest, load_numpy_dict, serialize_ordered_numpy_dict
 from rlmolecule.sql.tables import GameStore, RewardStore, StateStore
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
-from rlmolecule.tree_search.metrics import call_metrics
+from rlmolecule.tree_search.metrics import call_metrics, collect_metrics
 from rlmolecule.tree_search.reward import Reward, RewardFactory
 
 logger = logging.getLogger(__name__)
@@ -127,7 +127,7 @@ class AlphaZeroProblem(MCTSProblem):
 
         return vertex.policy_digest, policy_inputs
 
-    @call_metrics
+    @collect_metrics
     def maybe_store_state(self, vertex: AlphaZeroVertex) -> str:
         """ Add the serialized state to the StateStore table if it doesn't exist
 
