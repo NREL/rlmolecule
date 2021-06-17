@@ -1,6 +1,5 @@
 import logging
 import os
-import pathlib
 import sys
 from abc import ABC, abstractmethod
 from multiprocessing import Pool
@@ -9,7 +8,6 @@ from typing import Iterable, List, Optional
 import numpy as np
 import rdkit
 from diskcache import FanoutCache, Cache
-from joblib import Memory
 from rdkit import Chem, RDConfig
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
 from rdkit.Chem.rdDistGeom import EmbedMolecule
@@ -90,6 +88,11 @@ class MoleculeBuilder:
 
         else:
             return self.cached_call(parent_molecule)
+
+    def __getstate__(self):
+        attributes = self.__dict__
+        attributes['cached_call'] = None
+        return attributes
 
 
 class MoleculeTransformer(ABC):
