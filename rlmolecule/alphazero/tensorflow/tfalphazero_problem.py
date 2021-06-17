@@ -62,7 +62,7 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
             status = self.batched_policy_model.load_weights(self._checkpoint)
             status.assert_existing_objects_matched()
             logger.info(f'Loaded checkpoint {self._checkpoint}')
-        elif new_checkpoint == self._checkpoint:
+        elif (new_checkpoint == self._checkpoint) & (new_checkpoint is not None):
             logger.info(f'Skipping already loaded {self._checkpoint}')
         else:
             logger.info('No checkpoint found')
