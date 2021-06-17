@@ -8,6 +8,7 @@ from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from rlmolecule.mcts.mcts import MCTS
 from rlmolecule.mcts.mcts_vertex import MCTSVertex
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
+from rlmolecule.tree_search.metrics import call_metrics
 from rlmolecule.tree_search.reward import Reward
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,7 @@ class AlphaZero(MCTS):
         child_visits = [(child, child.visit_count / visit_sum) for child in children]
         path.append((vertex, child_visits))
 
+    @call_metrics
     def _evaluate(
         self,
         search_path: [AlphaZeroVertex],

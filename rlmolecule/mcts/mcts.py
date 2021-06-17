@@ -6,6 +6,7 @@ from typing import Callable, List, Optional, Type
 import numpy as np
 
 from rlmolecule.tree_search.dfs import dfs
+from rlmolecule.tree_search.metrics import call_metrics
 from rlmolecule.tree_search.reward import Reward
 from rlmolecule.mcts.mcts_problem import MCTSProblem
 from rlmolecule.mcts.mcts_vertex import MCTSVertex
@@ -29,6 +30,7 @@ class MCTS(GraphSearch[MCTSVertex]):
     def problem(self) -> MCTSProblem:
         return self._problem
 
+    @call_metrics
     def run(
         self,
         state: Optional[GraphSearchState] = None,
@@ -74,6 +76,7 @@ class MCTS(GraphSearch[MCTSVertex]):
         logger.warning(f"{self} reached max_depth.")
         return path, math.nan  # todo: make sure this returns a reward class
 
+    @call_metrics
     def sample(
         self,
         vertex: MCTSVertex,
@@ -91,6 +94,7 @@ class MCTS(GraphSearch[MCTSVertex]):
     def _accumulate_path_data(self, vertex: MCTSVertex, path: []):
         path.append(vertex)
 
+    @call_metrics
     def _select(
         self,
         root: MCTSVertex,
@@ -111,6 +115,7 @@ class MCTS(GraphSearch[MCTSVertex]):
                 return search_path
             search_path.append(max(children, key=lambda child: self._ucb_score(current, child)))
 
+    @call_metrics
     def _expand(self, leaf: MCTSVertex) -> None:
         """
         Expansion step of MCTS
@@ -133,7 +138,7 @@ class MCTS(GraphSearch[MCTSVertex]):
                 # to an already existing node in the MCTS graph.
                 if child.children is not None:
                     dfs(set(), child, leaf)
-
+    @call_metrics
     def _evaluate(
         self,
         search_path: [MCTSVertex],
@@ -162,6 +167,7 @@ class MCTS(GraphSearch[MCTSVertex]):
             state = random.choice(children)
 
     @staticmethod
+    @call_metrics
     def _backpropagate(search_path: [MCTSVertex], value: Reward):
         """
         Backpropagation step of MCTS

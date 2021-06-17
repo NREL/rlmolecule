@@ -127,6 +127,7 @@ class AlphaZeroProblem(MCTSProblem):
 
         return vertex.policy_digest, policy_inputs
 
+    @call_metrics
     def maybe_store_state(self, vertex: AlphaZeroVertex) -> str:
         """ Add the serialized state to the StateStore table if it doesn't exist
 
