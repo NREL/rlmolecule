@@ -39,6 +39,7 @@ class CrystalState(GraphSearchState):
         Uses the string representation of the current state
         """
         comp_str = self._composition + '|' if self._composition is not None else ""
+        comp_str = "" if self._composition == self._action_node else comp_str
         return comp_str + self._action_node
 
     # noinspection PyUnresolvedReferences
@@ -76,8 +77,8 @@ class CrystalState(GraphSearchState):
         return self._comp_type
 
     @property
-    def state_repr(self) -> str:
-        return self._state_repr
+    def action_node(self) -> str:
+        return self._action_node
 
     @property
     def terminal(self) -> bool:

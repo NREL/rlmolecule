@@ -21,8 +21,8 @@ class CrystalProblem(MCTSProblem, ABC):
 
     def get_initial_state(self) -> CrystalState:
         elements = ()
-        # The root node in the action space is an empty string
-        action_node = ""
+        # The root node in the action space is the string 'root'
+        action_node = "root"
         return CrystalState(elements, action_node, self._config)
 
 

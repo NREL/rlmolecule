@@ -63,9 +63,10 @@ class CrystalBuilder:
                     composition = neighbor if comp_type is not None else None
                     elements = neighbor if comp_type is None else crystal_state.elements
                     next_state = CrystalState(elements=elements,
+                                              action_node=neighbor,
+                                              builder=self,
                                               composition=composition,
                                               comp_type=comp_type,
-                                              action_node=neighbor,
                                               terminal=False,
                                               )
                     next_states.append(next_state)
@@ -88,9 +89,10 @@ class CrystalBuilder:
                         #structure_key = crystal_state.composition + '|' + neighbor
                         #structure = structures[structure_key]
                     next_state = CrystalState(elements=crystal_state.elements,
+                                              action_node=neighbor,
+                                              builder=self,
                                               composition=crystal_state.composition,
                                               comp_type=crystal_state.comp_type,
-                                              action_node=neighbor,
                                               terminal=terminal,
                                               #structure=structure,
                     )
