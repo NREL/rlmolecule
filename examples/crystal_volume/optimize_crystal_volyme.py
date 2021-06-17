@@ -49,19 +49,19 @@ def create_problem():
 
     G = nx.DiGraph()
     G2 = nx.DiGraph()
-    g_file = "inputs/elements_to_compositions.edgelist"
+    g_file = "inputs/elements_to_compositions.edgelist.gz"
     print(f"reading {g_file}")
     G = nx.read_edgelist(g_file, delimiter='\t', data=False, create_using=G)
     print(f'{G.number_of_nodes()} nodes, {G.number_of_edges()} edges')
 
-    g2_file = "inputs/comp_type_to_decorations.edgelist"
+    g2_file = "inputs/comp_type_to_decorations.edgelist.gz"
     print(f"reading {g2_file}")
     G2 = nx.read_edgelist(g2_file, delimiter='\t', data=False, create_using=G2)
     print(f'{G2.number_of_nodes()} nodes, {G2.number_of_edges()} edges')
 
     # also load the mapping from composition to composition type
     working_dir = 'inputs'
-    df_comp = pd.read_csv(f'{working_dir}/compositions.csv')
+    df_comp = pd.read_csv(f'{working_dir}/compositions.csv.gz')
     print(df_comp.head())
     compositions = df_comp['composition'].to_list()
     comp_types = set(df_comp['comp_type'].to_list())
