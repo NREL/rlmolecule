@@ -1,5 +1,6 @@
 import logging
 import os
+import pathlib
 import sys
 from abc import ABC, abstractmethod
 from multiprocessing import Pool
@@ -7,6 +8,7 @@ from typing import Iterable, List, Optional
 
 import numpy as np
 import rdkit
+from joblib import Memory
 from rdkit import Chem, RDConfig
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
 from rdkit.Chem.rdDistGeom import EmbedMolecule
@@ -29,7 +31,8 @@ class MoleculeBuilder:
                  atom_additions: Optional[List] = None,
                  stereoisomers: bool = True,
                  sa_score_threshold: Optional[float] = 3.5,
-                 tryEmbedding: bool = True) -> None:
+                 tryEmbedding: bool = True,
+                 cache_dir: Optional[pathlib.Path] = None) -> None:
         """A class to build molecules according to a number of different options
 
         :param max_atoms: Maximum number of heavy atoms
@@ -44,6 +47,15 @@ class MoleculeBuilder:
         self.max_atoms = max_atoms
         self.min_atoms = min_atoms
 
+        if cache_dir is not None:
+            self.mem = Memory(cachedir=cache_dir)
+            self.cached_call = self.mem.cache(self.call_list)
+
+        else:
+            self.mem = None
+            self.cached_call = None
+
+
         self.transformation_stack = [
             AddNewAtomsAndBonds(atom_additions),
             GdbFilter(),
@@ -56,13 +68,23 @@ class MoleculeBuilder:
             self.transformation_stack += [StereoEnumerator()]
 
         if tryEmbedding:
-            self.transformation_stack += [EmbeddingFilter(max_threads=None)]
+            self.transformation_stack += [EmbeddingFilter()]
 
-    def __call__(self, parent_molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
+    def call_iter(self, parent_molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
         inputs = [parent_molecule]
         for transformer in self.transformation_stack:
             inputs = transformer(inputs)
         yield from inputs
+
+    def call_list(self, parent_molecule: rdkit.Chem.Mol) -> List[rdkit.Chem.Mol]:
+        return list(self.call_iter(parent_molecule))
+
+    def __call__(self, parent_molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
+        if self.cached_call is None:
+            return self.call_iter(parent_molecule)
+
+        else:
+            return self.cached_call(parent_molecule)
 
 
 class MoleculeTransformer(ABC):

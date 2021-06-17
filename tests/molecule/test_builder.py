@@ -1,3 +1,5 @@
+from tempfile import TemporaryDirectory
+
 import rdkit
 from rdkit.Chem.rdmolfiles import MolFromSmiles, MolToSmiles
 
@@ -48,4 +50,11 @@ def test_gdb_filter():
 def test_builder():
     from rlmolecule.molecule.builder.builder import MoleculeBuilder
     next_mols = to_smiles(MoleculeBuilder()(MolFromSmiles('C=CC')))
+    assert next_mols
+
+
+def test_cache():
+    from rlmolecule.molecule.builder.builder import MoleculeBuilder
+    with TemporaryDirectory() as tempdir:
+        next_mols = to_smiles(MoleculeBuilder(cache_dir=tempdir)(MolFromSmiles('C=CC')))
     assert next_mols

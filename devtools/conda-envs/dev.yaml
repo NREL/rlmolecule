@@ -19,6 +19,7 @@ dependencies:
   - pyyaml
   - cclib
   - openbabel
+  - joblib
   - pip
   - pip:
     - nfp
