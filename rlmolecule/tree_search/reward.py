@@ -8,6 +8,7 @@ import sqlalchemy
 
 from rlmolecule.sql import Session
 from rlmolecule.sql.tables import GameStore
+from rlmolecule.tree_search.metrics import collect_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ class RewardFactory(ABC):
         """Any pre-run initialization that might be required"""
         pass
 
+    @collect_metrics
     def __call__(self, *, raw_reward: Optional[float] = None, scaled_reward: Optional[float] = None) -> Reward:
         """ Initialize a Reward class with raw and scaled rewards, scaling the raw reward if a scaled reward is not
         provided. Allows a pass-through of a scaled reward if scaled_reward is provided
