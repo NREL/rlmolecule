@@ -19,7 +19,7 @@ dependencies:
   - pyyaml
   - cclib
   - openbabel
-  - joblib
+  - diskcache
   - pip
   - pip:
     - nfp
