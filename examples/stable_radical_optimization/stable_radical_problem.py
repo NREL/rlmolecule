@@ -164,12 +164,18 @@ def construct_problem(run_config: RunConfig, stability_model: pathlib.Path, redo
     else:
         builder_class = MoleculeBuilderProtectRadical
 
+    if 'cache_dir' in prob_config:
+        cache_dir = os.path.join(prob_config['cache_dir'], run_config.run_id)
+    else:
+        cache_dir = None
     builder = builder_class(max_atoms=prob_config.get('max_atoms', 15),
                             min_atoms=prob_config.get('min_atoms', 4),
                             tryEmbedding=prob_config.get('tryEmbedding', True),
                             sa_score_threshold=prob_config.get('sa_score_threshold', 3.5),
                             stereoisomers=prob_config.get('stereoisomers', True),
-                            atom_additions=prob_config.get('atom_additions', ('C', 'N', 'O', 'S')))
+                            atom_additions=prob_config.get('atom_additions', ('C', 'N', 'O', 'S')),
+                            cache_dir=cache_dir,
+                            num_shards=prob_config.get('num_shards', 1))
 
     engine = run_config.start_engine()
 

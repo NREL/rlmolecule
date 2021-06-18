@@ -5,6 +5,7 @@ import os
 import pathlib
 
 from rlmolecule.sql.run_config import RunConfig
+from rlmolecule.tree_search.metrics import collect_metrics
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
