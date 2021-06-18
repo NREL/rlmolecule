@@ -5,7 +5,6 @@ from typing import Tuple
 import numpy as np
 import rdkit
 import tensorflow as tf
-from rdkit import Chem
 
 from bde_utils import bde_get_inputs, prepare_for_bde
 from examples.stable_radical_optimization.stable_radical_molecule_state import StableRadMoleculeState, \

@@ -8,7 +8,6 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 import rdkit
-import sqlalchemy
 from rdkit import Chem
 from sqlalchemy import create_engine
 
