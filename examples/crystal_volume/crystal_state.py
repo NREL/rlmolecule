@@ -1,4 +1,9 @@
-from typing import Tuple, Optional, Sequence
+from typing import Iterable, Optional, Sequence, Tuple
+import re
+import itertools
+from copy import deepcopy
+import numpy as np
+from pymatgen.core import Composition, Structure
 
 from rlmolecule.sql import hash_to_integer
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
@@ -14,24 +19,21 @@ class CrystalState(GraphSearchState):
     """
     def __init__(
         self,
-        elements: Tuple,
         action_node: any,
         builder: any,
         composition: Optional[str] = None,
-        comp_type: Optional[str] = None,
+        #structure: Optional[Structure] = None,
         terminal: bool = False,
-        #structure: any = None,
     ) -> None:
         """
-        :param builder: A CrystalBuilder class
         :param action_node: A representation of the current state in one of the action graphs
+        :param builder: A CrystalBuilder class
         :param terminal: Whether this state is a decoration of a specific structure (i.e., final state)
         """
-        self._builder: any = builder
-        self._elements: str = elements
-        self._composition: str = composition
-        self._comp_type: str = comp_type
         self._action_node: any = action_node
+        self._builder: any = builder
+        self._composition: str = composition
+        #self._structure: Optional[Structure] = structure
         self._terminal: bool = terminal
 
     def __repr__(self) -> str:
@@ -64,21 +66,96 @@ class CrystalState(GraphSearchState):
 
         return result
 
-    @property
-    def elements(self) -> str:
-        return self._elements
+    @staticmethod
+    def split_comp_to_eles_and_type(comp: str) -> Tuple[Iterable[str], str]:
+        """
+        Extract the elements and composition type from a given composition
+        e.g., _1_1_4 from Li1Sc1F4
+        """
+        # this splits by the digits
+        # e.g., for "Li1Sc1F4": ['Li', '1', 'Sc', '1', 'F', '4', '']
+        split = np.asarray(re.split('(\d+)', comp))
+        elements = tuple(sorted(split[range(0, len(split)-1, 2)]))
+        stoich = split[range(1, len(split), 2)]
+        # sort the stoichiometry to get the correct order of the comp type
+        comp_type = '_' + '_'.join(map(str, sorted(map(int, stoich))))
+        return elements, comp_type
+
+    @staticmethod
+    def get_stoich_from_comp(comp: str) -> Iterable[int]:
+        # split by the digits
+        # e.g., for "Li1Sc1F4": ['Li', '1', 'Sc', '1', 'F', '4', '']
+        split = np.asarray(re.split('(\d+)', comp))
+        stoich = tuple(map(int, split[range(1, len(split), 2)]))
+        return stoich
+
+
+    @staticmethod
+    def decorate_prototype_structure(icsd_prototype: Structure,
+                                     composition: str,
+                                     decoration_idx: int,
+                                     ) -> Structure:
+        """
+        Replace the atoms in the icsd prototype structure with the elements of this composition.
+        The decoration index is used to figure out which combination of
+        elements in this composition should replace the elements in the icsd prototype
+        """
+        comp = Composition(composition)
+
+        prototype_comp = Composition(icsd_prototype.formula).reduced_composition
+        prototype_stoic = tuple([int(p) for p in prototype_comp.formula if p.isdigit()])
+
+        # create permutations of order of elements within a composition
+        # e.g., for K1Br1: [('K1', 'Br1'), ('Br1', 'K1')]
+        comp_permutations = itertools.permutations(comp.formula.split(' '))
+        # only keep the permutations that match the stoichiometry of the prototype structure
+        valid_comp_permutations = []
+        for comp_permu in comp_permutations:
+            comp_stoich = CrystalState.get_stoich_from_comp(''.join(comp_permu))
+            if comp_stoich == prototype_stoic:
+                valid_comp_permutations.append(''.join(comp_permu))
+
+        # TODO find a better way than matching the decoration_idx here
+        assert decoration_idx < len(valid_comp_permutations), \
+            f"decoration_idx {decoration_idx} must be < num valid comp permutations {len(valid_comp_permutations)}." + \
+            f" prototype_stoic: {prototype_stoic}, comp_permu: {comp_permu}"
+
+        # now build the decorated structure for the specific index passed in
+        original_ele = ''.join(i for i in prototype_comp.formula if not i.isdigit()).split(' ')
+        #print(original_ele)
+        comp_to_decorate = Composition(valid_comp_permutations[decoration_idx]).reduced_composition
+        #comp_to_decorate = valid_comp_permutations[decoration_idx]
+        replacement_ele = ''.join(i for i in comp_to_decorate.formula if not i.isdigit()).split(' ')
+        #print(comp_to_decorate, replacement_ele)
+
+        # dictionary containing original elements as keys and new elements as values
+        replacement = {original_ele[i]: replacement_ele[i] for i in range(len(original_ele))}
+
+        # 'replace_species' function from pymatgen to replace original elements with new elements
+        strc_subs = deepcopy(icsd_prototype)
+        strc_subs.replace_species(replacement)
+
+        return strc_subs
+
+    # @property
+    # def elements(self) -> str:
+    #     return self._elements
 
     @property
     def composition(self) -> str:
         return self._composition
 
-    @property
-    def comp_type(self) -> str:
-        return self._comp_type
+    # @property
+    # def comp_type(self) -> str:
+    #     return self._comp_type
 
     @property
     def action_node(self) -> str:
         return self._action_node
+
+    # @property
+    # def structure(self) -> Structure:
+    #     return self._structure
 
     @property
     def terminal(self) -> bool:

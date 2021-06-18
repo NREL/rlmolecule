@@ -20,10 +20,9 @@ class CrystalProblem(MCTSProblem, ABC):
         super(CrystalProblem, self).__init__(*args, **kwargs)
 
     def get_initial_state(self) -> CrystalState:
-        elements = ()
         # The root node in the action space is the string 'root'
         action_node = "root"
-        return CrystalState(elements, action_node, self._config)
+        return CrystalState(action_node, self._config)
 
 
 # TODO implement for crystals

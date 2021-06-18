@@ -10,34 +10,56 @@ import time
 import pandas as pd
 import networkx as nx
 import random
+import json
+import gzip
+import pymatgen
+from pymatgen.core import Composition, Structure
+from pymatgen.analysis import local_env
 
 from examples.crystal_volume.builder import CrystalBuilder
 #from examples.crystal_volume.crystal_problem import CrystalTFAlphaZeroProblem
 from examples.crystal_volume.crystal_problem import CrystalProblem
 from examples.crystal_volume.crystal_state import CrystalState
 from rlmolecule.sql.run_config import RunConfig
-from rlmolecule.tree_search.reward import RankedRewardFactory
+#from rlmolecule.tree_search.reward import RankedRewardFactory
+from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
 from rlmolecule.sql import Base, Session, digest, load_numpy_dict, serialize_ordered_numpy_dict
 from rlmolecule.sql.tables import GameStore, RewardStore, StateStore
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-parser = argparse.ArgumentParser(description='Run the crystal conduction ion volume optimization. ' +
-                                             'Default is to run the script locally')
-parser.add_argument('--config', type=str, help='Configuration file')
-parser.add_argument('--train-policy', action="store_true", default=False, help='Train the policy model only (on GPUs)')
-parser.add_argument('--rollout', action="store_true", default=False, help='Run the game simulations only (on CPUs)')
+# want to maximize the volume around only the conducting ions
+conducting_ions = set(['Li', 'Na', 'K', 'Mg', 'Zn'])
+# Many structures fail with the default cutoff radius in Angstrom to look for near-neighbor atoms (13.0)
+# with the error: "No Voronoi neighbors found for site".
+# see: https://github.com/materialsproject/pymatgen/blob/v2022.0.8/pymatgen/analysis/local_env.py#L639.
+# Increasing the cutoff takes longer. If I bump it up to 1000, it can take over 100 Gb of Memory!
+nn13 = local_env.VoronoiNN(cutoff=13, compute_adj_neighbors=False)
 
-args = parser.parse_args()
+# load the action graphs for the search space
+G = nx.DiGraph()
+G2 = nx.DiGraph()
+action_graph_file = "inputs/elements_to_compositions.edgelist.gz"
+print(f"reading {action_graph_file}")
+G = nx.read_edgelist(action_graph_file, delimiter='\t', data=False, create_using=G)
+print(f'\t{G.number_of_nodes()} nodes, {G.number_of_edges()} edges')
 
-run_config = RunConfig(args.config)
-run_id = run_config.run_id
+action_graph2_file = "inputs/comp_type_to_decorations.edgelist.gz"
+print(f"reading {action_graph2_file}")
+G2 = nx.read_edgelist(action_graph2_file, delimiter='\t', data=False, create_using=G2)
+print(f'\t{G2.number_of_nodes()} nodes, {G2.number_of_edges()} edges')
 
-engine = run_config.start_engine()
-Base.metadata.create_all(engine, checkfirst=True)
-Session.configure(bind=engine)
-session = Session()
+# also load the icsd prototype structures
+# https://pymatgen.org/usage.html#side-note-as-dict-from-dict
+icsd_prototypes_file = "inputs/icsd_prototypes.json.gz"
+print(f"reading {icsd_prototypes_file}")
+with gzip.open(icsd_prototypes_file, 'r') as f:
+    structures_dict = json.loads(f.read().decode())
+structures = {}
+for key, structure_dict in structures_dict.items():
+    structures[key] = Structure.from_dict(structure_dict)
+print(f"\t{len(structures)} ICSD structures")
 
 
 class CrystalVolOptimizationProblem(CrystalProblem):
@@ -48,49 +70,77 @@ class CrystalVolOptimizationProblem(CrystalProblem):
         #if state.forced_terminal:
         #    return qed(state.molecule), {'forced_terminal': True, 'smiles': state.smiles}
         if state.terminal:
-            # TODO generate the pymatgen structure object for this decoration of the crystal structure
-            # and compute the volume of the conducting ions.
-            # For now, set a dummy reward which is the length of the string representation
-            return len(repr(state)), {'terminal': True, 'state_repr': repr(state)}
+            # Now create the decoration of this composition onto this prototype structure
+            # the 'action_node' string has the following format at this point:
+            # comp_type|prototype_structure|decoration_idx
+            # we just need 'comp_type|prototype_structure' to get the icsd structure
+            structure_key = '|'.join(state.action_node.split('|')[:-1])
+            icsd_prototype = structures[structure_key]
+            decoration_idx = int(state.action_node.split('|')[-1]) - 1
+            decorated_structure = CrystalState.decorate_prototype_structure(
+                icsd_prototype, state.composition, decoration_idx=decoration_idx)
+
+            # Compute the volume of the conducting ions.
+            conducting_ion_vol, total_vol = self.compute_structure_vol(decorated_structure)
+            frac_conducting_ion_vol = conducting_ion_vol / total_vol if total_vol is not 0 else 0
+            info = {
+                'terminal': True,
+                'conducting_ion_vol': conducting_ion_vol,
+                'total_vol': total_vol,
+                'state_repr': repr(state),
+            }
+            return frac_conducting_ion_vol, info
+            ## For now, set a dummy reward which is the length of the string representation
+            #return len(repr(state)), {'terminal': True, 'state_repr': repr(state)}
         return 0.0, {'terminal': False, 'state_repr': repr(state)}
+
+    def compute_structure_vol(self, structure: Structure):
+        """ compute the total volume and the volume of just the conducting ions
+        """
+        # if the voronoi search fails, could try increasing the cutoff here
+        for nn in [nn13]:
+            try:
+                voronoi_stats = nn.get_all_voronoi_polyhedra(structure)
+                break
+            except ValueError as e:
+                # TODO log these as warnings
+                #print(f"ValueError: {e}. ({descriptor})")
+                return 0,0
+            except MemoryError as e:
+                #print(f"MemoryError: {e}")
+                return 0,0
+        total_vol = 0
+        conducting_ion_vol = 0
+        for atom in voronoi_stats:
+            for site, site_info in atom.items():
+                vol = site_info['volume']
+                total_vol += vol
+
+                element = site_info['site'].as_dict()['species'][0]['element']
+                #curr_conducting_ion = [e for e in ]
+                # TODO Zn can be either a conducting ion or a framework cation.
+                # Make sure we're counting it correctly here
+                if element in conducting_ions:
+                    conducting_ion_vol += vol
+        return conducting_ion_vol, total_vol
 
 
 def create_problem():
     prob_config = run_config.problem_config
 
-    G = nx.DiGraph()
-    G2 = nx.DiGraph()
-    action_graph_file = "inputs/elements_to_compositions.edgelist.gz"
-    print(f"reading {action_graph_file}")
-    G = nx.read_edgelist(action_graph_file, delimiter='\t', data=False, create_using=G)
-    print(f'{G.number_of_nodes()} nodes, {G.number_of_edges()} edges')
-
-    action_graph2_file = "inputs/comp_type_to_decorations.edgelist.gz"
-    print(f"reading {action_graph2_file}")
-    G2 = nx.read_edgelist(action_graph2_file, delimiter='\t', data=False, create_using=G2)
-    print(f'{G2.number_of_nodes()} nodes, {G2.number_of_edges()} edges')
-
-    # also load the mapping from composition to composition type
-    working_dir = 'inputs'
-    df_comp = pd.read_csv(f'{working_dir}/compositions.csv.gz')
-    print(df_comp.head())
-    compositions = df_comp['composition'].to_list()
-    comp_types = set(df_comp['comp_type'].to_list())
-    comp_to_comp_type = dict(zip(df_comp['composition'], df_comp['comp_type']))
-
-    builder = CrystalBuilder(G,
-                             G2,
-                             comp_to_comp_type,
-    )
+    builder = CrystalBuilder(G, G2)
 
     run_id = run_config.run_id
     train_config = run_config.train_config
 
-    reward_factory = RankedRewardFactory(engine=engine,
-                                         run_id=run_id,
-                                         reward_buffer_min_size=train_config.get('reward_buffer_min_size', 10),
-                                         reward_buffer_max_size=train_config.get('reward_buffer_max_size', 50),
-                                         ranked_reward_alpha=train_config.get('ranked_reward_alpha', 0.75))
+    # reward_factory = RankedRewardFactory(engine=engine,
+    #                                      run_id=run_id,
+    #                                      reward_buffer_min_size=train_config.get('reward_buffer_min_size', 10),
+    #                                      reward_buffer_max_size=train_config.get('reward_buffer_max_size', 50),
+    #                                      ranked_reward_alpha=train_config.get('ranked_reward_alpha', 0.75))
+
+    reward_factory = LinearBoundedRewardFactory(min_reward=train_config.get('min_reward', 0),
+                                                max_reward=train_config.get('max_reward', 1))
 
     problem = CrystalVolOptimizationProblem(#engine,
                                      builder,
@@ -129,8 +179,9 @@ def run_games():
     )
     while True:
         path, reward = game.run(
-            num_mcts_samples=config.get('num_mcts_samples', 50),
+            num_mcts_samples=config.get('num_mcts_samples', 1),
             max_depth=config.get('max_depth', 1000000),
+            reset_canonicalizer=False,
         )
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1]}')
 
@@ -182,6 +233,23 @@ def monitor():
 
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='Run the crystal conduction ion volume optimization. ' +
+                                                 'Default is to run the script locally')
+    parser.add_argument('--config', type=str, help='Configuration file')
+    parser.add_argument('--train-policy', action="store_true", default=False,
+                        help='Train the policy model only (on GPUs)')
+    parser.add_argument('--rollout', action="store_true", default=False, help='Run the game simulations only (on CPUs)')
+
+    args = parser.parse_args()
+
+    run_config = RunConfig(args.config)
+    run_id = run_config.run_id
+
+    engine = run_config.start_engine()
+    Base.metadata.create_all(engine, checkfirst=True)
+    Session.configure(bind=engine)
+    session = Session()
 
     if args.train_policy:
         print("policy model not yet implemented")
