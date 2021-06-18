@@ -9,6 +9,7 @@ import os
 import time
 import pandas as pd
 import networkx as nx
+import random
 
 from examples.crystal_volume.builder import CrystalBuilder
 #from examples.crystal_volume.crystal_problem import CrystalTFAlphaZeroProblem
@@ -16,6 +17,8 @@ from examples.crystal_volume.crystal_problem import CrystalProblem
 from examples.crystal_volume.crystal_state import CrystalState
 from rlmolecule.sql.run_config import RunConfig
 from rlmolecule.tree_search.reward import RankedRewardFactory
+from rlmolecule.sql import Base, Session, digest, load_numpy_dict, serialize_ordered_numpy_dict
+from rlmolecule.sql.tables import GameStore, RewardStore, StateStore
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -29,6 +32,12 @@ parser.add_argument('--rollout', action="store_true", default=False, help='Run t
 args = parser.parse_args()
 
 run_config = RunConfig(args.config)
+run_id = run_config.run_id
+
+engine = run_config.start_engine()
+Base.metadata.create_all(engine, checkfirst=True)
+Session.configure(bind=engine)
+session = Session()
 
 
 class CrystalVolOptimizationProblem(CrystalProblem):
@@ -39,7 +48,9 @@ class CrystalVolOptimizationProblem(CrystalProblem):
         #if state.forced_terminal:
         #    return qed(state.molecule), {'forced_terminal': True, 'smiles': state.smiles}
         if state.terminal:
-            # for now, set a dummy reward which is the length of the string representation
+            # TODO generate the pymatgen structure object for this decoration of the crystal structure
+            # and compute the volume of the conducting ions.
+            # For now, set a dummy reward which is the length of the string representation
             return len(repr(state)), {'terminal': True, 'state_repr': repr(state)}
         return 0.0, {'terminal': False, 'state_repr': repr(state)}
 
@@ -49,14 +60,14 @@ def create_problem():
 
     G = nx.DiGraph()
     G2 = nx.DiGraph()
-    g_file = "inputs/elements_to_compositions.edgelist.gz"
-    print(f"reading {g_file}")
-    G = nx.read_edgelist(g_file, delimiter='\t', data=False, create_using=G)
+    action_graph_file = "inputs/elements_to_compositions.edgelist.gz"
+    print(f"reading {action_graph_file}")
+    G = nx.read_edgelist(action_graph_file, delimiter='\t', data=False, create_using=G)
     print(f'{G.number_of_nodes()} nodes, {G.number_of_edges()} edges')
 
-    g2_file = "inputs/comp_type_to_decorations.edgelist.gz"
-    print(f"reading {g2_file}")
-    G2 = nx.read_edgelist(g2_file, delimiter='\t', data=False, create_using=G2)
+    action_graph2_file = "inputs/comp_type_to_decorations.edgelist.gz"
+    print(f"reading {action_graph2_file}")
+    G2 = nx.read_edgelist(action_graph2_file, delimiter='\t', data=False, create_using=G2)
     print(f'{G2.number_of_nodes()} nodes, {G2.number_of_edges()} edges')
 
     # also load the mapping from composition to composition type
@@ -72,7 +83,6 @@ def create_problem():
                              comp_to_comp_type,
     )
 
-    engine = run_config.start_engine()
     run_id = run_config.run_id
     train_config = run_config.train_config
 
@@ -100,25 +110,29 @@ def create_problem():
 
 
 def run_games():
-    from rlmolecule.alphazero.alphazero import AlphaZero
+    # from rlmolecule.alphazero.alphazero import AlphaZero
     config = run_config.mcts_config
-    game = AlphaZero(
+    # game = AlphaZero(
+    #     create_problem(),
+    #     min_reward=config.get('min_reward', 0.0),
+    #     pb_c_base=config.get('pb_c_base', 1.0),
+    #     pb_c_init=config.get('pb_c_init', 1.25),
+    #     dirichlet_noise=config.get('dirichlet_noise', True),
+    #     dirichlet_alpha=config.get('dirichlet_alpha', 1.0),
+    #     dirichlet_x=config.get('dirichlet_x', 0.25),
+    #     # MCTS parameters
+    #     ucb_constant=config.get('ucb_constant', math.sqrt(2)),
+    # )
+    from rlmolecule.mcts.mcts import MCTS
+    game = MCTS(
         create_problem(),
-        min_reward=config.get('min_reward', 0.0),
-        pb_c_base=config.get('pb_c_base', 1.0),
-        pb_c_init=config.get('pb_c_init', 1.25),
-        dirichlet_noise=config.get('dirichlet_noise', True),
-        dirichlet_alpha=config.get('dirichlet_alpha', 1.0),
-        dirichlet_x=config.get('dirichlet_x', 0.25),
-        # MCTS parameters
-        ucb_constant=config.get('ucb_constant', math.sqrt(2)),
     )
     while True:
         path, reward = game.run(
             num_mcts_samples=config.get('num_mcts_samples', 50),
             max_depth=config.get('max_depth', 1000000),
         )
-        logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
+        logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1]}')
 
 
 def train_model():
@@ -130,16 +144,35 @@ def train_model():
                                         verbose=config.get('verbose', 2))
 
 
+# TODO copied from alphazero_problem.py
+def iter_recent_games():
+    """Iterate over randomly chosen positions in games from the replay buffer
+
+    :returns: a generator of (serialized_parent, visit_probabilities, scaled_reward) pairs
+    """
+
+    recent_games = session.query(GameStore).filter_by(run_id=run_id) \
+        .order_by(GameStore.time.desc()).limit(200)
+
+    for game in recent_games:
+        parent_state_string, visit_probabilities = random.choice(game.search_statistics)
+        policy_digests, visit_probs = zip(*visit_probabilities)
+        yield ([parent_state_string] + list(policy_digests), [game.scaled_reward] + list(visit_probs))
+
+
 def monitor():
     from rlmolecule.sql.tables import RewardStore
     problem = create_problem()
 
     while True:
-        best_reward = problem.session.query(RewardStore) \
-            .filter_by(run_id=problem.run_id) \
+        #best_reward = problem.session.query(RewardStore) \
+            #.filter_by(run_id=problem.run_id) \
+        best_reward = session.query(RewardStore) \
+            .filter_by(run_id=run_id) \
             .order_by(RewardStore.reward.desc()).first()
 
-        num_games = len(list(problem.iter_recent_games()))
+        num_games = len(list(iter_recent_games()))
+        print(best_reward, num_games)
 
         if best_reward:
             print(f"Best Reward: {best_reward.reward:.3f} for molecule "
@@ -151,29 +184,30 @@ def monitor():
 if __name__ == "__main__":
 
     if args.train_policy:
-        train_model()
-    elif args.rollout:
+        print("policy model not yet implemented")
+    #     train_model()
+    if args.rollout:
         # make sure the rollouts do not use the GPU
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
         run_games()
     else:
-
-        jobs = [multiprocessing.Process(target=monitor)]
-        jobs[0].start()
-        time.sleep(1)
-
-        for i in range(5):
-            jobs += [multiprocessing.Process(target=run_games)]
-
-        jobs += [multiprocessing.Process(target=train_model)]
-
-        for job in jobs[1:]:
-            job.start()
-
-        start = time.time()
-        while time.time() - start <= run_config.problem_config.get('timeout', 300):
-            time.sleep(1)
-
-        for j in jobs:
-            j.terminate()
-            j.join()
+        monitor()
+        # jobs = [multiprocessing.Process(target=monitor)]
+        # jobs[0].start()
+        # time.sleep(1)
+        #
+        # for i in range(5):
+        #     jobs += [multiprocessing.Process(target=run_games)]
+        #
+        # jobs += [multiprocessing.Process(target=train_model)]
+        #
+        # for job in jobs[1:]:
+        #     job.start()
+        #
+        # start = time.time()
+        # while time.time() - start <= run_config.problem_config.get('timeout', 300):
+        #     time.sleep(1)
+        #
+        # for j in jobs:
+        #     j.terminate()
+        #     j.join()
