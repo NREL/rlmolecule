@@ -8,9 +8,11 @@ from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from rlmolecule.mcts.mcts import MCTS
 from rlmolecule.mcts.mcts_vertex import MCTSVertex
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
+from rlmolecule.tree_search.metrics import collect_metrics
 from rlmolecule.tree_search.reward import Reward
 
 logger = logging.getLogger(__name__)
+random_state = np.random.RandomState()
 
 
 class AlphaZero(MCTS):
@@ -20,6 +22,7 @@ class AlphaZero(MCTS):
     
     AlphaZeroGame interacts with AlphaZeroVertex. See AlphaZeroVertex for more details.
     """
+
     def __init__(self,
                  problem: AlphaZeroProblem,
                  min_reward: float = 0.0,
@@ -57,9 +60,10 @@ class AlphaZero(MCTS):
         child_visits = [(child, child.visit_count / visit_sum) for child in children]
         path.append((vertex, child_visits))
 
+    @collect_metrics
     def _evaluate(
-        self,
-        search_path: [AlphaZeroVertex],
+            self,
+            search_path: [AlphaZeroVertex],
     ) -> Reward:
         """
         Expansion step of AlphaZero, overrides MCTS evaluate step.
@@ -81,7 +85,6 @@ class AlphaZero(MCTS):
         prior_array: np.ndarray = np.array([child_priors[child] for child in children])
 
         if self._dirichlet_noise:
-            random_state = np.random.RandomState()
             noise = random_state.dirichlet(np.ones_like(prior_array) * self._dirichlet_alpha)
             prior_array = prior_array * (1 - self._dirichlet_x) + (noise * self._dirichlet_x)
 

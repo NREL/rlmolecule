@@ -1,12 +1,10 @@
 import logging
 import time
-from typing import Tuple
 
 import numpy as np
 from sqlalchemy import create_engine
 
-from rlmolecule.tree_search.reward import Reward
-from rlmolecule.alphazero.tfalphazero_problem import TFAlphaZeroProblem
+from rlmolecule.alphazero.tensorflow.tfalphazero_problem import TFAlphaZeroProblem
 from rlmolecule.gym.gym_problem import GymProblem
 from rlmolecule.gym.gym_state import GymEnvState
 from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv

@@ -1,6 +1,7 @@
 import logging
 import os
 import random
+import time
 from abc import abstractmethod
 from typing import List, Optional
 
@@ -13,7 +14,7 @@ from rlmolecule.mcts.mcts_problem import MCTSProblem
 from rlmolecule.sql import Base, Session, digest, load_numpy_dict, serialize_ordered_numpy_dict
 from rlmolecule.sql.tables import GameStore, RewardStore, StateStore
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
-from rlmolecule.tree_search.metrics import call_metrics
+from rlmolecule.tree_search.metrics import call_metrics, collect_metrics
 from rlmolecule.tree_search.reward import Reward, RewardFactory
 
 logger = logging.getLogger(__name__)
@@ -127,6 +128,7 @@ class AlphaZeroProblem(MCTSProblem):
 
         return vertex.policy_digest, policy_inputs
 
+    @collect_metrics
     def maybe_store_state(self, vertex: AlphaZeroVertex) -> str:
         """ Add the serialized state to the StateStore table if it doesn't exist
 
@@ -183,13 +185,17 @@ class AlphaZeroProblem(MCTSProblem):
         :returns: a generator of (serialized_parent, visit_probabilities, scaled_reward) pairs
         """
 
-        recent_games = self.session.query(GameStore).filter_by(run_id=self.run_id) \
-            .order_by(GameStore.time.desc()).limit(self.max_buffer_size)
+        try:
+            recent_games = self.session.query(GameStore).filter_by(run_id=self.run_id) \
+                .order_by(GameStore.time.desc()).limit(self.max_buffer_size)
 
-        for game in recent_games:
-            parent_state_string, visit_probabilities = random.choice(game.search_statistics)
-            policy_digests, visit_probs = zip(*visit_probabilities)
-            yield ([parent_state_string] + list(policy_digests), [game.scaled_reward] + list(visit_probs))
+            for game in recent_games:
+                parent_state_string, visit_probabilities = random.choice(game.search_statistics)
+                policy_digests, visit_probs = zip(*visit_probabilities)
+                yield [parent_state_string] + list(policy_digests), [game.scaled_reward] + list(visit_probs)
+
+        except sqlalchemy.exc.OperationalError:
+            time.sleep(5)
 
     def lookup_policy_inputs_from_digest(self, policy_digest: str) -> {str: np.ndarray}:
 

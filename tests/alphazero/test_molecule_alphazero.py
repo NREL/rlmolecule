@@ -1,4 +1,5 @@
 import os
+import tempfile
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -13,7 +14,13 @@ from tests.qed_optimization_problem import QEDWithMoleculePolicy
 
 @pytest.fixture()
 def builder():
-    return MoleculeBuilder(max_atoms=4, min_atoms=1, tryEmbedding=False, sa_score_threshold=None, stereoisomers=False)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        yield MoleculeBuilder(max_atoms=4,
+                              min_atoms=1,
+                              tryEmbedding=False,
+                              sa_score_threshold=None,
+                              stereoisomers=False,
+                              cache_dir=tmpdir)
 
 
 @pytest.fixture(scope='function')

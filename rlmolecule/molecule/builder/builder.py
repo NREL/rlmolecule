@@ -2,10 +2,12 @@ import logging
 import os
 import sys
 from abc import ABC, abstractmethod
+from multiprocessing import Pool
 from typing import Iterable, List, Optional
 
 import numpy as np
 import rdkit
+from diskcache import FanoutCache, Cache
 from rdkit import Chem, RDConfig
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
 from rdkit.Chem.rdDistGeom import EmbedMolecule
@@ -28,7 +30,9 @@ class MoleculeBuilder:
                  atom_additions: Optional[List] = None,
                  stereoisomers: bool = True,
                  sa_score_threshold: Optional[float] = 3.5,
-                 tryEmbedding: bool = True) -> None:
+                 tryEmbedding: bool = True,
+                 cache_dir: Optional[str] = None,
+                 num_shards: int = 1) -> None:
         """A class to build molecules according to a number of different options
 
         :param max_atoms: Maximum number of heavy atoms
@@ -42,6 +46,18 @@ class MoleculeBuilder:
         # Not the most elegant solution, these are carried and referenced by MoleculeState, but are not used internally
         self.max_atoms = max_atoms
         self.min_atoms = min_atoms
+
+        if cache_dir is not None:
+            if num_shards == 1:
+                cache = Cache(directory=cache_dir)
+            else:
+                cache = FanoutCache(directory=cache_dir, shards=num_shards)
+
+            self.cached_call = cache.memoize()(self.call_list)
+
+        else:
+            self.mem = None
+            self.cached_call = None
 
         self.transformation_stack = [
             AddNewAtomsAndBonds(atom_additions),
@@ -57,21 +73,48 @@ class MoleculeBuilder:
         if tryEmbedding:
             self.transformation_stack += [EmbeddingFilter()]
 
-    def __call__(self, parent_molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
+    def call_iter(self, parent_molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
         inputs = [parent_molecule]
         for transformer in self.transformation_stack:
             inputs = transformer(inputs)
         yield from inputs
 
+    def call_list(self, parent_molecule: rdkit.Chem.Mol) -> List[rdkit.Chem.Mol]:
+        return list(self.call_iter(parent_molecule))
+
+    def __call__(self, parent_molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
+        if self.cached_call is None:
+            return self.call_iter(parent_molecule)
+
+        else:
+            return self.cached_call(parent_molecule)
+
+    def __getstate__(self):
+        attributes = self.__dict__
+        attributes['cached_call'] = None
+        return attributes
+
 
 class MoleculeTransformer(ABC):
+    def __init__(self, max_threads: Optional[int] = 1):
+        self.max_threads = max_threads
+
     @abstractmethod
     def call(self, molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
         pass
 
+    def call_list(self, molecule: rdkit.Chem.Mol) -> List[rdkit.Chem.Mol]:
+        return list(self.call(molecule))
+
     def __call__(self, inputs: Iterable[rdkit.Chem.Mol]) -> Iterable[rdkit.Chem.Mol]:
-        for molecule in inputs:
-            yield from self.call(molecule)
+        if self.max_threads == 1:
+            for molecule in inputs:
+                yield from self.call(molecule)
+
+        else:
+            with Pool(self.max_threads) as p:
+                for result in p.map(self.call_list, list(inputs)):
+                    yield from result
 
 
 class MoleculeFilter(MoleculeTransformer, ABC):
@@ -95,7 +138,8 @@ class UniqueMoleculeTransformer(MoleculeTransformer, ABC):
 
 
 class AddNewAtomsAndBonds(UniqueMoleculeTransformer):
-    def __init__(self, atom_additions: Optional[List] = None):
+    def __init__(self, atom_additions: Optional[List] = None, **kwargs):
+        super(AddNewAtomsAndBonds, self).__init__(**kwargs)
         if atom_additions is not None:
             self.atom_additions = atom_additions
         else:
@@ -117,7 +161,7 @@ class AddNewAtomsAndBonds(UniqueMoleculeTransformer):
         return list(
             set(range(starting_mol.GetNumAtoms())) - set((neighbor.GetIdx() for neighbor in atom.GetNeighbors())) -
             set(range(atom.GetIdx())) -  # Prevent duplicates by only bonding forward
-            set((atom.GetIdx(), )) | set(np.arange(len(self.atom_additions)) + starting_mol.GetNumAtoms()))
+            set((atom.GetIdx(),)) | set(np.arange(len(self.atom_additions)) + starting_mol.GetNumAtoms()))
 
     def _get_valid_bonds(self, starting_mol: rdkit.Chem.Mol, atom1_idx: int, atom2_idx: int) -> range:
         """ Compare free valences of two atoms to calculate valid bonds """
@@ -145,7 +189,8 @@ class AddNewAtomsAndBonds(UniqueMoleculeTransformer):
 
 
 class StereoEnumerator(UniqueMoleculeTransformer):
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.opts = StereoEnumerationOptions(unique=True)
 
     def call(self, molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
@@ -153,7 +198,8 @@ class StereoEnumerator(UniqueMoleculeTransformer):
 
 
 class SAScoreFilter(MoleculeFilter):
-    def __init__(self, sa_score_threshold: float, min_atoms: int = 1):
+    def __init__(self, sa_score_threshold: float, min_atoms: int = 1, **kwargs):
+        super().__init__(**kwargs)
         self.min_atoms = min_atoms
         self.sa_score_threshold = sa_score_threshold
 
@@ -168,7 +214,7 @@ class EmbeddingFilter(MoleculeFilter):
         molH = Chem.AddHs(molecule)
 
         try:
-            assert EmbedMolecule(molH) >= 0
+            assert EmbedMolecule(molH, maxAttempts=30, randomSeed=42) >= 0
             return True
 
         except (AssertionError, RuntimeError):

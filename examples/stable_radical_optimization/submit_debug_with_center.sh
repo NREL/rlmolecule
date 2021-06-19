@@ -1,17 +1,15 @@
 #!/bin/bash
+#SBATCH --partition=debug
 #SBATCH --account=bpms
-#SBATCH --time=4:00:00
-#SBATCH --job-name=stable_rad_opt
-#SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --mail-user=jlaw@nrel.gov
-# --- Policy Trainer ---
+#SBATCH --time=1:00:00
+#SBATCH --job-name=test_stable_rad_opt
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:2
-# --- MCTS Rollouts ---
-#SBATCH hetjob
-#SBATCH -N 10
+#SBATCH --ntasks=8
+#SBATCH --cpus-per-task=4
+#SBATCH --output=/scratch/pstjohn/slurm.%j.out
 
-export WORKING_DIR=/scratch/${USER}/rlmolecule/stable_radical_optimization/
+export WORKING_DIR=/scratch/${USER}/rlmolecule/stable_radical_optimization
 mkdir -p $WORKING_DIR
 export START_POLICY_SCRIPT="$SLURM_SUBMIT_DIR/$JOB/.policy.sh"
 export START_ROLLOUT_SCRIPT="$SLURM_SUBMIT_DIR/$JOB/.rollout.sh"
@@ -20,8 +18,9 @@ export PYTHONPATH="$(readlink -e ../../):$PYTHONPATH"
 
 model_dir="/projects/rlmolecule/pstjohn/models/"; 
 stability_model="$model_dir/20210214_radical_stability_new_data/"
-redox_model="$model_dir/20210214_redox_new_data/"
+redox_model="$model_dir/20210602_redox_tempo/"
 bde_model="$model_dir/20210216_bde_new_nfp/"
+config="config/config_eagle_no.yaml"
 
 cat << EOF > "$START_POLICY_SCRIPT"
 #!/bin/bash
@@ -29,7 +28,9 @@ source $HOME/.bashrc
 module use /nopt/nrel/apps/modules/test/modulefiles/
 module load cudnn/8.1.1/cuda-11.2
 conda activate rlmol
-python -u stable_radical_opt.py --train-policy \
+python -u stable_radical_opt.py \
+    --train-policy \
+    --config="$config" \
     --stability-model="$stability_model" \
     --redox-model="$redox_model" \
     --bde-model="$bde_model" 
@@ -39,7 +40,9 @@ cat << EOF > "$START_ROLLOUT_SCRIPT"
 #!/bin/bash
 source $HOME/.bashrc
 conda activate rlmol
-python -u stable_radical_opt.py --rollout \
+python -u stable_radical_opt.py \
+    --rollout \
+    --config="$config" \
     --stability-model="$stability_model" \
     --redox-model="$redox_model" \
     --bde-model="$bde_model" 
@@ -47,14 +50,15 @@ EOF
 
 chmod +x "$START_POLICY_SCRIPT" "$START_ROLLOUT_SCRIPT"
 
-srun --pack-group=0 \
-     --job-name="az-policy" \
-     --output=$WORKING_DIR/gpu.%j.out \
-     "$START_POLICY_SCRIPT" &
+# there are 36 cores on eagle nodes.
 
-srun --pack-group=1 \
-     --ntasks-per-node=18 \
-     --job-name="az-rollout" \
-     --output=$WORKING_DIR/mcts.%j.out \
-     "$START_ROLLOUT_SCRIPT"
+# run one policy training job
+srun --gres=gpu:1 --ntasks=1 --cpus-per-task=4 \
+    --output=$WORKING_DIR/gpu.%j.out \
+    "$START_POLICY_SCRIPT" &
+
+# and run 7 cpu rollout jobs
+srun --gres=gpu:0 --ntasks=14 --cpus-per-task=2 \
+    --output=$WORKING_DIR/mcts.%j.out \
+    "$START_ROLLOUT_SCRIPT"
 

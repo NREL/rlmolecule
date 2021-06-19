@@ -13,6 +13,8 @@ dependencies:
   - sqlalchemy
   - pytest
   - pytest-cov
+  - lazy_import
+  - diskcache
   - pip
   - pip:
     - nfp
