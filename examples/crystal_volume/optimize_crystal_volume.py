@@ -133,7 +133,7 @@ class CrystalVolOptimizationProblem(CrystalProblem):
             correct_ion = list(set(conducting_ion_vol.keys()) - {'Zn'})[0]
             conducting_ion_vol = conducting_ion_vol[correct_ion]
         else:
-            logger.warning(f"Expected 1 conducting ion. Found {len(conducting_ion_vol}")
+            logger.warning(f"Expected 1 conducting ion. Found {len(conducting_ion_vol)}")
             conducting_ion_vol = 0
 
         return conducting_ion_vol, total_vol
