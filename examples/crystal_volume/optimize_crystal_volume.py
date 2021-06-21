@@ -12,6 +12,7 @@ import networkx as nx
 import random
 import json
 import gzip
+from collections import defaultdict
 import pymatgen
 from pymatgen.core import Composition, Structure
 from pymatgen.analysis import local_env
@@ -31,6 +32,9 @@ logger = logging.getLogger(__name__)
 
 # want to maximize the volume around only the conducting ions
 conducting_ions = set(['Li', 'Na', 'K', 'Mg', 'Zn'])
+anions = set(['F', 'Cl', 'Br', 'I', 'O', 'S', 'N', 'P'])
+framework_cations = set(['Sc', 'Y', 'La', 'Ti', 'Zr', 'Hf', 'W', 'Zn', 'Cd', 'Hg', 'B', 'Al', 'Si', 'Ge', 'Sn', 'P', 'Sb'])
+
 # Many structures fail with the default cutoff radius in Angstrom to look for near-neighbor atoms (13.0)
 # with the error: "No Voronoi neighbors found for site".
 # see: https://github.com/materialsproject/pymatgen/blob/v2022.0.8/pymatgen/analysis/local_env.py#L639.
@@ -82,7 +86,7 @@ class CrystalVolOptimizationProblem(CrystalProblem):
 
             # Compute the volume of the conducting ions.
             conducting_ion_vol, total_vol = self.compute_structure_vol(decorated_structure)
-            frac_conducting_ion_vol = conducting_ion_vol / total_vol if total_vol is not 0 else 0
+            frac_conducting_ion_vol = conducting_ion_vol / total_vol if total_vol != 0 else 0
             info = {
                 'terminal': True,
                 'conducting_ion_vol': conducting_ion_vol,
@@ -110,18 +114,28 @@ class CrystalVolOptimizationProblem(CrystalProblem):
                 #print(f"MemoryError: {e}")
                 return 0,0
         total_vol = 0
-        conducting_ion_vol = 0
+        conducting_ion_vol = defaultdict(int)
         for atom in voronoi_stats:
             for site, site_info in atom.items():
                 vol = site_info['volume']
                 total_vol += vol
 
                 element = site_info['site'].as_dict()['species'][0]['element']
-                #curr_conducting_ion = [e for e in ]
-                # TODO Zn can be either a conducting ion or a framework cation.
-                # Make sure we're counting it correctly here
                 if element in conducting_ions:
-                    conducting_ion_vol += vol
+                    conducting_ion_vol[element] += vol
+
+        # Zn can be either a conducting ion or a framework cation.
+        # Make sure we're counting it correctly here
+        if len(conducting_ion_vol) == 1:
+            conducting_ion_vol = list(conducting_ion_vol.values())[0]
+        elif len(conducting_ion_vol) == 2:
+            # remove Zn
+            correct_ion = list(set(conducting_ion_vol.keys()) - {'Zn'})[0]
+            conducting_ion_vol = conducting_ion_vol[correct_ion]
+        else:
+            logger.warning(f"Expected 1 conducting ion. Found {len(conducting_ion_vol}")
+            conducting_ion_vol = 0
+
         return conducting_ion_vol, total_vol
 
 
