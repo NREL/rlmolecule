@@ -1,5 +1,3 @@
-[![Total alerts](https://img.shields.io/lgtm/alerts/g/NREL/rlmolecule.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/NREL/rlmolecule/alerts/)
-
 # rlmolecule
 
 ## About
@@ -14,10 +12,10 @@ Code currently under development as part of the ["End-to-End Optimization for Ba
 Most dependencies for this project are installable via conda, with the exception of [nfp](https://github.com/NREL/nfp), which can be installed via pip. An example conda environment file is provided below:
 
 ```yaml
-name: tf2_gpu
 channels:
   - conda-forge
   - defaults
+  
 dependencies:
   - python=3.7
   - jupyterlab
@@ -30,24 +28,13 @@ dependencies:
   - pymatgen
   - xlrd
   - tqdm
+  - tensorflow-gpu
   - psycopg2
-  - cudnn=7.6
-  - sqlalchemy
-  - pyyaml
   - pip
-  - pip:
-    - nfp
-    - networkx
-    - tensorflow-gpu==2.3.0
-    - tensorflow-addons
+    - pip:
+    - nfp >= 0.1.4
 ```
 
-
-With the above file as `environment.yml`, you can install on Eagle with 
-```bash
-module purge
-conda env create -f environment.yml --prefix /projects/rlmolecule/<USER>/envs/tf2_gpu
-```
 
 ## Usage
 
