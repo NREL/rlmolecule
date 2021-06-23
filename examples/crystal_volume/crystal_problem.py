@@ -2,8 +2,7 @@ import logging
 from abc import ABC
 from typing import Dict, Optional
 
-import rdkit
-import sqlalchemy
+#import sqlalchemy
 
 #from rlmolecule.alphazero.tensorflow.tfalphazero_problem import TFAlphaZeroProblem
 from rlmolecule.mcts.mcts_problem import MCTSProblem
