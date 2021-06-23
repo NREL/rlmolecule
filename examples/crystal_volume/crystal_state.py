@@ -8,6 +8,7 @@ from pymatgen.core import Composition, Structure
 from rlmolecule.sql import hash_to_integer
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 from rlmolecule.tree_search.metrics import collect_metrics
+#import pdb
 
 
 class CrystalState(GraphSearchState):
@@ -89,6 +90,13 @@ class CrystalState(GraphSearchState):
         stoich = tuple(map(int, split[range(1, len(split), 2)]))
         return stoich
 
+    @staticmethod
+    def get_eles_from_comp(comp: str) -> Iterable[str]:
+        # split by the digits
+        # e.g., for "Li1Sc1F4": ['Li', '1', 'Sc', '1', 'F', '4', '']
+        split = np.asarray(re.split('(\d+)', comp))
+        eles = tuple(split[range(0, len(split)-1, 2)])
+        return eles
 
     @staticmethod
     def decorate_prototype_structure(icsd_prototype: Structure,
@@ -117,16 +125,13 @@ class CrystalState(GraphSearchState):
 
         # TODO find a better way than matching the decoration_idx here
         assert decoration_idx < len(valid_comp_permutations), \
-            f"decoration_idx {decoration_idx} must be < num valid comp permutations {len(valid_comp_permutations)}." + \
-            f" prototype_stoic: {prototype_stoic}, comp_permu: {comp_permu}"
+            f"decoration_idx {decoration_idx} must be < num valid comp permutations {len(valid_comp_permutations)} -- " + \
+            f"prototype_stoic: {prototype_stoic}, comp_permu: {comp_permu}, " + \
+            f"composition: {composition}, prototype_comp: {prototype_comp} "
 
         # now build the decorated structure for the specific index passed in
         original_ele = ''.join(i for i in prototype_comp.formula if not i.isdigit()).split(' ')
-        #print(original_ele)
-        comp_to_decorate = Composition(valid_comp_permutations[decoration_idx]).reduced_composition
-        #comp_to_decorate = valid_comp_permutations[decoration_idx]
-        replacement_ele = ''.join(i for i in comp_to_decorate.formula if not i.isdigit()).split(' ')
-        #print(comp_to_decorate, replacement_ele)
+        replacement_ele = CrystalState.get_eles_from_comp(valid_comp_permutations[decoration_idx])
 
         # dictionary containing original elements as keys and new elements as values
         replacement = {original_ele[i]: replacement_ele[i] for i in range(len(original_ele))}
@@ -135,7 +140,7 @@ class CrystalState(GraphSearchState):
         strc_subs = deepcopy(icsd_prototype)
         strc_subs.replace_species(replacement)
 
-        return strc_subs
+        return strc_subs, valid_comp_permutations[decoration_idx]
 
     # @property
     # def elements(self) -> str:
