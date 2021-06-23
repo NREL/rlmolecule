@@ -16,6 +16,7 @@ from collections import defaultdict
 import pymatgen
 from pymatgen.core import Composition, Structure
 from pymatgen.analysis import local_env
+import pdb
 
 from examples.crystal_volume.builder import CrystalBuilder
 #from examples.crystal_volume.crystal_problem import CrystalTFAlphaZeroProblem
@@ -30,40 +31,67 @@ from rlmolecule.sql.tables import GameStore, RewardStore, StateStore
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# want to maximize the volume around only the conducting ions
-conducting_ions = set(['Li', 'Na', 'K', 'Mg', 'Zn'])
-anions = set(['F', 'Cl', 'Br', 'I', 'O', 'S', 'N', 'P'])
-framework_cations = set(['Sc', 'Y', 'La', 'Ti', 'Zr', 'Hf', 'W', 'Zn', 'Cd', 'Hg', 'B', 'Al', 'Si', 'Ge', 'Sn', 'P', 'Sb'])
 
-# Many structures fail with the default cutoff radius in Angstrom to look for near-neighbor atoms (13.0)
-# with the error: "No Voronoi neighbors found for site".
-# see: https://github.com/materialsproject/pymatgen/blob/v2022.0.8/pymatgen/analysis/local_env.py#L639.
-# Increasing the cutoff takes longer. If I bump it up to 1000, it can take over 100 Gb of Memory!
-nn13 = local_env.VoronoiNN(cutoff=13, compute_adj_neighbors=False)
+def read_structures_file(structures_file):
+    logger.info(f"reading {structures_file}")
+    with gzip.open(structures_file, 'r') as f:
+        structures_dict = json.loads(f.read().decode())
+    structures = {}
+    for key, structure_dict in structures_dict.items():
+        structures[key] = Structure.from_dict(structure_dict)
+    logger.info(f"\t{len(structures)} structures read")
+    return structures
 
-# load the action graphs for the search space
-G = nx.DiGraph()
-G2 = nx.DiGraph()
-action_graph_file = "inputs/elements_to_compositions.edgelist.gz"
-print(f"reading {action_graph_file}")
-G = nx.read_edgelist(action_graph_file, delimiter='\t', data=False, create_using=G)
-print(f'\t{G.number_of_nodes()} nodes, {G.number_of_edges()} edges')
 
-action_graph2_file = "inputs/comp_type_to_decorations.edgelist.gz"
-print(f"reading {action_graph2_file}")
-G2 = nx.read_edgelist(action_graph2_file, delimiter='\t', data=False, create_using=G2)
-print(f'\t{G2.number_of_nodes()} nodes, {G2.number_of_edges()} edges')
+def write_structures_file(structures_file, structures_dict):
+    logger.info(f"writing {structures_file}")
+    with gzip.open(structures_file, 'w') as out:
+            out.write(json.dumps(structures_dict, indent=2).encode())
 
-# also load the icsd prototype structures
-# https://pymatgen.org/usage.html#side-note-as-dict-from-dict
-icsd_prototypes_file = "inputs/icsd_prototypes.json.gz"
-print(f"reading {icsd_prototypes_file}")
-with gzip.open(icsd_prototypes_file, 'r') as f:
-    structures_dict = json.loads(f.read().decode())
-structures = {}
-for key, structure_dict in structures_dict.items():
-    structures[key] = Structure.from_dict(structure_dict)
-print(f"\t{len(structures)} ICSD structures")
+
+def compute_structure_vol(structure: Structure):
+    """ compute the total volume and the volume of just the conducting ions
+    """
+    # if the voronoi search fails, could try increasing the cutoff here
+    for nn in [nn13]:
+        try:
+            voronoi_stats = nn.get_all_voronoi_polyhedra(structure)
+            break
+        except ValueError as e:
+            # TODO log these as warnings
+            #print(f"ValueError: {e}. ({descriptor})")
+            return 0,0
+        except MemoryError as e:
+            #print(f"MemoryError: {e}")
+            return 0,0
+        except RuntimeError as e:
+            logger.warning(f"RuntimeError: {e}  -  {repr(structure)}")
+            return 0,0
+
+    total_vol = 0
+    conducting_ion_vol = defaultdict(int)
+    for atom in voronoi_stats:
+        for site, site_info in atom.items():
+            vol = site_info['volume']
+            total_vol += vol
+
+            element = site_info['site'].as_dict()['species'][0]['element']
+            if element in conducting_ions:
+                conducting_ion_vol[element] += vol
+
+    # Zn can be either a conducting ion or a framework cation.
+    # Make sure we're counting it correctly here
+    if len(conducting_ion_vol) == 1:
+        conducting_ion_vol = list(conducting_ion_vol.values())[0]
+    elif len(conducting_ion_vol) == 2:
+        # remove Zn
+        correct_ion = list(set(conducting_ion_vol.keys()) - {'Zn'})[0]
+        conducting_ion_vol = conducting_ion_vol[correct_ion]
+    else:
+        logger.warning(f"Expected 1 conducting ion. Found {len(conducting_ion_vol)}")
+        conducting_ion_vol = 0
+
+    return conducting_ion_vol, total_vol
 
 
 class CrystalVolOptimizationProblem(CrystalProblem):
@@ -74,6 +102,13 @@ class CrystalVolOptimizationProblem(CrystalProblem):
         #if state.forced_terminal:
         #    return qed(state.molecule), {'forced_terminal': True, 'smiles': state.smiles}
         if state.terminal:
+            # if this has already been computed, then skip it
+            descriptor = repr(state)
+            comp_type = state.action_node.split('|')[0]
+            if descriptor in volume_stats:
+                stats = volume_stats[descriptor]
+                return stats[2], {'terminal': True, 'state_repr': repr(state)}
+
             # Now create the decoration of this composition onto this prototype structure
             # the 'action_node' string has the following format at this point:
             # comp_type|prototype_structure|decoration_idx
@@ -81,11 +116,17 @@ class CrystalVolOptimizationProblem(CrystalProblem):
             structure_key = '|'.join(state.action_node.split('|')[:-1])
             icsd_prototype = structures[structure_key]
             decoration_idx = int(state.action_node.split('|')[-1]) - 1
-            decorated_structure = CrystalState.decorate_prototype_structure(
-                icsd_prototype, state.composition, decoration_idx=decoration_idx)
+            try:
+                decorated_structure, comp = CrystalState.decorate_prototype_structure(
+                    icsd_prototype, state.composition, decoration_idx=decoration_idx)
+                decorations[descriptor] = decorated_structure.as_dict()
+            except AssertionError as e:
+                print(f"AssertionError: {e}")
+                volume_stats[descriptor] = (-1, -1, 0, comp_type)
+                return 0.0, {'terminal': True, 'state_repr': repr(state)}
 
             # Compute the volume of the conducting ions.
-            conducting_ion_vol, total_vol = self.compute_structure_vol(decorated_structure)
+            conducting_ion_vol, total_vol = compute_structure_vol(decorated_structure)
             frac_conducting_ion_vol = conducting_ion_vol / total_vol if total_vol != 0 else 0
             info = {
                 'terminal': True,
@@ -93,50 +134,12 @@ class CrystalVolOptimizationProblem(CrystalProblem):
                 'total_vol': total_vol,
                 'state_repr': repr(state),
             }
+            #if total_vol != 0:
+            volume_stats[descriptor] = (conducting_ion_vol, total_vol, frac_conducting_ion_vol, comp_type)
             return frac_conducting_ion_vol, info
             ## For now, set a dummy reward which is the length of the string representation
             #return len(repr(state)), {'terminal': True, 'state_repr': repr(state)}
         return 0.0, {'terminal': False, 'state_repr': repr(state)}
-
-    def compute_structure_vol(self, structure: Structure):
-        """ compute the total volume and the volume of just the conducting ions
-        """
-        # if the voronoi search fails, could try increasing the cutoff here
-        for nn in [nn13]:
-            try:
-                voronoi_stats = nn.get_all_voronoi_polyhedra(structure)
-                break
-            except ValueError as e:
-                # TODO log these as warnings
-                #print(f"ValueError: {e}. ({descriptor})")
-                return 0,0
-            except MemoryError as e:
-                #print(f"MemoryError: {e}")
-                return 0,0
-        total_vol = 0
-        conducting_ion_vol = defaultdict(int)
-        for atom in voronoi_stats:
-            for site, site_info in atom.items():
-                vol = site_info['volume']
-                total_vol += vol
-
-                element = site_info['site'].as_dict()['species'][0]['element']
-                if element in conducting_ions:
-                    conducting_ion_vol[element] += vol
-
-        # Zn can be either a conducting ion or a framework cation.
-        # Make sure we're counting it correctly here
-        if len(conducting_ion_vol) == 1:
-            conducting_ion_vol = list(conducting_ion_vol.values())[0]
-        elif len(conducting_ion_vol) == 2:
-            # remove Zn
-            correct_ion = list(set(conducting_ion_vol.keys()) - {'Zn'})[0]
-            conducting_ion_vol = conducting_ion_vol[correct_ion]
-        else:
-            logger.warning(f"Expected 1 conducting ion. Found {len(conducting_ion_vol)}")
-            conducting_ion_vol = 0
-
-        return conducting_ion_vol, total_vol
 
 
 def create_problem():
@@ -191,6 +194,7 @@ def run_games():
     game = MCTS(
         create_problem(),
     )
+    i = 0
     while True:
         path, reward = game.run(
             num_mcts_samples=config.get('num_mcts_samples', 1),
@@ -198,6 +202,15 @@ def run_games():
             reset_canonicalizer=False,
         )
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1]}')
+
+        i += 1
+        if i % 10 == 0:
+            df = pd.DataFrame(volume_stats).T
+            df.columns = ['conducting_ion_vol', 'total_vol', 'fraction', 'comp_type']
+            df = df.sort_index()
+            print(f"writing current stats to {out_file}")
+            df.to_csv(out_file, sep='\t')
+            write_structures_file(decorations_file, decorations)
 
 
 def train_model():
@@ -244,6 +257,58 @@ def monitor():
                   f"{best_reward.data['smiles']} with {num_games} games played")
 
         time.sleep(5)
+
+
+# want to maximize the volume around only the conducting ions
+conducting_ions = set(['Li', 'Na', 'K', 'Mg', 'Zn'])
+anions = set(['F', 'Cl', 'Br', 'I', 'O', 'S', 'N', 'P'])
+framework_cations = set(['Sc', 'Y', 'La', 'Ti', 'Zr', 'Hf', 'W', 'Zn', 'Cd', 'Hg', 'B', 'Al', 'Si', 'Ge', 'Sn', 'P', 'Sb'])
+
+# Many structures fail with the default cutoff radius in Angstrom to look for near-neighbor atoms (13.0)
+# with the error: "No Voronoi neighbors found for site".
+# see: https://github.com/materialsproject/pymatgen/blob/v2022.0.8/pymatgen/analysis/local_env.py#L639.
+# Increasing the cutoff takes longer. If I bump it up to 1000, it can take over 100 Gb of Memory!
+nn13 = local_env.VoronoiNN(cutoff=13, compute_adj_neighbors=False)
+
+# load the action graphs for the search space
+G = nx.DiGraph()
+G2 = nx.DiGraph()
+action_graph_file = "inputs/elements_to_compositions.edgelist.gz"
+logger.info(f"reading {action_graph_file}")
+G = nx.read_edgelist(action_graph_file, delimiter='\t', data=False, create_using=G)
+logger.info(f'\t{G.number_of_nodes()} nodes, {G.number_of_edges()} edges')
+
+action_graph2_file = "inputs/comp_type_to_decorations.edgelist.gz"
+logger.info(f"reading {action_graph2_file}")
+G2 = nx.read_edgelist(action_graph2_file, delimiter='\t', data=False, create_using=G2)
+logger.info(f'\t{G2.number_of_nodes()} nodes, {G2.number_of_edges()} edges')
+
+# also load the icsd prototype structures
+# https://pymatgen.org/usage.html#side-note-as-dict-from-dict
+icsd_prototypes_file = "inputs/icsd_prototypes.json.gz"
+structures = read_structures_file(icsd_prototypes_file)
+
+# Temporary caching approach:
+# store the computed structures in a json file
+decorations = {}
+run_id = "2021-06-22"
+base_dir = f"/projects/rlmolecule/jlaw/crystals/{run_id}"
+decorations_file = f"{base_dir}/decorations.json.gz"
+if os.path.isfile(decorations_file):
+    decorations = read_structures_file(decorations_file)
+# keep track of the composition volume and total volume for each decoration
+volume_stats = {}
+errored = set()
+# shubham said they didn't consider prototypes with more than 50 atoms when calculating the DFT relaxed structures.
+max_atoms = 50
+skipped_max_atoms = []
+skipped_prototypes = set()
+out_file = f"{base_dir}/volume-stats.tsv"
+if os.path.isfile(out_file):
+    logger.info(f"reading {out_file}")
+    df = pd.read_csv(out_file, sep='\t', index_col=0)
+    volume_stats = dict(zip(df.index, df.values))
+    logger.info(f"\tread {len(volume_stats)} values")
 
 
 if __name__ == "__main__":
