@@ -25,21 +25,12 @@ class ParametricGridWorldEnv(gym.Env):
         self.delegate: GridWorldEnv = delegate
 
         num_actions = len(self.delegate.action_map)
-        delegate_observation_space = delegate.observation_space
-
-        def get_repeated_bounds(bound):
-            if isinstance(bound, np.ndarray):
-                return bound.reshape((1,) + bound.shape) + np.zeros((num_actions,) + tuple([1] * len(bound.shape)))
-            return bound
 
         self.observation_space = gym.spaces.Dict({
             'action_mask': Box(False, True, shape=(num_actions,), dtype=np.bool),
-            'action_observations': gym.spaces.Tuple(
-                (delegate_observation_space,) * num_actions),
+            'action_observations': gym.spaces.Tuple((delegate.observation_space,) * num_actions),
         })
         self.action_space = delegate.action_space
-
-        print(f'pospace: {self.observation_space} num_actions: {num_actions}')
 
     def reset(self) -> {str: np.ndarray}:
         self.delegate.reset()

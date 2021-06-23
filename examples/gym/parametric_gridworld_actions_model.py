@@ -48,12 +48,6 @@ class ParametricGridworldActionsModel(DistributionalQTFModel):
         flat_action_weights = self.per_action_model({'obs': flattened_action_features})[0]
         action_weights = tf.reshape(flat_action_weights, (batch_size, self.num_actions))
 
-        # print(f'action_weights {action_weights.shape}  action_mask {action_mask.shape}')
-
-        # Mask out invalid actions (use tf.float32.min for stability)
-        # TODO: this seems like not a good way to mask
-        # inf_mask = tf.maximum(tf.math.log(action_mask), tf.float32.min)
-
         self.action_mask = action_mask
         masked_action_weights = tf.where(action_mask != 0, action_weights,
                                        tf.ones_like(action_weights) * action_weights.dtype.min)
