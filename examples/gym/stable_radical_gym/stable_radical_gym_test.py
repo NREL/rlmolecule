@@ -8,8 +8,9 @@ from ray.rllib.models import ModelCatalog
 from ray.rllib.utils.test_utils import check_learning_achieved
 from ray.tune.registry import register_env
 
+from examples.gym.gridworld_env import GridWorldEnv, make_doorway_grid
+from examples.gym.parametric_gridworld_env import ParametricGridWorldEnv
 from examples.gym.stable_radical_gym.stable_radical_graph_problem import StableRadicalGraphProblem
-from examples.gym.stable_radical_gym.stable_radical_model import StableRadicalModel
 from rlmolecule.graph_gym.graph_gym_env import GraphGymEnv
 from rlmolecule.graph_gym.graph_gym_model import GraphGymModel
 from rlmolecule.molecule.builder.builder import MoleculeBuilder
@@ -28,7 +29,13 @@ if __name__ == "__main__":
 
 
     def make_env(_):
+        print('make_env()')
         return GraphGymEnv(StableRadicalGraphProblem(MoleculeBuilder()))
+
+
+    def make_env2(_):
+        print('make_env2()')
+        return ParametricGridWorldEnv(GridWorldEnv(make_doorway_grid()))
 
 
     class ThisModel(GraphGymModel):
@@ -39,14 +46,19 @@ if __name__ == "__main__":
                      model_config,
                      name,
                      **kwargs):
-            per_action_model = StableRadicalModel(make_env(None))
+            # per_action_model = StableRadicalModel(make_env(None))
+            # super(ThisModel, self).__init__(
+            #     obs_space, action_space, num_outputs, model_config, name,
+            #     per_action_model,
+            #     **kwargs)
             super(ThisModel, self).__init__(
                 obs_space, action_space, num_outputs, model_config, name,
-                per_action_model,
+                None,
                 **kwargs)
 
 
     register_env('stable_radical_graph_problem', make_env)
+    register_env('stable_radical_graph_problem2', make_env2)
 
     ModelCatalog.register_custom_model('stable_radical_graph_problem_model', ThisModel)
 

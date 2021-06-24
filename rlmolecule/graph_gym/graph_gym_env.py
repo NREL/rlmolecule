@@ -8,9 +8,6 @@ from gym.spaces import Box
 from rlmolecule.graph_gym.graph_problem import GraphProblem
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 
 class GraphGymEnv(gym.Env):
     """
