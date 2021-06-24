@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class GraphGym(gym.Env):
+class GraphGymEnv(gym.Env):
     """
 
     """
@@ -20,7 +20,7 @@ class GraphGym(gym.Env):
     def __init__(self,
                  problem: GraphProblem,
                  ) -> None:
-
+        super().__init__()
         self.problem: GraphProblem = problem
         self.state: GraphSearchState = self.problem.get_initial_state()
         self.action_space = problem.action_space
@@ -46,7 +46,7 @@ class GraphGym(gym.Env):
             action_mask.append(True)
             action_observations.append(self.problem.make_observation(successor))
 
-        null_observation = self.problem.make_null_observation()
+        null_observation = self.problem.null_observation
         for _ in range(len(action_mask), self.problem.max_num_actions):
             action_mask.append(False)
             action_observations.append(null_observation)

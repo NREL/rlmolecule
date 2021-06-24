@@ -53,8 +53,14 @@ class MolPreprocessor(nfp.preprocessing.SmilesPreprocessor):
     def padded_shapes(self, *args, **kwargs):
         return filter_keys(super().padded_shapes(*args, **kwargs))
 
-    def construct_feature_matrices(self, mol: rdkit.Chem.Mol, train: bool = False) -> {}:
-        """ Convert an rdkit Mol to a list of tensors
+    def construct_feature_matrices(self,
+                                   mol: rdkit.Chem.Mol,
+                                   train: bool = False,
+                                   max_num_atoms: Optional[int] = None,
+                                   max_num_bonds: Optional[int] = None,
+                                   ) -> {}:
+        """ Convert an rdkit Mol to a list of tensors. If max_* is defined, the corresponding matrices will be
+        zero-padded to that size.
         'atom' : (n_atom,) length list of atom classes
         'bond' : (n_bond,) list of bond classes
         'connectivity' : (n_bond, 2) array of source atom, target atom pairs.
@@ -66,16 +72,18 @@ class MolPreprocessor(nfp.preprocessing.SmilesPreprocessor):
         if self.explicit_hs:
             mol = rdkit.Chem.AddHs(mol)
 
-        n_atom = mol.GetNumAtoms()
         n_bond = 2 * mol.GetNumBonds()
 
         # If its an isolated atom, add a self-link
         if n_bond == 0:
             n_bond = 1
 
-        atom_feature_matrix = np.zeros(n_atom, dtype='int64')
-        bond_feature_matrix = np.zeros(n_bond, dtype='int64')
-        connectivity = np.zeros((n_bond, 2), dtype='int64')
+        max_num_atoms = mol.GetNumAtoms() if max_num_atoms is None else max_num_atoms
+        max_num_bonds = n_bond if max_num_bonds is None else max_num_bonds
+
+        atom_feature_matrix = np.zeros(max_num_atoms, dtype='int64')
+        bond_feature_matrix = np.zeros(max_num_bonds, dtype='int64')
+        connectivity = np.zeros((max_num_bonds, 2), dtype='int64')
 
         if n_bond == 1:
             bond_feature_matrix[0] = self.bond_tokenizer('self-link')
