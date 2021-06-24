@@ -1,3 +1,5 @@
+from tempfile import TemporaryDirectory
+
 import rdkit
 from rdkit.Chem.rdmolfiles import MolFromSmiles, MolToSmiles
 
@@ -21,7 +23,7 @@ def test_stereo_enumerator():
         for bond in mol.GetBonds():
             assert bond.GetStereo() is not rdkit.Chem.rdchem.BondStereo.STEREOANY
 
-    next_mols = to_smiles(StereoEnumerator()([MolFromSmiles('C(C)(O)(Cl)')]))
+    next_mols = to_smiles(StereoEnumerator()([MolFromSmiles('CC(O)(Cl)')]))
     assert 'C[C@H](O)Cl' in next_mols
     assert 'C[C@@H](O)Cl' in next_mols
     assert len(next_mols) == 2
@@ -48,4 +50,13 @@ def test_gdb_filter():
 def test_builder():
     from rlmolecule.molecule.builder.builder import MoleculeBuilder
     next_mols = to_smiles(MoleculeBuilder()(MolFromSmiles('C=CC')))
+    assert next_mols
+
+
+def test_cache():
+    from rlmolecule.molecule.builder.builder import MoleculeBuilder
+    with TemporaryDirectory() as tempdir:
+        next_mols = to_smiles(MoleculeBuilder(cache_dir=tempdir)(MolFromSmiles('C=CC')))
+        next_mols = to_smiles(MoleculeBuilder(cache_dir=tempdir, num_shards=2)(MolFromSmiles('C=CC')))
+
     assert next_mols

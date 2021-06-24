@@ -7,7 +7,7 @@ import pytest
 import tensorflow as tf
 from tensorflow.keras import layers
 
-from rlmolecule.alphazero.tf_keras_policy import PolicyWrapper, align_input_names
+from rlmolecule.alphazero.tensorflow.tf_keras_policy import PolicyWrapper, align_input_names
 
 
 # Example function for building a simple model

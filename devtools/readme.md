@@ -9,7 +9,6 @@ Installing on eagle:
 
 ```bash
 module purge
-module use /nopt/nrel/apps/modules/test/modulefiles/
 module load conda
 module load cudnn/8.1.1/cuda-11.2
 

@@ -4,6 +4,8 @@ channels:
   - defaults
 dependencies:
   - python
+  - numpy=1.19
+  - tensorflow
   - rdkit
   - pandas
   - tqdm
@@ -11,7 +13,8 @@ dependencies:
   - sqlalchemy
   - pytest
   - pytest-cov
+  - lazy_import
+  - diskcache
   - pip
   - pip:
     - nfp
-    - tensorflow

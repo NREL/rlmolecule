@@ -66,6 +66,7 @@ class RewardFactory(ABC):
 
 class RawRewardFactory(RewardFactory):
     """Just passes the raw reward through as the scaled reward"""
+
     def _scale(self, reward: float) -> float:
         return reward
 
@@ -73,6 +74,7 @@ class RawRewardFactory(RewardFactory):
 class LinearBoundedRewardFactory(RewardFactory):
     """Maps rewards to the 0->1 range, where the minimum reward maps to zero and the maximum reward maps to 1. Values
     above and below the max / min reward are capped at 0 or 1 respectively. """
+
     def __init__(self, min_reward: float = 0., max_reward: float = 1.) -> None:
         self.min_reward = min_reward
         self.max_reward = max_reward
@@ -89,12 +91,12 @@ class LinearBoundedRewardFactory(RewardFactory):
 #  tricky to modularize which reward scaling scheme we wanted to use.
 class RankedRewardFactory(RewardFactory):
     def __init__(
-        self,
-        engine: sqlalchemy.engine.Engine,
-        run_id: Optional[str] = None,
-        reward_buffer_min_size: int = 50,
-        reward_buffer_max_size: int = 250,
-        ranked_reward_alpha: float = 0.90,
+            self,
+            engine: sqlalchemy.engine.Engine,
+            run_id: Optional[str] = None,
+            reward_buffer_min_size: int = 50,
+            reward_buffer_max_size: int = 250,
+            ranked_reward_alpha: float = 0.90,
     ) -> None:
 
         Session.configure(bind=engine)
