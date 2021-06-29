@@ -60,3 +60,18 @@ def test_cache():
         next_mols = to_smiles(MoleculeBuilder(cache_dir=tempdir, num_shards=2)(MolFromSmiles('C=CC')))
 
     assert next_mols
+
+
+def test_tautomers():
+    from rlmolecule.molecule.builder.builder import MoleculeBuilder, TautomerCanonicalizer, TautomerEnumerator
+
+    start = rdkit.Chem.MolFromSmiles('CC1=C(O)CCCC1')
+    mols = to_smiles(TautomerEnumerator()([start]))
+    assert len(mols) == 3
+    assert mols[0] != mols[1]
+
+    mols_canonical = to_smiles(TautomerCanonicalizer()([rdkit.Chem.MolFromSmiles(smiles) for smiles in mols]))
+    assert len(mols_canonical) == 1
+
+    builder_tautomers = MoleculeBuilder(canonicalize_tautomers=True)
+    products = to_smiles(builder_tautomers(start))
