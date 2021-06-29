@@ -1,6 +1,6 @@
 # Config file for stable_radical_opt.py
 
-run_id: 'stable_rad_c_debug'
+run_id: 'stable_rad_c_large'
 
 # Parameters for setting up the problem
 problem_config:
@@ -13,11 +13,13 @@ problem_config:
   atom_additions: [ 'C', 'N', 'O', 'S' ]
   # if set, don't construct molecules greater than a given Synthetic Accessibility (SA) score
   # see: https://github.com/rdkit/rdkit/blob/master/Contrib/SA_Score/sascorer.py
-  sa_score_threshold: 3.5
+  sa_score_threshold: 4.0
   # whether to consider stereoisomers different molecules
   stereoisomers: True
   # try to get a 3D embedding of the molecule, and if this fails, remote it.
   try_embedding: True
+  cache_dir: '$LOCAL_SCRATCH/$USER/rlmolecule_cache/'
+  num_shards: 18
 
 # Parameters for training the policy model
 train_config:
@@ -35,8 +37,8 @@ train_config:
   # https://stackoverflow.com/a/49924566/7483950
   # learning rate
   lr: 1E-3
-  # number times that the learning algorithm will work through the entire training dataset
-  epochs: 1E4
+  # number times that the learning algorithm will work through the entire training dataset (PSJ -- we actually never want training to stop)
+  epochs: 1E6
   # number of batch iterations before a training epoch is considered finished
   steps_per_epoch: 100
   # number of seconds to wait to check if enough games have been played
@@ -69,9 +71,9 @@ mcts_config:
   # dirichlet 'shape' parameter. Larger values spread out probability over more moves.
   dirichlet_alpha: 1.0
   # percentage to favor dirichlet noise vs. prior estimation. Smaller means less noise
-  dirichlet_x: 0.25
+  dirichlet_x: 0.5
   # number of samples to perform at each level of the MCTS search
-  num_mcts_samples: 250
+  num_mcts_samples: 500
   # the maximum search depth
   max_depth: 1000000
   #ucb_constant: math.sqrt(2)
