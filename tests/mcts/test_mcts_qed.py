@@ -18,7 +18,9 @@ def problem(request, engine):
                               min_atoms=1,
                               tryEmbedding=False,
                               sa_score_threshold=None,
-                              stereoisomers=False)
+                              stereoisomers=False,
+                              canonicalize_tautomers=True
+                              )
 
     if name == 'random':
         return QEDWithRandomPolicy(reward_class=LinearBoundedRewardFactory(), builder=builder, engine=engine)

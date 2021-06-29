@@ -10,6 +10,7 @@ import rdkit
 from diskcache import FanoutCache, Cache
 from rdkit import Chem, RDConfig
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
+from rdkit.Chem.MolStandardize import rdMolStandardize
 from rdkit.Chem.rdDistGeom import EmbedMolecule
 
 from rlmolecule.molecule.builder.gdb_filters import check_all_filters
@@ -19,6 +20,7 @@ sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
 import sascorer
 
 pt = Chem.GetPeriodicTable()
+tautomer_enumerator = rdMolStandardize.TautomerEnumerator()
 bond_orders = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE, Chem.BondType.TRIPLE]
 logger = logging.getLogger(__name__)
 
@@ -29,8 +31,9 @@ class MoleculeBuilder:
                  min_atoms: int = 4,
                  atom_additions: Optional[List] = None,
                  stereoisomers: bool = True,
+                 canonicalize_tautomers: bool = False,
                  sa_score_threshold: Optional[float] = 3.5,
-                 tryEmbedding: bool = True,
+                 tryEmbedding: bool = False,
                  cache_dir: Optional[str] = None,
                  num_shards: int = 1) -> None:
         """A class to build molecules according to a number of different options
@@ -59,7 +62,12 @@ class MoleculeBuilder:
             self.mem = None
             self.cached_call = None
 
-        self.transformation_stack = [
+        self.transformation_stack = []
+
+        if canonicalize_tautomers:
+            self.transformation_stack += [TautomerEnumerator()]
+
+        self.transformation_stack += [
             AddNewAtomsAndBonds(atom_additions),
             GdbFilter(),
         ]
@@ -69,6 +77,9 @@ class MoleculeBuilder:
 
         if stereoisomers:
             self.transformation_stack += [StereoEnumerator()]
+
+        if canonicalize_tautomers:
+            self.transformation_stack += [TautomerCanonicalizer()]
 
         if tryEmbedding:
             self.transformation_stack += [EmbeddingFilter()]
@@ -123,8 +134,9 @@ class MoleculeFilter(MoleculeTransformer, ABC):
         pass
 
     def call(self, molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
-        if self.filter(molecule):
-            yield molecule
+        if molecule is not None:  # Not sure why we need this
+            if self.filter(molecule):
+                yield molecule
 
 
 class UniqueMoleculeTransformer(MoleculeTransformer, ABC):
@@ -186,6 +198,16 @@ class AddNewAtomsAndBonds(UniqueMoleculeTransformer):
             rw_mol.AddBond(atom1_idx, num_atom, bond_orders[bond_type])
 
         return rw_mol
+
+
+class TautomerEnumerator(MoleculeTransformer):
+    def call(self, molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
+        return tautomer_enumerator.Enumerate(molecule)
+
+
+class TautomerCanonicalizer(UniqueMoleculeTransformer):
+    def call(self, molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
+        yield tautomer_enumerator.Canonicalize(molecule)
 
 
 class StereoEnumerator(UniqueMoleculeTransformer):
