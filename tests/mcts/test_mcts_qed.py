@@ -16,7 +16,7 @@ def problem(request, engine):
     name = request.param
     builder = MoleculeBuilder(max_atoms=4,
                               min_atoms=1,
-                              tryEmbedding=False,
+                              try_embedding=False,
                               sa_score_threshold=None,
                               stereoisomers=False,
                               canonicalize_tautomers=True

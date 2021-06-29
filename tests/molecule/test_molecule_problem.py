@@ -12,7 +12,7 @@ from tests.qed_optimization_problem import QEDWithMoleculePolicy
 
 @pytest.fixture
 def builder():
-    return MoleculeBuilder(max_atoms=4, min_atoms=1, tryEmbedding=False, sa_score_threshold=None, stereoisomers=False)
+    return MoleculeBuilder(max_atoms=4, min_atoms=1, try_embedding=False, sa_score_threshold=None, stereoisomers=False)
 
 
 @pytest.fixture

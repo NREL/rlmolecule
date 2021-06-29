@@ -10,7 +10,7 @@ from tests.qed_optimization_problem import QEDWithRandomPolicy
 def test_get_successors(engine):
     builder = MoleculeBuilder(max_atoms=4,
                               min_atoms=1,
-                              tryEmbedding=False,
+                              try_embedding=False,
                               sa_score_threshold=None,
                               stereoisomers=False)
 

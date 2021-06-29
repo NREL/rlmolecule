@@ -17,7 +17,7 @@ def builder():
     with tempfile.TemporaryDirectory() as tmpdir:
         yield MoleculeBuilder(max_atoms=4,
                               min_atoms=1,
-                              tryEmbedding=False,
+                              try_embedding=False,
                               sa_score_threshold=None,
                               stereoisomers=False,
                               cache_dir=tmpdir)

@@ -33,7 +33,7 @@ class MoleculeBuilder:
                  stereoisomers: bool = True,
                  canonicalize_tautomers: bool = False,
                  sa_score_threshold: Optional[float] = 3.5,
-                 tryEmbedding: bool = False,
+                 try_embedding: bool = False,
                  cache_dir: Optional[str] = None,
                  num_shards: int = 1) -> None:
         """A class to build molecules according to a number of different options
@@ -43,7 +43,7 @@ class MoleculeBuilder:
         :param atom_additions: potential atom types to consider. Defaults to ('C', 'H', 'O')
         :param stereoisomers: whether to consider stereoisomers different molecules
         :param sa_score_threshold: If set, don't construct molecules greater than a given sa_score.
-        :param tryEmbedding: Try to get a 3D embedding of the molecule, and if this fails, remote it.
+        :param try_embedding: Try to get a 3D embedding of the molecule, and if this fails, remote it.
         """
 
         # Not the most elegant solution, these are carried and referenced by MoleculeState, but are not used internally
@@ -81,7 +81,7 @@ class MoleculeBuilder:
         if canonicalize_tautomers:
             self.transformation_stack += [TautomerCanonicalizer()]
 
-        if tryEmbedding:
+        if try_embedding:
             self.transformation_stack += [EmbeddingFilter()]
 
     def call_iter(self, parent_molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:

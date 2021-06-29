@@ -111,7 +111,7 @@ def construct_problem(run_config):
     builder = MoleculeBuilder(
         max_atoms=prob_config.get('max_atoms', 25),
         min_atoms=prob_config.get('min_atoms', 1),
-        tryEmbedding=prob_config.get('tryEmbedding', True),
+        try_embedding=prob_config.get('tryEmbedding', True),
         sa_score_threshold=prob_config.get('sa_score_threshold', 4),
         stereoisomers=prob_config.get('stereoisomers', False),
         atom_additions=prob_config.get('atom_additions', ('C', 'N', 'O'))
