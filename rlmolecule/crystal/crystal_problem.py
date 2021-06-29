@@ -1,14 +1,8 @@
 import logging
 from abc import ABC
-from typing import Dict, Optional
 
-#import sqlalchemy
-
-#from rlmolecule.alphazero.tensorflow.tfalphazero_problem import TFAlphaZeroProblem
+from rlmolecule.crystal.crystal_state import CrystalState
 from rlmolecule.mcts.mcts_problem import MCTSProblem
-#from rlmolecule.molecule.molecule_state import MoleculeState
-from examples.crystal_volume.crystal_state import CrystalState
-#from rlmolecule.molecule.policy.model import policy_model
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +16,6 @@ class CrystalProblem(MCTSProblem, ABC):
         # The root node in the action space is the string 'root'
         action_node = "root"
         return CrystalState(action_node, self._config)
-
 
 # TODO implement for crystals
 # class MoleculeTFAlphaZeroProblem(MoleculeProblem, TFAlphaZeroProblem, ABC):
@@ -41,11 +34,23 @@ class CrystalProblem(MCTSProblem, ABC):
 #         self.preprocessor = preprocessor if preprocessor else load_preprocessor(preprocessor_data)
 #         super(MoleculeTFAlphaZeroProblem, self).__init__(builder=builder, engine=engine, **kwargs)
 #
-#     def policy_model(self) -> 'tf.keras.Model':
-#         return policy_model(self.preprocessor,
-#                             features=self.features,
-#                             num_heads=self.num_heads,
-#                             num_messages=self.num_messages)
-#
+    def policy_model(self) -> 'tf.keras.Model':
+
+        # conducting_embedding = layers.Embedding(max_framework_atoms, features, name='atom_embedding')
+        # anion_embedding = layers.Embedding(max_framework_atoms, features, name='atom_embedding')
+        # framework_embedding = layers.Embedding(max_framework_atoms, features, name='atom_embedding')
+        #
+        #
+        # atom1 = conducting_embedding(input1)
+        # atom2 = anion_embedding(input2)
+        # atom3 = anion_embedding(input3)
+        # atom4 = framework_embedding(input4)
+        # atom5 = framework_embedding(input5)
+        #
+        # global_state = layers.Add()([atom1, atom2, atom3, atom4, atom5])
+        # output = layers.Dense(some_number, activation='relu')(global_state)
+        # output = layers.Dense(1)(output)
+
+        #
 #     def get_policy_inputs(self, state: MoleculeState) -> Dict:
 #         return self.preprocessor.construct_feature_matrices(state.molecule)

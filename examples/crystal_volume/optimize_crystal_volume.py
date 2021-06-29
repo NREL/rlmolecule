@@ -3,8 +3,6 @@
 
 import argparse
 import logging
-import math
-import multiprocessing
 import os
 import time
 import pandas as pd
@@ -13,20 +11,18 @@ import random
 import json
 import gzip
 from collections import defaultdict
-import pymatgen
-from pymatgen.core import Composition, Structure
+from pymatgen.core import Structure
 from pymatgen.analysis import local_env
-import pdb
 
-from examples.crystal_volume.builder import CrystalBuilder
+from rlmolecule.crystal.builder import CrystalBuilder
 #from examples.crystal_volume.crystal_problem import CrystalTFAlphaZeroProblem
 from examples.crystal_volume.crystal_problem import CrystalProblem
 from examples.crystal_volume.crystal_state import CrystalState
 from rlmolecule.sql.run_config import RunConfig
 #from rlmolecule.tree_search.reward import RankedRewardFactory
 from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
-from rlmolecule.sql import Base, Session, digest, load_numpy_dict, serialize_ordered_numpy_dict
-from rlmolecule.sql.tables import GameStore, RewardStore, StateStore
+from rlmolecule.sql import Base, Session
+from rlmolecule.sql.tables import GameStore
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -273,19 +269,19 @@ nn13 = local_env.VoronoiNN(cutoff=13, compute_adj_neighbors=False)
 # load the action graphs for the search space
 G = nx.DiGraph()
 G2 = nx.DiGraph()
-action_graph_file = "inputs/elements_to_compositions.edgelist.gz"
+action_graph_file = "../../rlmolecule/crystal/inputs/elements_to_compositions.edgelist.gz"
 logger.info(f"reading {action_graph_file}")
 G = nx.read_edgelist(action_graph_file, delimiter='\t', data=False, create_using=G)
 logger.info(f'\t{G.number_of_nodes()} nodes, {G.number_of_edges()} edges')
 
-action_graph2_file = "inputs/comp_type_to_decorations.edgelist.gz"
+action_graph2_file = "../../rlmolecule/crystal/inputs/comp_type_to_decorations.edgelist.gz"
 logger.info(f"reading {action_graph2_file}")
 G2 = nx.read_edgelist(action_graph2_file, delimiter='\t', data=False, create_using=G2)
 logger.info(f'\t{G2.number_of_nodes()} nodes, {G2.number_of_edges()} edges')
 
 # also load the icsd prototype structures
 # https://pymatgen.org/usage.html#side-note-as-dict-from-dict
-icsd_prototypes_file = "inputs/icsd_prototypes.json.gz"
+icsd_prototypes_file = "../../rlmolecule/crystal/inputs/icsd_prototypes.json.gz"
 structures = read_structures_file(icsd_prototypes_file)
 
 # Temporary caching approach:

@@ -1,21 +1,21 @@
 import logging
 import os
-import sys
-from abc import ABC, abstractmethod
 from typing import Iterable, Optional
-import networkx as nx
-from pymatgen.core import Composition, Structure
 
-#from examples.crystal_volume.crystal_state import CrystalState
-from examples.crystal_volume.crystal_state import CrystalState
+import networkx as nx
+
+from rlmolecule.crystal.crystal_state import CrystalState
 
 logger = logging.getLogger(__name__)
+dir_path = os.path.dirname(os.path.realpath(__file__))
+action_graph_file = os.path.join(dir_path, 'inputs', 'elements_to_compositions.edgelist.gz')
+action_graph2_file = os.path.join(dir_path, 'inputs', 'comp_type_to_decorations.edgelist.gz')
 
 
 class CrystalBuilder:
     def __init__(self,
-                 G: nx.DiGraph,
-                 G2: nx.DiGraph,
+                 G: Optional[nx.DiGraph] = None,
+                 G2: Optional[nx.DiGraph] = None,
                  ) -> None:
         """A class to build crystals according to a number of different options
 
@@ -24,19 +24,32 @@ class CrystalBuilder:
         comp_to_comp_type: Mapping from a composition string to the composition type
         structures: Mapping from a decoration string to a pymatgen structure object
         """
+
+        if G is None:
+            G = nx.read_edgelist(action_graph_file,
+                                 delimiter='\t',
+                                 data=False,
+                                 create_using=nx.DiGraph())
+
+        if G2 is None:
+            G2 = nx.read_edgelist(action_graph2_file,
+                                  delimiter='\t',
+                                  data=False,
+                                  create_using=nx.DiGraph())
+
         self.G = G
         self.G2 = G2
         # Update: build the comp_to_comp_type dictionary on the fly
         # the first action graph G ends in the compositions, so we can extract those using the out degree
         compositions = [n for n in G.nodes() if G.out_degree(n) == 0]
         self.comp_to_comp_type = {c: CrystalState.split_comp_to_eles_and_type(c)[1] for c in compositions}
-        #self.transformation_stack = [
+        # self.transformation_stack = [
         #    find_next_steps(),
-        #]
+        # ]
 
     def __call__(self, parent_state: any) -> Iterable[any]:
-        #inputs = [parent_state]
-        #for transformer in self.transformation_stack:
+        # inputs = [parent_state]
+        # for transformer in self.transformation_stack:
         #    inputs = transformer(inputs)
         states = self.find_next_states(parent_state)
         yield from states
@@ -83,17 +96,17 @@ class CrystalBuilder:
                         # TODO cache the decorated structuers?
                         # There could be over 15M which would take a lot of RAM
                         # instead of caching the structes, I can just cache the end reward value
-                        #decorated_structure = self.decorated_structures.get()
-                        #structure_key = crystal_state.composition + '|' + crystal_state.action_node
-                        #icsd_prototype = self.icsd_structures[structure_key]
+                        # decorated_structure = self.decorated_structures.get()
+                        # structure_key = crystal_state.composition + '|' + crystal_state.action_node
+                        # icsd_prototype = self.icsd_structures[structure_key]
                     next_state = CrystalState(action_node=neighbor,
                                               builder=self,
                                               composition=crystal_state.composition,
-                                              #structure=decorated_structure,
+                                              # structure=decorated_structure,
                                               terminal=terminal,
-                    )
+                                              )
                     next_states.append(next_state)
                 return next_states
 
         if node_found is False:
-            raise(f"StateNotFound: Action node '{n}' was not in either action graph.")
+            raise (f"StateNotFound: Action node '{n}' was not in either action graph.")
