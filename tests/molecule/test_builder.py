@@ -3,6 +3,9 @@ from tempfile import TemporaryDirectory
 import rdkit
 from rdkit.Chem.rdmolfiles import MolFromSmiles, MolToSmiles
 
+from rlmolecule.molecule.builder.builder import MoleculeBuilder
+from rlmolecule.molecule.molecule_state import MoleculeState
+
 
 def to_smiles(input_list):
     return [MolToSmiles(x) for x in input_list]
@@ -75,3 +78,17 @@ def test_tautomers():
 
     builder_tautomers = MoleculeBuilder(canonicalize_tautomers=True)
     products = to_smiles(builder_tautomers(start))
+
+def test_eagle_error():
+
+    builder = MoleculeBuilder(max_atoms=15,
+                              min_atoms=4,
+                              try_embedding=False,
+                              sa_score_threshold=None,
+                              stereoisomers=True,
+                              canonicalize_tautomers=True,
+                              atom_additions=['C', 'N', 'O', 'S'])
+
+    state = MoleculeState(rdkit.Chem.MolFromSmiles('CC(=N)C(=O)C(C)C=N'), builder=builder)
+    actions = state.get_next_actions()
+    assert len(actions) == 49

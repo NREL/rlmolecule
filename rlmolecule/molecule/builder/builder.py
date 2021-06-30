@@ -1,3 +1,4 @@
+import functools
 import logging
 import os
 import sys
@@ -23,6 +24,11 @@ pt = Chem.GetPeriodicTable()
 tautomer_enumerator = rdMolStandardize.TautomerEnumerator()
 bond_orders = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE, Chem.BondType.TRIPLE]
 logger = logging.getLogger(__name__)
+
+
+@functools.lru_cache(maxsize=4096)
+def canconicalize_tautomer(mol_binary: bytes):
+    return tautomer_enumerator.Canonicalize(rdkit.Chem.Mol(mol_binary))
 
 
 class MoleculeBuilder:
@@ -207,7 +213,7 @@ class TautomerEnumerator(MoleculeTransformer):
 
 class TautomerCanonicalizer(UniqueMoleculeTransformer):
     def call(self, molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
-        yield tautomer_enumerator.Canonicalize(molecule)
+        yield canconicalize_tautomer(molecule.ToBinary())
 
 
 class StereoEnumerator(UniqueMoleculeTransformer):
