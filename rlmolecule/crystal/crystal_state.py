@@ -1,14 +1,17 @@
-from typing import Iterable, Optional, Sequence, Tuple
-import re
 import itertools
+import re
 from copy import deepcopy
+from typing import Iterable, Optional, Sequence, Tuple
+
 import numpy as np
 from pymatgen.core import Composition, Structure
 
 from rlmolecule.sql import hash_to_integer
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 from rlmolecule.tree_search.metrics import collect_metrics
-#import pdb
+
+
+# import pdb
 
 
 class CrystalState(GraphSearchState):
@@ -18,13 +21,14 @@ class CrystalState(GraphSearchState):
     
     Crystals are generated only at the final state
     """
+
     def __init__(
-        self,
-        action_node: any,
-        builder: any,
-        composition: Optional[str] = None,
-        #structure: Optional[Structure] = None,
-        terminal: bool = False,
+            self,
+            action_node: any,
+            builder: any,
+            composition: Optional[str] = None,
+            # structure: Optional[Structure] = None,
+            terminal: bool = False,
     ) -> None:
         """
         :param action_node: A representation of the current state in one of the action graphs
@@ -34,7 +38,7 @@ class CrystalState(GraphSearchState):
         self._action_node: any = action_node
         self._builder: any = builder
         self._composition: str = composition
-        #self._structure: Optional[Structure] = structure
+        # self._structure: Optional[Structure] = structure
         self._terminal: bool = terminal
 
     def __repr__(self) -> str:
@@ -76,7 +80,7 @@ class CrystalState(GraphSearchState):
         # this splits by the digits
         # e.g., for "Li1Sc1F4": ['Li', '1', 'Sc', '1', 'F', '4', '']
         split = np.asarray(re.split('(\d+)', comp))
-        elements = tuple(sorted(split[range(0, len(split)-1, 2)]))
+        elements = tuple(sorted(split[range(0, len(split) - 1, 2)]))
         stoich = split[range(1, len(split), 2)]
         # sort the stoichiometry to get the correct order of the comp type
         comp_type = '_' + '_'.join(map(str, sorted(map(int, stoich))))
@@ -95,7 +99,7 @@ class CrystalState(GraphSearchState):
         # split by the digits
         # e.g., for "Li1Sc1F4": ['Li', '1', 'Sc', '1', 'F', '4', '']
         split = np.asarray(re.split('(\d+)', comp))
-        eles = tuple(split[range(0, len(split)-1, 2)])
+        eles = tuple(split[range(0, len(split) - 1, 2)])
         return eles
 
     @staticmethod
@@ -169,4 +173,3 @@ class CrystalState(GraphSearchState):
     @property
     def builder(self) -> any:
         return self._builder
-
