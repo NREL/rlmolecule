@@ -11,7 +11,7 @@ from rlmolecule.tree_search.graph_search_state import GraphSearchState
 from rlmolecule.tree_search.metrics import collect_metrics
 
 
-# import pdb
+crystal_systems = {'triclinic', 'monoclinic', 'orthorhombic', 'tetragonal', 'trigonal', 'hexagonal', 'cubic'}
 
 
 class CrystalState(GraphSearchState):
@@ -168,6 +168,7 @@ class CrystalState(GraphSearchState):
         # extract the crystal system str from the action node
         if '|' in self.action_node:
             crystal_sys_str = self.action_node.split('|')[1]
+        assert crystal_sys_str in crystal_systems
         return crystal_sys_str
 
     def get_proto_strc(self) -> str:
@@ -175,6 +176,7 @@ class CrystalState(GraphSearchState):
         # extract the prototype structure str from the action node
         if len(self.action_node.split('|')) > 2:
             proto_strc_str = self.action_node.split('|')[2]
+        # TODO add a check here to ensure this is a valid prototype structure string e.g., POSCAR_sg14_icsd_083588
         return proto_strc_str
 
     @property

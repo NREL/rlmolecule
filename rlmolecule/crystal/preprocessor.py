@@ -1,3 +1,4 @@
+import os
 from typing import List
 
 import numpy as np
@@ -5,26 +6,41 @@ import numpy as np
 from rlmolecule.crystal.crystal_state import CrystalState
 
 
+conducting_ions = {'Li', 'Na', 'K', 'Mg', 'Zn'}
+anions = {'F', 'Cl', 'Br', 'I', 'O', 'S', 'N', 'P'}
+framework_cations = {'Sc', 'Y', 'La', 'Ti', 'Zr', 'Hf', 'W', 'Zn', 'Cd', 'Hg', 'B', 'Al', 'Si', 'Ge', 'Sn', 'P', 'Sb'}
+default_elements = conducting_ions | anions | framework_cations
+
+default_crystal_systems = {'triclinic', 'monoclinic', 'orthorhombic', 'tetragonal', 'trigonal', 'hexagonal', 'cubic'}
+
+dir_path = os.path.dirname(os.path.realpath(__file__))
+default_proto_strc_names_file = os.path.join(dir_path, 'inputs', 'icsd_prototype_filenames.txt')
+default_proto_strc_names = set()
+with open(default_proto_strc_names_file, 'r') as f:
+    for line in f:
+        default_proto_strc_names.add(line.rstrip())
+
+
 class CrystalPreprocessor:
 
     def __init__(self,
-                 elements: List,
-                 crystal_systems: List,
-                 prototype_structure_names: List,
+                 elements: List = None,
+                 crystal_systems: List = None,
+                 proto_strc_names: List = None,
                  max_stoich: int = 8):
-        self.elements = elements
-        self.crystal_systems = crystal_systems
-        self.prototype_structure_names = prototype_structure_names
+        self.elements = elements if elements is not None else default_elements
+        self.crystal_systems = crystal_systems if crystal_systems is not None else default_crystal_systems
+        self.proto_strc_names = proto_strc_names if proto_strc_names is not None else default_proto_strc_names
         self.max_stoich = max_stoich
 
     #def build_preprocessor(self):
-        elements_and_soich = [(ele + str(i)).replace('0', '') \
-                              for ele in self.elements \
+        elements_and_soich = [(ele + str(i)).replace('0', '')
+                              for ele in self.elements
                               for i in range(self.max_stoich + 1)]
         self.element_mapping = {ele: i for i, ele in enumerate(elements_and_soich)}
 
         self.crystal_sys_mapping = {c: i for i, c in enumerate(self.crystal_systems)}
-        self.proto_strc_mapping = {p: i for i, p in enumerate(self.prototype_structure_names)}
+        self.proto_strc_mapping = {p: i for i, p in enumerate(self.proto_strc_names)}
 
     def construct_feature_matrices(self, state: CrystalState, train: bool = False) -> {}:
         """ Convert a crystal state to a list of tensors
