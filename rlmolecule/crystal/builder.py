@@ -93,12 +93,6 @@ class CrystalBuilder:
                     structure = None
                     if self.G2.out_degree(neighbor) == 0:
                         terminal = True
-                        # TODO cache the decorated structuers?
-                        # There could be over 15M which would take a lot of RAM
-                        # instead of caching the structes, I can just cache the end reward value
-                        # decorated_structure = self.decorated_structures.get()
-                        # structure_key = crystal_state.composition + '|' + crystal_state.action_node
-                        # icsd_prototype = self.icsd_structures[structure_key]
                     next_state = CrystalState(action_node=neighbor,
                                               builder=self,
                                               composition=crystal_state.composition,

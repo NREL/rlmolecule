@@ -266,19 +266,6 @@ framework_cations = set(['Sc', 'Y', 'La', 'Ti', 'Zr', 'Hf', 'W', 'Zn', 'Cd', 'Hg
 # Increasing the cutoff takes longer. If I bump it up to 1000, it can take over 100 Gb of Memory!
 nn13 = local_env.VoronoiNN(cutoff=13, compute_adj_neighbors=False)
 
-# load the action graphs for the search space
-G = nx.DiGraph()
-G2 = nx.DiGraph()
-action_graph_file = "../../rlmolecule/crystal/inputs/elements_to_compositions.edgelist.gz"
-logger.info(f"reading {action_graph_file}")
-G = nx.read_edgelist(action_graph_file, delimiter='\t', data=False, create_using=G)
-logger.info(f'\t{G.number_of_nodes()} nodes, {G.number_of_edges()} edges')
-
-action_graph2_file = "../../rlmolecule/crystal/inputs/comp_type_to_decorations.edgelist.gz"
-logger.info(f"reading {action_graph2_file}")
-G2 = nx.read_edgelist(action_graph2_file, delimiter='\t', data=False, create_using=G2)
-logger.info(f'\t{G2.number_of_nodes()} nodes, {G2.number_of_edges()} edges')
-
 # also load the icsd prototype structures
 # https://pymatgen.org/usage.html#side-note-as-dict-from-dict
 icsd_prototypes_file = "../../rlmolecule/crystal/inputs/icsd_prototypes.json.gz"

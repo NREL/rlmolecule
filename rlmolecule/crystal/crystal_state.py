@@ -32,6 +32,7 @@ class CrystalState(GraphSearchState):
     ) -> None:
         """
         :param action_node: A representation of the current state in one of the action graphs
+            e.g., 'Zn1Hg1Al1F1Cl6' in the first graph, or '1_1_1_1_6|cubic' of the second graph
         :param builder: A CrystalBuilder class
         :param terminal: Whether this state is a decoration of a specific structure (i.e., final state)
         """
@@ -162,9 +163,19 @@ class CrystalState(GraphSearchState):
     def action_node(self) -> str:
         return self._action_node
 
-    # @property
-    # def structure(self) -> Structure:
-    #     return self._structure
+    def get_crystal_sys(self) -> str:
+        crystal_sys_str = None
+        # extract the crystal system str from the action node
+        if '|' in self.action_node:
+            crystal_sys_str = self.action_node.split('|')[1]
+        return crystal_sys_str
+
+    def get_proto_strc(self) -> str:
+        proto_strc_str = None
+        # extract the prototype structure str from the action node
+        if len(self.action_node.split('|')) > 2:
+            proto_strc_str = self.action_node.split('|')[2]
+        return proto_strc_str
 
     @property
     def terminal(self) -> bool:
