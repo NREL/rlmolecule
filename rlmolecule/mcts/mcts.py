@@ -34,6 +34,7 @@ class MCTS(GraphSearch[MCTSVertex]):
             self,
             state: Optional[GraphSearchState] = None,
             num_mcts_samples: int = 256,
+            timeout: Optional[float] = None,
             max_depth: int = 1000000,
             action_selection_function: Optional[Callable[[MCTSVertex], MCTSVertex]] = None,
             reset_canonicalizer: bool = True,
@@ -63,7 +64,7 @@ class MCTS(GraphSearch[MCTSVertex]):
         path: [] = []
         for _ in range(max_depth):
             # todo: this loop is odd, we're sampling terminal nodes a whole bunch of extra times
-            self.sample(vertex, num_mcts_samples)
+            self.sample(vertex, num_mcts_samples, timeout=timeout)
             self._accumulate_path_data(vertex, path)
             if len(vertex.children) == 0:
                 return path, self.problem.reward_wrapper(vertex)

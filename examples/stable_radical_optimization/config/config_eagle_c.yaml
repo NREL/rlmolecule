@@ -74,7 +74,9 @@ mcts_config:
   # percentage to favor dirichlet noise vs. prior estimation. Smaller means less noise
   dirichlet_x: 0.5
   # number of samples to perform at each level of the MCTS search
-  num_mcts_samples: 500
+  num_mcts_samples: 250
+  # Maximum number of seconds per MCTS round
+  timeout: 30
   # the maximum search depth
   max_depth: 1000000
   #ucb_constant: math.sqrt(2)

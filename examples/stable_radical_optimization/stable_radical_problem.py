@@ -9,7 +9,7 @@ import tensorflow as tf
 
 from bde_utils import bde_get_inputs, prepare_for_bde
 from examples.stable_radical_optimization.stable_radical_molecule_state import StableRadMoleculeState, \
-    MoleculeBuilderProtectRadical
+    MoleculeBuilderProtectRadical, MoleculeBuilderWithFingerprint
 from rlmolecule.molecule.builder.builder import MoleculeBuilder
 from rlmolecule.molecule.molecule_problem import MoleculeTFAlphaZeroProblem
 from rlmolecule.molecule.molecule_state import MoleculeState
@@ -169,7 +169,7 @@ def construct_problem(run_config: RunConfig, stability_model: pathlib.Path, redo
     prob_config = run_config.problem_config
     initial_state = prob_config.get('initial_state', 'C')
     if initial_state == 'C':
-        builder_class = MoleculeBuilder
+        builder_class = MoleculeBuilderWithFingerprint
     else:
         builder_class = MoleculeBuilderProtectRadical
 
