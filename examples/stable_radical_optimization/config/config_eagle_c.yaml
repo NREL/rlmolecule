@@ -1,6 +1,6 @@
 # Config file for stable_radical_opt.py
 
-run_id: 'stable_rad_c_large'
+run_id: 'stable_rad_c_tautomers_noembed2'
 
 # Parameters for setting up the problem
 problem_config:
@@ -16,8 +16,9 @@ problem_config:
   sa_score_threshold: 4.0
   # whether to consider stereoisomers different molecules
   stereoisomers: True
-  # try to get a 3D embedding of the molecule, and if this fails, remote it.
-  try_embedding: True
+  # try to get a 3D embedding of the molecule, and if this fails, remove it.
+  try_embedding: False
+  canonicalize_tautomers: True
   cache_dir: '$LOCAL_SCRATCH/$USER/rlmolecule_cache/'
   num_shards: 18
 
