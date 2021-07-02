@@ -1,8 +1,11 @@
+import concurrent.futures
 import itertools
 import logging
 import os
 import sys
 from abc import ABC, abstractmethod
+from concurrent.futures import Executor, ProcessPoolExecutor
+from contextlib import nullcontext
 from typing import Iterable, List, Optional
 
 import numpy as np
@@ -26,6 +29,10 @@ tautomer_enumerator.SetMaxTransforms(50)
 
 bond_orders = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE, Chem.BondType.TRIPLE]
 logger = logging.getLogger(__name__)
+
+from rdkit import RDLogger
+
+RDLogger.DisableLog('rdApp.warning')
 
 
 class SmilesMol(rdkit.Chem.Mol):
@@ -58,7 +65,8 @@ class MoleculeBuilder:
                  sa_score_threshold: Optional[float] = 3.5,
                  try_embedding: bool = False,
                  cache_dir: Optional[str] = None,
-                 num_shards: int = 1) -> None:
+                 num_shards: int = 1,
+                 parallel: bool = False) -> None:
         """A class to build molecules according to a number of different options
 
         :param max_atoms: Maximum number of heavy atoms
@@ -70,6 +78,7 @@ class MoleculeBuilder:
         """
 
         # Not the most elegant solution, these are carried and referenced by MoleculeState, but are not used internally
+        self.parallel = parallel
         self.max_atoms = max_atoms
         self.min_atoms = min_atoms
 
@@ -109,8 +118,9 @@ class MoleculeBuilder:
 
     def call(self, parent_molecule: rdkit.Chem.Mol) -> List[rdkit.Chem.Mol]:
         inputs = [parent_molecule]
-        for transformer in self.transformation_stack:
-            inputs = list(transformer(inputs))
+        with (ProcessPoolExecutor() if self.parallel else nullcontext()) as executor:
+            for transformer in self.transformation_stack:
+                inputs = list(transformer(inputs, executor=executor))
         return inputs
 
     def __call__(self, parent_molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
@@ -128,18 +138,29 @@ class MoleculeBuilder:
 
 class BaseTransformer(ABC):
     @abstractmethod
-    def __call__(self, inputs: Iterable[rdkit.Chem.Mol]) -> Iterable[rdkit.Chem.Mol]:
+    def __call__(self,
+                 inputs: Iterable[rdkit.Chem.Mol],
+                 executor: Optional[Executor] = None) -> Iterable[rdkit.Chem.Mol]:
         pass
 
 
 class MoleculeTransformer(BaseTransformer, ABC):
     @abstractmethod
-    def call(self, molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
+    def call(self, molecule: rdkit.Chem.Mol) -> List[rdkit.Chem.Mol]:
         pass
 
-    def __call__(self, inputs: Iterable[rdkit.Chem.Mol]) -> Iterable[rdkit.Chem.Mol]:
-        for molecule in inputs:
-            yield from self.call(molecule)
+    def __call__(self,
+                 inputs: Iterable[rdkit.Chem.Mol],
+                 executor: Optional[Executor] = None) -> Iterable[rdkit.Chem.Mol]:
+
+        if executor is None:
+            for molecule in inputs:
+                yield from self.call(molecule)
+
+        else:
+            futures = [executor.submit(self.call, molecule) for molecule in inputs]
+            for future in concurrent.futures.as_completed(futures):
+                yield from future.result()
 
 
 class MoleculeFilter(MoleculeTransformer, ABC):
@@ -147,16 +168,22 @@ class MoleculeFilter(MoleculeTransformer, ABC):
     def filter(self, molecule: rdkit.Chem.Mol) -> bool:
         pass
 
-    def call(self, molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
+    def call(self, molecule: rdkit.Chem.Mol) -> List[rdkit.Chem.Mol]:
         if molecule is not None:  # Not sure why we need this
             if self.filter(molecule):
-                yield molecule
+                return [molecule]
+
+        return []
 
 
 class UniqueMoleculeTransformer(MoleculeTransformer, ABC):
-    def __call__(self, inputs: Iterable[rdkit.Chem.Mol]) -> List[rdkit.Chem.Mol]:
-        results = itertools.chain(*(self.call(molecule) for molecule in inputs))
-        return list(set((SmilesMol(molecule) for molecule in results)))
+    def __call__(self, inputs: Iterable[rdkit.Chem.Mol],
+                 executor: Optional[Executor] = None) -> List[rdkit.Chem.Mol]:
+        if executor is None:
+            results = itertools.chain(*(self.call(molecule) for molecule in inputs))
+        else:
+            results = itertools.chain(*executor.map(self.call, inputs))
+        return list(set((SmilesMol(molecule) for molecule in results if molecule)))
 
 
 class AddNewAtomsAndBonds(UniqueMoleculeTransformer):
@@ -175,17 +202,20 @@ class AddNewAtomsAndBonds(UniqueMoleculeTransformer):
         :param molecule: rdkit RWmol or variant
         :return: sanitized molecule
         """
-        molecule = rdkit.Chem.Mol(molecule)
-        rdkit.Chem.SanitizeMol(molecule)
-        return molecule
-        # return rdkit.Chem.MolFromSmiles(rdkit.Chem.MolToSmiles(molecule))
+        # molecule = rdkit.Chem.Mol(molecule)
+        # rdkit.Chem.SanitizeMol(molecule)
+        # return molecule
+        return rdkit.Chem.MolFromSmiles(rdkit.Chem.MolToSmiles(molecule))
 
-    def call(self, molecule) -> Iterable[rdkit.Chem.Mol]:
+    def call_iter(self, molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
         for i, atom in enumerate(molecule.GetAtoms()):
             for partner in self._get_valid_partners(molecule, atom):
                 for bond_order in self._get_valid_bonds(molecule, i, partner):
                     rw_mol = self._add_bond(molecule, i, partner, bond_order)
                     yield self.sanitize(rw_mol)
+
+    def call(self, molecule: rdkit.Chem.Mol) -> List[rdkit.Chem.Mol]:
+        return list(self.call_iter(molecule))
 
     @staticmethod
     def _get_free_valence(atom) -> int:
@@ -225,12 +255,14 @@ class AddNewAtomsAndBonds(UniqueMoleculeTransformer):
 
 
 class TautomerEnumerator(UniqueMoleculeTransformer):
-    def call(self, molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
-        return tautomer_enumerator.Enumerate(molecule)
+    def call(self, molecule: rdkit.Chem.Mol) -> List[rdkit.Chem.Mol]:
+        return list(tautomer_enumerator.Enumerate(molecule))
 
 
 class TautomerCanonicalizer(BaseTransformer):
-    def __call__(self, inputs: Iterable[SmilesMol]) -> List[rdkit.Chem.Mol]:
+    def __call__(self, inputs: Iterable[SmilesMol],
+                 executor: Optional[Executor] = None) -> List[rdkit.Chem.Mol]:
+
         all_canonical = set()
         considered = set()
         for molecule in inputs:
@@ -246,7 +278,7 @@ class TautomerCanonicalizer(BaseTransformer):
             considered = considered.union(set(tautomers.smilesTautomerMap.values()))
             all_canonical.add(SmilesMol(tautomer_enumerator.PickCanonical(tautomers)))
 
-        return all_canonical
+        return list(all_canonical)
 
 
 class StereoEnumerator(UniqueMoleculeTransformer):
@@ -254,8 +286,8 @@ class StereoEnumerator(UniqueMoleculeTransformer):
         super().__init__(**kwargs)
         self.opts = StereoEnumerationOptions(unique=True)
 
-    def call(self, molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
-        return EnumerateStereoisomers(molecule, options=self.opts)
+    def call(self, molecule: rdkit.Chem.Mol) -> List[rdkit.Chem.Mol]:
+        return list(EnumerateStereoisomers(molecule, options=self.opts))
 
 
 class SAScoreFilter(MoleculeFilter):

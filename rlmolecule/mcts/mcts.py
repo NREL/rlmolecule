@@ -1,6 +1,7 @@
 import logging
 import math
 import random
+from time import time
 from typing import Callable, List, Optional, Type
 
 import numpy as np
@@ -78,14 +79,22 @@ class MCTS(GraphSearch[MCTSVertex]):
             self,
             vertex: MCTSVertex,
             num_mcts_samples: int = 1,
+            timeout: Optional[float] = None,
     ) -> None:
         """
         Perform MCTS sampling from the given vertex.
         """
+        start_time = time()
         for _ in range(num_mcts_samples):
             search_path = self._select(vertex)
             value = self._evaluate(search_path)
             self._backpropagate(search_path, value)
+
+            if timeout:
+                # Break the iterations if we're running for a fixed time
+                if (time() - start_time) > timeout:
+                    return
+
 
     # noinspection PyMethodMayBeStatic
     def _accumulate_path_data(self, vertex: MCTSVertex, path: []):

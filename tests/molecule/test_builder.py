@@ -86,14 +86,15 @@ def test_tautomers():
     products = to_smiles(builder_tautomers(start))
 
 
-def test_eagle_error():
+def test_parallel_build():
     builder = MoleculeBuilder(max_atoms=15,
                               min_atoms=4,
                               try_embedding=False,
                               sa_score_threshold=None,
                               stereoisomers=True,
                               canonicalize_tautomers=True,
-                              atom_additions=['C', 'N', 'O', 'S'])
+                              atom_additions=['C', 'N', 'O', 'S'],
+                              parallel=True)
 
     state = MoleculeState(rdkit.Chem.MolFromSmiles('CC(=N)C(=O)C(C)C=N'), builder=builder)
     actions = state.get_next_actions()
