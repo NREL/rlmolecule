@@ -80,7 +80,7 @@ def test_tautomers():
 
     result = TautomerCanonicalizer()([rdkit.Chem.MolFromSmiles(smiles) for smiles in mols])
     mols_canonical = to_smiles(result)
-    assert len(mols_canonical) == 1
+    assert len(set(mols_canonical)) == 1
 
     builder_tautomers = MoleculeBuilder(canonicalize_tautomers=True)
     products = to_smiles(builder_tautomers(start))
@@ -94,25 +94,28 @@ def test_parallel_build():
                               stereoisomers=True,
                               canonicalize_tautomers=True,
                               atom_additions=['C', 'N', 'O', 'S'],
-                              parallel=True)
+                              parallel=True
+                              )
 
     state = MoleculeState(rdkit.Chem.MolFromSmiles('CC(=N)C(=O)C(C)C=N'), builder=builder)
     actions = state.get_next_actions()
     smiles = to_smiles((state.molecule for state in actions))
-    assert len(actions) == 46
-    assert len(set(smiles)) == 46
+    assert len(actions) == len(set(smiles))
 
-## Just make sure this runs in finite time...
-# def test_eagle_error2():
-#
-#     builder = MoleculeBuilder(max_atoms=15,
-#                               min_atoms=4,
-#                               try_embedding=False,
-#                               sa_score_threshold=None,
-#                               stereoisomers=True,
-#                               canonicalize_tautomers=True,
-#                               atom_additions=['C', 'N', 'O', 'S'])
-#
-#     mol = rdkit.Chem.MolFromSmiles('Cc1nc(-c2cc(=O)[nH][nH]2)c[nH]1')
-#     state = MoleculeState(mol, builder=builder)
-#     actions = state.get_next_actions()
+
+# Just make sure this runs in finite time...
+def test_eagle_error2():
+
+    builder = MoleculeBuilder(max_atoms=15,
+                              min_atoms=4,
+                              try_embedding=True,
+                              sa_score_threshold=None,
+                              stereoisomers=True,
+                              canonicalize_tautomers=True,
+                              atom_additions=['C', 'N', 'O', 'S'],
+                              parallel=True
+                              )
+
+    mol = rdkit.Chem.MolFromSmiles('Cc1nc(-c2cc(=O)[nH][nH]2)c[nH]1')
+    state = MoleculeState(mol, builder=builder)
+    actions = state.get_next_actions()
