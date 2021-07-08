@@ -44,33 +44,48 @@ class CrystalPreprocessor:
 
     def construct_feature_matrices(self, state: CrystalState, train: bool = False) -> {}:
         """ Convert a crystal state to a list of tensors
-        'element' : (n_ele_and_stoich,) length list of atom classes
-        'crystal_sys' : (n_crystal_sys,) length list of crystal systems
-        'proto_strc' : (n_proto_strc, ) length list of prototype structures
+        'eles_and_stoich' : (n_ele_and_stoich,) vector of the elements and their stoichiometries
+        'crystal_sys' : (1,) vector of the crystal system index
+        'proto_strc' : (1,) vector of the prototype structures index
         """
 
         # at the beginning of the action graph, the action node is a tuple of elements
-        eles_and_stoich = state.action_node
         if state.composition is not None:
             eles = list(state.get_eles_from_comp(state.composition))
             stoich = list(state.get_stoich_from_comp(state.composition))
             eles_and_stoich = eles + [e + str(stoich[i]) for i, e in enumerate(eles)]
+        else:
+            eles_and_stoich = []
+            if state.action_node != 'root':
+                eles_and_stoich = state.action_node
+                if isinstance(state.action_node, str):
+                    eles_and_stoich = [state.action_node]
 
-        element_feature_vector = np.zeros(len(self.element_mapping), dtype='int64')
+        element_features = []
         for ele in eles_and_stoich:
-            element_feature_vector[self.element_mapping[ele]] = 1
+            element_features.append(self.element_mapping[ele])
 
-        crystal_sys_feature_vector = np.zeros(len(self.crystal_sys_mapping), dtype='int64')
         crystal_sys = state.get_crystal_sys()
         if crystal_sys is not None:
-            crystal_sys_feature_vector[self.crystal_sys_mapping[crystal_sys]] = 1
+            crystal_sys = self.crystal_sys_mapping[crystal_sys] + 1
+        else:
+            crystal_sys = 0
 
-        proto_strc_feature_vector = np.zeros(len(self.proto_strc_mapping), dtype='int64')
         proto_strc = state.get_proto_strc()
         if proto_strc is not None:
-            proto_strc_feature_vector[self.proto_strc_mapping[proto_strc]] = 1
+            proto_strc = self.proto_strc_mapping[proto_strc] + 1
+        else:
+            proto_strc = 0
 
-        return {'element': element_feature_vector,
-                'crystal_sys': crystal_sys_feature_vector,
-                'proto_strc': proto_strc_feature_vector,
+        return {'eles_and_stoich': np.asarray(element_features),
+                'crystal_sys': np.asarray([crystal_sys]),
+                'proto_strc': np.asarray([proto_strc]),
                 }
+
+
+        # return {'eles_and_stoich': np.asarray([element_features]),
+        #         # pad zeros to the end so they're all the same size.
+        #         # TODO zero's will be masked
+        #         'crystal_sys': np.asarray([[crystal_sys] + [0] * (len(element_features) - 1)]),
+        #         'proto_strc': np.asarray([[proto_strc] + [0] * (len(element_features) - 1)]),
+        #         }

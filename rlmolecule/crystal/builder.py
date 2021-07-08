@@ -30,6 +30,8 @@ class CrystalBuilder:
                                  delimiter='\t',
                                  data=False,
                                  create_using=nx.DiGraph())
+            # some of the nodes are meant to be tuples. Fix that here
+            nx.relabel_nodes(G, {n: eval(n) for n in G.nodes(data=False) if '(' in n}, copy=False)
 
         if G2 is None:
             G2 = nx.read_edgelist(action_graph2_file,

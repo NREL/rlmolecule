@@ -1,7 +1,7 @@
 import itertools
 import re
 from copy import deepcopy
-from typing import Iterable, Optional, Sequence, Tuple
+from typing import Iterable, Optional, Sequence, Tuple, Union
 
 import numpy as np
 from pymatgen.core import Composition, Structure
@@ -48,7 +48,7 @@ class CrystalState(GraphSearchState):
         """
         comp_str = self._composition + '|' if self._composition is not None else ""
         comp_str = "" if self._composition == self._action_node else comp_str
-        return comp_str + self._action_node
+        return comp_str + str(self._action_node)
 
     # noinspection PyUnresolvedReferences
     def equals(self, other: any) -> bool:
@@ -160,22 +160,22 @@ class CrystalState(GraphSearchState):
     #     return self._comp_type
 
     @property
-    def action_node(self) -> str:
+    def action_node(self) -> Union[str, tuple]:
         return self._action_node
 
     def get_crystal_sys(self) -> str:
-        crystal_sys_str = None
+        if '|' not in self.action_node:
+            return None
         # extract the crystal system str from the action node
-        if '|' in self.action_node:
-            crystal_sys_str = self.action_node.split('|')[1]
+        crystal_sys_str = self.action_node.split('|')[1]
         assert crystal_sys_str in crystal_systems
         return crystal_sys_str
 
     def get_proto_strc(self) -> str:
-        proto_strc_str = None
+        if '|' not in self.action_node or len(self.action_node.split('|')) < 3:
+            return None
         # extract the prototype structure str from the action node
-        if len(self.action_node.split('|')) > 2:
-            proto_strc_str = self.action_node.split('|')[2]
+        proto_strc_str = self.action_node.split('|')[2]
         # TODO add a check here to ensure this is a valid prototype structure string e.g., POSCAR_sg14_icsd_083588
         return proto_strc_str
 

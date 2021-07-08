@@ -26,6 +26,7 @@ class CrystalProblem(MCTSProblem, ABC):
         action_node = "root"
         return CrystalState(action_node, self._config)
 
+
 class CrystalTFAlphaZeroProblem(CrystalProblem, TFAlphaZeroProblem, ABC):
     def __init__(self,
                  engine: sqlalchemy.engine.Engine,
@@ -39,12 +40,12 @@ class CrystalTFAlphaZeroProblem(CrystalProblem, TFAlphaZeroProblem, ABC):
         self.num_messages = num_messages
         self.num_heads = num_heads
         self.features = features
-        self.preprocessor = preprocessor if preprocessor else load_preprocessor(preprocessor_data)
+        self.preprocessor = preprocessor if preprocessor else CrystalPreprocessor()
         super(CrystalTFAlphaZeroProblem, self).__init__(builder=builder, engine=engine, **kwargs)
-#
-    def policy_model(self,
-                     features: int = 64,
-                     num_eles_and_stoich: int = 252,
+
+    def policy_model(features: int = 64,
+                     num_eles_and_stoich: int = 10,
+                     num_eles_and_stoich_comb: int = 252,
                      num_crystal_sys: int = 7,
                      num_proto_strc: int = 4170,
                      ) -> tf.keras.Model:
@@ -59,31 +60,40 @@ class CrystalTFAlphaZeroProblem(CrystalProblem, TFAlphaZeroProblem, ABC):
         # 5 conducting ions, 8 anions, 17 framework cations, up to 8 elements in a composition.
         # I will include the elements by themselves, and the elements with a stoichiometry e.g., 'Cl', 'Cl6'
         # TODO Many element stoichiometries are not present. For now I will just include all of them
-        element_class = layers.Input(shape=[None], dtype=tf.int64, name='eles_and_stoich')
+        # There are up to 10 items here:
+        # 1 conducting ion, 2 anions, 2 framework cations, and a stoichiometry for each
+        # e.g., for K1La1Sb2I2N4: K, K1, La, La1, Sb, Sb2, I, I2, N, N4
+        element_class = layers.Input(shape=[num_eles_and_stoich], dtype=tf.int64, name='eles_and_stoich')
         # 7 crystal systems
-        crystal_sys_class = layers.Input(shape=[None], dtype=tf.int64, name='crystal_sys')
+        crystal_sys_class = layers.Input(shape=[], dtype=tf.int64, name='crystal_sys')
         # 4170 total prototype structures
-        proto_strc_class = layers.Input(shape=[None], dtype=tf.int64, name='proto_strc')
+        proto_strc_class = layers.Input(shape=[], dtype=tf.int64, name='proto_strc')
 
         input_tensors = [element_class, crystal_sys_class, proto_strc_class]
 
         element_embedding = layers.Embedding(
-            num_eles_and_stoich, features, name='conducting_embedding')(element_class)
+            input_dim=num_eles_and_stoich_comb, output_dim=features,
+            input_length=None, name='element_embedding')(element_class)
+        # sum the embeddings of each of the elements
+        element_embedding = layers.Lambda(lambda x: tf.keras.backend.sum(x, axis=-2, keepdims=True),
+                                          output_shape=lambda s: (s[-1],))(element_embedding)
+        element_embedding = layers.Reshape((features,))(element_embedding)
 
-        elements_output = layers.Dense(features, activation='relu')(element_embedding)
-
-        # TODO don't need an embedding because the number of crystal systems is small(?). Just use a one-hot encoding
         crystal_sys_embedding = layers.Embedding(
-            num_crystal_sys, features, name='crystal_sys_embedding')(crystal_sys_class)
-        crystal_sys_output = layers.Dense(features, activation='relu')(crystal_sys_embedding)
-
+            input_dim=num_crystal_sys + 1, output_dim=features,
+            input_length=1, mask_zero=True, name='crystal_sys_embedding')(crystal_sys_class)
         proto_strc_embedding = layers.Embedding(
-            num_proto_strc, features, name='proto_strc_embedding')(proto_strc_class)
-        proto_strc_output = layers.Dense(features, activation='relu')(proto_strc_embedding)
+            input_dim=num_proto_strc + 1, output_dim=features,
+            input_length=1, mask_zero=True, name='proto_strc_embedding')(proto_strc_class)
 
         # Merge all available features into a single large vector via concatenation
-        x = layers.concatenate([elements_output, crystal_sys_output, proto_strc_output])
-        global_state = layers.Dense(features, activation='relu')(x)
+        x = layers.concatenate([element_embedding, crystal_sys_embedding, proto_strc_embedding])
+
+        # pass the features through a couple of dense layers
+        x = layers.Dense(features, activation='relu')(x)
+        global_state = layers.Dense(features // 2, activation='relu')(x)
+
+        # output a single prediction value at the end
         output = layers.Dense(1)(global_state)
 
         return tf.keras.Model(input_tensors, output, name='policy_model')
