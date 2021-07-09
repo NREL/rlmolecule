@@ -16,21 +16,18 @@ logger = logging.getLogger(__name__)
 
 class CrystalProblem(MCTSProblem, ABC):
     def __init__(self,
-                 builder: 'CrystalBuilder',
                  *args, **kwargs):
-        self._config = builder
         super(CrystalProblem, self).__init__(*args, **kwargs)
 
     def get_initial_state(self) -> CrystalState:
         # The root node in the action space is the string 'root'
         action_node = "root"
-        return CrystalState(action_node, self._config)
+        return CrystalState(action_node)
 
 
 class CrystalTFAlphaZeroProblem(CrystalProblem, TFAlphaZeroProblem, ABC):
     def __init__(self,
                  engine: sqlalchemy.engine.Engine,
-                 builder: 'CrystalBuilder',
                  preprocessor: Optional[CrystalPreprocessor] = None,
                  preprocessor_data: Optional[str] = None,
                  features: int = 64,
@@ -41,18 +38,18 @@ class CrystalTFAlphaZeroProblem(CrystalProblem, TFAlphaZeroProblem, ABC):
         self.num_heads = num_heads
         self.features = features
         self.preprocessor = preprocessor if preprocessor else CrystalPreprocessor()
-        super(CrystalTFAlphaZeroProblem, self).__init__(builder=builder, engine=engine, **kwargs)
+        super(CrystalTFAlphaZeroProblem, self).__init__(engine=engine, **kwargs)
 
-    def policy_model(features: int = 64,
+    def policy_model(self,
+                     features: int = 64,
                      num_eles_and_stoich: int = 10,
                      num_eles_and_stoich_comb: int = 252,
                      num_crystal_sys: int = 7,
                      num_proto_strc: int = 4170,
                      ) -> tf.keras.Model:
-        """ Constructs a policy model that predicts value, pi_logits from a batch of molecule inputs. Main model used in
+        """ Constructs a policy model that predicts value, pi_logits from a batch of crystal inputs. Main model used in
         policy training and loading weights
 
-        :param preprocessor: a MolPreprocessor class for initializing the embedding matrices
         :param features: Size of network hidden layers
         :return: The constructed policy model
         """
@@ -72,8 +69,8 @@ class CrystalTFAlphaZeroProblem(CrystalProblem, TFAlphaZeroProblem, ABC):
         input_tensors = [element_class, crystal_sys_class, proto_strc_class]
 
         element_embedding = layers.Embedding(
-            input_dim=num_eles_and_stoich_comb, output_dim=features,
-            input_length=None, name='element_embedding')(element_class)
+            input_dim=num_eles_and_stoich_comb + 1, output_dim=features,
+            input_length=None, mask_zero=True, name='element_embedding')(element_class)
         # sum the embeddings of each of the elements
         element_embedding = layers.Lambda(lambda x: tf.keras.backend.sum(x, axis=-2, keepdims=True),
                                           output_shape=lambda s: (s[-1],))(element_embedding)
@@ -91,12 +88,13 @@ class CrystalTFAlphaZeroProblem(CrystalProblem, TFAlphaZeroProblem, ABC):
 
         # pass the features through a couple of dense layers
         x = layers.Dense(features, activation='relu')(x)
-        global_state = layers.Dense(features // 2, activation='relu')(x)
+        x = layers.Dense(features // 2, activation='relu')(x)
 
-        # output a single prediction value at the end
-        output = layers.Dense(1)(global_state)
+        # output a single prediction value, and a prior logit at the end
+        value_logit = layers.Dense(1)(x)
+        pi_logit = layers.Dense(1)(x)
 
-        return tf.keras.Model(input_tensors, output, name='policy_model')
+        return tf.keras.Model(input_tensors, [value_logit, pi_logit], name='policy_model')
 
     def get_policy_inputs(self, state: CrystalState) -> Dict:
 

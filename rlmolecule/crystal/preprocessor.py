@@ -2,6 +2,7 @@ import os
 from typing import List
 
 import numpy as np
+import tensorflow as tf
 
 from rlmolecule.crystal.crystal_state import CrystalState
 
@@ -63,7 +64,7 @@ class CrystalPreprocessor:
 
         element_features = []
         for ele in eles_and_stoich:
-            element_features.append(self.element_mapping[ele])
+            element_features.append(self.element_mapping[ele] + 1)
 
         crystal_sys = state.get_crystal_sys()
         if crystal_sys is not None:
@@ -77,9 +78,9 @@ class CrystalPreprocessor:
         else:
             proto_strc = 0
 
-        return {'eles_and_stoich': np.asarray(element_features),
-                'crystal_sys': np.asarray([crystal_sys]),
-                'proto_strc': np.asarray([proto_strc]),
+        return {'eles_and_stoich': np.asarray(element_features + [0] * (10 - len(element_features)), dtype=np.int64),
+                'crystal_sys': np.asarray([crystal_sys], dtype=np.int64),
+                'proto_strc': np.asarray([proto_strc], dtype=np.int64),
                 }
 
 
