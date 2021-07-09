@@ -3,8 +3,10 @@ from tensorflow.keras import layers
 import numpy as np
 
 from examples.crystal_volume import optimize_crystal_volume as ocv
+from examples.crystal_volume.optimize_crystal_volume import CrystalVolOptimizationProblem
 from rlmolecule.crystal.builder import CrystalBuilder
 from rlmolecule.crystal.crystal_state import CrystalState
+from rlmolecule.crystal.crystal_problem import CrystalTFAlphaZeroProblem
 from rlmolecule.crystal.preprocessor import CrystalPreprocessor
 from rlmolecule.sql.run_config import RunConfig
 from rlmolecule.sql import Base, Session
@@ -176,7 +178,10 @@ session = Session()
 ocv.engine = engine
 
 # now try passing each of these through the policy model to see if they work
-model = policy_model()
+# problem = CrystalVolOptimizationProblem(engine)
+problem = ocv.create_problem()
+# model = policy_model()
+model = problem.policy_model()
 
 print(model.summary())
 
@@ -190,18 +195,18 @@ preprocessor = CrystalPreprocessor()
 builder = CrystalBuilder()
 
 root = 'root'
-state = CrystalState(root, builder)
+state = CrystalState(root)
 
 #print(state.get_next_actions())
 
-state = CrystalState('Li', builder)
+state = CrystalState('Li')
 print(state)
 policy_inputs = preprocessor.construct_feature_matrices(state)
 print(policy_inputs)
 print(model(policy_inputs))
 
 while state.terminal is False:
-    next_actions = state.get_next_actions()
+    next_actions = state.get_next_actions(builder)
     state = next_actions[-1]
     print(state)
 

@@ -62,19 +62,19 @@ class CrystalTFAlphaZeroProblem(CrystalProblem, TFAlphaZeroProblem, ABC):
         # e.g., for K1La1Sb2I2N4: K, K1, La, La1, Sb, Sb2, I, I2, N, N4
         element_class = layers.Input(shape=[num_eles_and_stoich], dtype=tf.int64, name='eles_and_stoich')
         # 7 crystal systems
-        crystal_sys_class = layers.Input(shape=[], dtype=tf.int64, name='crystal_sys')
+        crystal_sys_class = layers.Input(shape=[1], dtype=tf.int64, name='crystal_sys')
         # 4170 total prototype structures
-        proto_strc_class = layers.Input(shape=[], dtype=tf.int64, name='proto_strc')
+        proto_strc_class = layers.Input(shape=[1], dtype=tf.int64, name='proto_strc')
 
         input_tensors = [element_class, crystal_sys_class, proto_strc_class]
 
         element_embedding = layers.Embedding(
             input_dim=num_eles_and_stoich_comb + 1, output_dim=features,
-            input_length=None, mask_zero=True, name='element_embedding')(element_class)
+            input_length=num_eles_and_stoich, mask_zero=True, name='element_embedding')(element_class)
         # sum the embeddings of each of the elements
         element_embedding = layers.Lambda(lambda x: tf.keras.backend.sum(x, axis=-2, keepdims=True),
                                           output_shape=lambda s: (s[-1],))(element_embedding)
-        element_embedding = layers.Reshape((features,))(element_embedding)
+        element_embedding = layers.Reshape((-1, features))(element_embedding)
 
         crystal_sys_embedding = layers.Embedding(
             input_dim=num_crystal_sys + 1, output_dim=features,
