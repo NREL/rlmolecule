@@ -25,7 +25,6 @@ class CrystalState(GraphSearchState):
     def __init__(
             self,
             action_node: any,
-            builder: any,
             composition: Optional[str] = None,
             # structure: Optional[Structure] = None,
             terminal: bool = False,
@@ -33,11 +32,9 @@ class CrystalState(GraphSearchState):
         """
         :param action_node: A representation of the current state in one of the action graphs
             e.g., 'Zn1Hg1Al1F1Cl6' in the first graph, or '1_1_1_1_6|cubic' of the second graph
-        :param builder: A CrystalBuilder class
         :param terminal: Whether this state is a decoration of a specific structure (i.e., final state)
         """
         self._action_node: any = action_node
-        self._builder: any = builder
         self._composition: str = composition
         # self._structure: Optional[Structure] = structure
         self._terminal: bool = terminal
@@ -65,10 +62,15 @@ class CrystalState(GraphSearchState):
         return hash_to_integer(self.__repr__().encode())
 
     @collect_metrics
-    def get_next_actions(self) -> Sequence['CrystalState']:
+    # Storing the builder as part of the crystal state was really slowing down the serialization step.
+    # so just pass the builder here
+    def get_next_actions(self, builder) -> Sequence['CrystalState']:
+        """
+        :param builder: A CrystalBuilder class
+        """
         result = []
         if not self._terminal:
-            result.extend(self.builder(self))
+            result.extend(builder(self))
 
         return result
 
@@ -182,7 +184,3 @@ class CrystalState(GraphSearchState):
     @property
     def terminal(self) -> bool:
         return self._terminal
-
-    @property
-    def builder(self) -> any:
-        return self._builder

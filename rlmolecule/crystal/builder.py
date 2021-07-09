@@ -75,7 +75,6 @@ class CrystalBuilder:
                     comp_type = self.comp_to_comp_type.get(neighbor)
                     composition = neighbor if comp_type is not None else None
                     next_state = CrystalState(action_node=neighbor,
-                                              builder=self,
                                               composition=composition,
                                               terminal=False,
                                               )
@@ -96,7 +95,6 @@ class CrystalBuilder:
                     if self.G2.out_degree(neighbor) == 0:
                         terminal = True
                     next_state = CrystalState(action_node=neighbor,
-                                              builder=self,
                                               composition=crystal_state.composition,
                                               # structure=decorated_structure,
                                               terminal=terminal,

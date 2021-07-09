@@ -3,6 +3,7 @@
 
 import argparse
 import logging
+import math
 import os
 import time
 import pandas as pd
@@ -97,6 +98,7 @@ class CrystalVolOptimizationProblem(CrystalTFAlphaZeroProblem):
         # if state.forced_terminal:
         #    return qed(state.molecule), {'forced_terminal': True, 'smiles': state.smiles}
         if state.terminal:
+            print(f"calculating reward for {state}")
             # if this has already been computed, then skip it
             descriptor = repr(state)
             comp_type = state.action_node.split('|')[0]
@@ -140,8 +142,6 @@ class CrystalVolOptimizationProblem(CrystalTFAlphaZeroProblem):
 def create_problem():
     prob_config = run_config.problem_config
 
-    builder = CrystalBuilder()
-
     run_id = run_config.run_id
     train_config = run_config.train_config
 
@@ -155,7 +155,6 @@ def create_problem():
                                                 max_reward=train_config.get('max_reward', 1))
 
     problem = CrystalVolOptimizationProblem(engine,
-                                            builder,
                                             run_id=run_id,
                                             reward_class=reward_factory,
                                             # num_messages=train_config.get('num_messages', 1),
@@ -173,6 +172,8 @@ def create_problem():
 
 def run_games():
     from rlmolecule.alphazero.alphazero import AlphaZero
+
+    builder = CrystalBuilder()
     config = run_config.mcts_config
     game = AlphaZero(
         create_problem(),
@@ -184,6 +185,7 @@ def run_games():
         dirichlet_x=config.get('dirichlet_x', 0.25),
         # MCTS parameters
         ucb_constant=config.get('ucb_constant', math.sqrt(2)),
+        state_builder=builder,
     )
     from rlmolecule.mcts.mcts import MCTS
     #game = MCTS(
@@ -192,7 +194,7 @@ def run_games():
     i = 0
     while True:
         path, reward = game.run(
-            num_mcts_samples=config.get('num_mcts_samples', 1),
+            num_mcts_samples=config.get('num_mcts_samples', 5),
             max_depth=config.get('max_depth', 1000000),
             reset_canonicalizer=False,
         )
@@ -269,13 +271,13 @@ nn13 = local_env.VoronoiNN(cutoff=13, compute_adj_neighbors=False)
 # also load the icsd prototype structures
 # https://pymatgen.org/usage.html#side-note-as-dict-from-dict
 icsd_prototypes_file = "../../rlmolecule/crystal/inputs/icsd_prototypes.json.gz"
-#structures = read_structures_file(icsd_prototypes_file)
+structures = read_structures_file(icsd_prototypes_file)
 
 # Temporary caching approach:
 # store the computed structures in a json file
 decorations = {}
 run_id = "2021-07-01"
-#base_dir = f"/projects/rlmolecule/jlaw/crystals/{run_id}"
+# base_dir = f"/projects/rlmolecule/jlaw/crystals/{run_id}"
 base_dir = f"./{run_id}"
 os.makedirs(base_dir, exist_ok=True)
 decorations_file = f"{base_dir}/decorations.json.gz"
