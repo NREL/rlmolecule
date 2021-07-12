@@ -144,15 +144,12 @@ def create_problem():
     problem = CrystalVolOptimizationProblem(engine,
                                             run_id=run_id,
                                             reward_class=reward_factory,
-                                            # num_messages=train_config.get('num_messages', 1),
-                                            # num_heads=train_config.get('num_heads', 2),
-                                            # features=train_config.get('features', 8),
-                                            # max_buffer_size=train_config.get('max_buffer_size', 200),
-                                            # min_buffer_size=train_config.get('min_buffer_size', 15),
-                                            # batch_size=train_config.get('batch_size', 32),
-                                            # policy_checkpoint_dir=train_config.get('policy_checkpoint_dir',
-                                            #                                       'policy_checkpoints'))
-                                            )
+                                            features=train_config.get('features', 64),
+                                            max_buffer_size=train_config.get('max_buffer_size', 200),
+                                            min_buffer_size=train_config.get('min_buffer_size', 15),
+                                            batch_size=train_config.get('batch_size', 32),
+                                            policy_checkpoint_dir=train_config.get('policy_checkpoint_dir',
+                                                                                  'policy_checkpoints'))
 
     return problem
 
