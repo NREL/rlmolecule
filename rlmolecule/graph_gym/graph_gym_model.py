@@ -18,35 +18,68 @@ class GraphGymModel(DistributionalQTFModel):
             obs_space, action_space, num_outputs, model_config, name, **kw)
 
         self.per_action_model = per_action_model
-        self.action_mask = None
+        self.total_value = None
 
     def forward(self, input_dict, state, seq_lens):
         # Extract the available actions tensor from the observation.
         action_mask = input_dict['obs']['action_mask']
         action_observations = input_dict['obs']['action_observations']
-        batch_size = action_observations[0].shape[0]
 
+        print(f'action_mask {action_mask.shape}')
         print(f'input_dict {input_dict}')
+        batch_size, num_actions = action_mask.shape
+        action_mask_shape = tf.shape(action_mask)  # batch size, num_actions
+        # num_actions = action_mask.shape[1]
 
-        flattened_action_features = tf.reshape(
-            tf.stack(action_observations, axis=1),
-            (batch_size * self.num_actions,) + self.per_action_model.input_shape)
+        # TODO: might need to extend this code to deal with non-dict shaped observation spaces
 
-        flat_action_weights = self.per_action_model({'obs': flattened_action_features})[0]
-        action_weights = tf.reshape(flat_action_weights, (batch_size, self.num_actions))
+        # action_observations is a list of dicts, one for each successor/action.
+        # take each action's observations and compile them into a single dict of tensors
 
-        self.action_mask = action_mask
+        # print(f'action_observations {action_observations}')
+        # flat_action_observations = {}
+        # for key in action_observations[0].keys():
+        #     action_observations_sublist = [action_observation[key] for action_observation in action_observations]
+        #     flat_action_observations[key] = tf.concat(action_observations_sublist, axis=0)
+        #
+        # print(f'combined_action_observations {flat_action_observations}')
+        # flat_action_values, flat_action_weights = tuple(self.per_action_model.forward(flat_action_observations))
+        #
+        #
+        #
+        # print(f'flat_action_values {flat_action_values}')
+        # action_values = tf.reshape(flat_action_values, action_mask_shape)
+        # action_values = tf.reshape(action_values, action_mask.shape)
+        # action_values = tf.where(action_mask == 0,
+        #                          action_values,
+        #                          tf.ones_like(action_values) * action_values.dtype.min)
+        # self.total_value = tf.reduce_max(action_values, axis=1)
+        #
+        # action_weights = tf.reshape(flat_action_weights, action_mask_shape)
+        # masked_action_weights = tf.where(action_mask == 0,
+        #                                  action_weights,
+        #                                  tf.ones_like(action_weights) * action_weights.dtype.min)
+        # return masked_action_weights, state
+
+        # action_outputs = \
+        #     [tuple(self.per_action_model.forward(action_observation)) for action_observation in action_observations]
+        # action_values = tf.stack([tf.reshape(a[0], action_mask.shape) for a in action_outputs], axis=1)
+        # action_weights = tf.stack([tf.reshape(a[1], action_mask.shape) for a in action_outputs], axis=1)
+
+        action_model = self.per_action_model.forward(action_observation)
+
+        print(f'action_values {action_values}')
+        print(f'action_weights {action_weights}')
+
+        action_values = tf.where(action_mask == 0,
+                                 action_values,
+                                 tf.ones_like(action_values) * action_values.dtype.min)
+        self.total_value = tf.reduce_max(action_values, axis=1)
+
         masked_action_weights = tf.where(action_mask == 0,
                                          action_weights,
                                          tf.ones_like(action_weights) * action_weights.dtype.min)
         return masked_action_weights, state
 
     def value_function(self):
-        inner_vf = self.per_action_model.value_function()
-        batch_size = inner_vf.shape[0] // self.num_actions
-        action_values = tf.reshape(inner_vf, (batch_size, self.num_actions))
-        masked_action_values = tf.where(self.action_mask == 0,
-                                        action_values,
-                                        tf.ones_like(action_values) * action_values.dtype.min)
-        total_value = tf.reduce_max(masked_action_values, axis=1)
-        return total_value
+        return self.total_value

@@ -44,7 +44,7 @@ class GraphGymEnv(gym.Env):
             action_observations.append(self.problem.make_observation(successor))
 
         null_observation = self.problem.null_observation
-        for _ in range(len(action_mask), self.problem.max_num_actions):
+        while len(action_mask) < self.problem.max_num_actions:
             action_mask.append(False)
             action_observations.append(null_observation)
 

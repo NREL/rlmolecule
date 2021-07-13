@@ -12,7 +12,7 @@ from rlmolecule.molecule.molecule_state import MoleculeState
 from rlmolecule.molecule.policy.preprocessor import load_preprocessor, MolPreprocessor
 
 
-class StableRadicalGraphProblem(GraphProblem):
+class MoleculeGraphProblem(GraphProblem):
 
     def __init__(self,
                  builder: MoleculeBuilder,
@@ -29,10 +29,16 @@ class StableRadicalGraphProblem(GraphProblem):
 
         # TODO: check ranges on these
         self._observation_space: gym.Space = gym.spaces.Dict({
-            'atom': gym.spaces.Box(low=0, high=3, shape=(self.builder.max_atoms,), dtype=np.int64),
-            'bond': gym.spaces.Box(low=0, high=4, shape=(self.max_num_bonds,), dtype=np.int64),
+            'atom_class': gym.spaces.Box(
+                low=0, high=self.preprocessor.atom_classes,
+                shape=(self.builder.max_atoms,), dtype=np.int),
+            'bond_class': gym.spaces.Box(
+                low=0, high=self.preprocessor.bond_classes,
+                shape=(self.max_num_bonds,), dtype=np.int),
             'connectivity':
-                gym.spaces.Box(low=0, high=self.builder.max_atoms, shape=(self.max_num_bonds, 2), dtype=np.int64),
+                gym.spaces.Box(
+                    low=0, high=self.builder.max_atoms,
+                    shape=(self.max_num_bonds, 2), dtype=np.int),
         })
 
         self._action_space: gym.Space = gym.spaces.Discrete(self.max_num_actions)

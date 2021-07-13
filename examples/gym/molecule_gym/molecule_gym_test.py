@@ -8,13 +8,6 @@ from ray.rllib.models import ModelCatalog
 from ray.rllib.utils.test_utils import check_learning_achieved
 from ray.tune.registry import register_env
 
-from examples.gym.gridworld_env import GridWorldEnv, make_doorway_grid
-from examples.gym.parametric_gridworld_env import ParametricGridWorldEnv
-from examples.gym.stable_radical_gym.stable_radical_graph_problem import StableRadicalGraphProblem
-from rlmolecule.graph_gym.graph_gym_env import GraphGymEnv
-from rlmolecule.graph_gym.graph_gym_model import GraphGymModel
-from rlmolecule.molecule.builder.builder import MoleculeBuilder
-
 if __name__ == "__main__":
     # args = parser.parse_args()
     ray.init()
@@ -29,13 +22,19 @@ if __name__ == "__main__":
 
 
     def make_env(_):
-        print('make_env()')
-        return GraphGymEnv(StableRadicalGraphProblem(MoleculeBuilder()))
+        from examples.gym.molecule_gym.molecule_graph_problem import MoleculeGraphProblem
+        from rlmolecule.graph_gym.graph_gym_env import GraphGymEnv
+        from rlmolecule.molecule.builder.builder import MoleculeBuilder
+        return GraphGymEnv(MoleculeGraphProblem(MoleculeBuilder()))
 
 
-    def make_env2(_):
-        print('make_env2()')
-        return ParametricGridWorldEnv(GridWorldEnv(make_doorway_grid()))
+    # def make_parametric_gridworld(_):
+    #     from examples.gym.gridworld_env import GridWorldEnv, make_doorway_grid
+    #     from examples.gym.parametric_gridworld_env import ParametricGridWorldEnv
+    #     print('make_parametric_gridworld()')
+    #     return ParametricGridWorldEnv(GridWorldEnv(make_doorway_grid()))
+
+    from rlmolecule.graph_gym.graph_gym_model import GraphGymModel
 
 
     class ThisModel(GraphGymModel):
@@ -46,21 +45,24 @@ if __name__ == "__main__":
                      model_config,
                      name,
                      **kwargs):
-            # per_action_model = StableRadicalModel(make_env(None))
+            from examples.gym.molecule_gym.molecule_model import MoleculeModel
+            from rlmolecule.molecule.policy.model import make_policy_model_internals
+            # inner_action_model = policy_model()
+            per_action_model = MoleculeModel(make_policy_model_internals)
             # super(ThisModel, self).__init__(
             #     obs_space, action_space, num_outputs, model_config, name,
             #     per_action_model,
             #     **kwargs)
             super(ThisModel, self).__init__(
                 obs_space, action_space, num_outputs, model_config, name,
-                None,
+                per_action_model,
                 **kwargs)
 
 
-    register_env('stable_radical_graph_problem', make_env)
-    register_env('stable_radical_graph_problem2', make_env2)
+    register_env('molecule_graph_problem', make_env)
+    # register_env('parametric_gridworld', make_parametric_gridworld)
 
-    ModelCatalog.register_custom_model('stable_radical_graph_problem_model', ThisModel)
+    ModelCatalog.register_custom_model('molecule_graph_problem_model', ThisModel)
 
     if args['run'] == 'DQN':
         cfg = {
@@ -76,14 +78,15 @@ if __name__ == "__main__":
 
     config = dict(
         {
-            'env': 'stable_radical_graph_problem',
+            'env': 'molecule_graph_problem',
             'model': {
-                'custom_model': 'stable_radical_graph_problem_model',
+                'custom_model': 'molecule_graph_problem_model',
             },
             'num_gpus': 0.0,
             'num_gpus_per_worker': 0.0,
-            'num_workers': 6,
-            'framework': 'tf2',
+            'num_workers': 0,
+            # 'framework': 'tf2',
+            # 'eager_tracing': False,
             'rollout_fragment_length': int(1e2),
             'train_batch_size': int(1e3),
         },
