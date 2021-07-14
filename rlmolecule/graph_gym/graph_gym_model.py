@@ -88,16 +88,13 @@ class GraphGymModel(DistributionalQTFModel):
 
         print(f'flat_action_values {flat_action_values}')
         action_values = tf.reshape(flat_action_values, action_mask_shape)
-        action_values = tf.where(action_mask == 0,
-                                 action_values,
-                                 tf.ones_like(action_values) * action_values.dtype.min)
+        action_values = tf.where(action_mask == 0, action_values, action_values.dtype.min)
         self.total_value = tf.reduce_max(action_values, axis=1)
 
         action_weights = tf.reshape(flat_action_weights, action_mask_shape)
-        action_weights = tf.where(action_mask == 0,
-                                  action_weights,
-                                  tf.ones_like(action_weights) * action_weights.dtype.min)
+        action_weights = tf.where(action_mask == 0, action_weights, action_weights.dtype.min)
 
+        print(f'action_values {action_values}\naction_weights {action_weights}')
         return action_weights, state
 
     def value_function(self):
