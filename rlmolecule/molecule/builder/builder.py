@@ -4,7 +4,7 @@ import sys
 from abc import ABC, abstractmethod
 from functools import partial
 from multiprocessing import Pool
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Dict
 
 import numpy as np
 import rdkit
@@ -106,11 +106,11 @@ class MoleculeBuilder:
         if sa_score_threshold is not None:
             parallel_stack += [SAScoreFilter(sa_score_threshold, min_atoms)]
 
-        if stereoisomers:
-            parallel_stack += [StereoEnumerator()]
-
         if canonicalize_tautomers:
             parallel_stack += [TautomerCanonicalizer()]
+
+        if stereoisomers:
+            parallel_stack += [StereoEnumerator()]
 
         if not parallel:
             # If we're not running in parallel, reduce to unique molecules before embedding
@@ -193,19 +193,14 @@ class MoleculeFilter(MoleculeTransformer, ABC):
             yield molecule
 
 
-class UniqueMoleculeFilter(MoleculeFilter, ABC):
-    def __init__(self):
-        super(UniqueMoleculeFilter, self).__init__()
+class UniqueMoleculeFilter(BaseTransformer, ABC):
+    def __call__(self, inputs: Iterable[rdkit.Chem.Mol]) -> Iterable[rdkit.Chem.Mol]:
         self.seen_smiles = set()
-
-    def filter(self, molecule: rdkit.Chem.Mol) -> bool:
-        smiles = rdkit.Chem.MolToSmiles(molecule)
-        if smiles in self.seen_smiles:
-            return False
-
-        else:
-            self.seen_smiles.add(smiles)
-            return True
+        for molecule in inputs:
+            smiles = rdkit.Chem.MolToSmiles(molecule)
+            if smiles not in self.seen_smiles:
+                yield molecule
+                self.seen_smiles.add(smiles)
 
 
 class AddNewAtomsAndBonds(MoleculeTransformer):
@@ -217,12 +212,12 @@ class AddNewAtomsAndBonds(MoleculeTransformer):
             self.atom_additions = ('C', 'N', 'O')
 
     @staticmethod
-    def sanitize(molecule: rdkit.Chem.Mol) -> rdkit.Chem.Mol:
+    def sanitize(molecule: rdkit.Chem.Mol) -> Optional[rdkit.Chem.Mol]:
         """Sanitize the output molecules, as the RWmols don't have the correct initialization of rings and valence.
         Would be good to debug faster versions of this.
 
         :param molecule: rdkit RWmol or variant
-        :return: sanitized molecule
+        :return: sanitized molecule, or None if failed
         """
         # molecule = rdkit.Chem.Mol(molecule)
         # rdkit.Chem.SanitizeMol(molecule)
@@ -234,7 +229,9 @@ class AddNewAtomsAndBonds(MoleculeTransformer):
             for partner in self._get_valid_partners(molecule, atom):
                 for bond_order in self._get_valid_bonds(molecule, i, partner):
                     rw_mol = self._add_bond(molecule, i, partner, bond_order)
-                    yield self.sanitize(rw_mol)
+                    sanitized_mol = self.sanitize(rw_mol)
+                    if sanitized_mol is not None:
+                        yield sanitized_mol
 
     @staticmethod
     def _get_free_valence(atom) -> int:
@@ -280,24 +277,9 @@ class TautomerEnumerator(MoleculeTransformer):
 
 class TautomerCanonicalizer(MoleculeTransformer):
     def call(self, molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
-        yield tautomer_enumerator.Canonicalize(molecule)
-
-        # all_canonical = set()
-        # considered = set()
-        # for molecule in inputs:
-        #     try:
-        #         smiles = molecule.smiles
-        #     except AttributeError:
-        #         smiles = rdkit.Chem.MolToSmiles(molecule)
-        #
-        #     if smiles in considered:
-        #         continue
-        #
-        #     tautomers = tautomer_enumerator.Enumerate(molecule)
-        #     considered = considered.union(set(tautomers.smilesTautomerMap.values()))
-        #     all_canonical.add(SmilesMol(tautomer_enumerator.PickCanonical(tautomers)))
-        #
-        # return all_canonical
+        canonical = tautomer_enumerator.Canonicalize(molecule)
+        rdkit.Chem.FindMolChiralCenters(canonical, includeUnassigned=True)
+        yield canonical
 
 
 class StereoEnumerator(MoleculeTransformer):
@@ -305,8 +287,19 @@ class StereoEnumerator(MoleculeTransformer):
         super().__init__(**kwargs)
         self.opts = StereoEnumerationOptions(unique=True)
 
-    def call(self, molecule: rdkit.Chem.Mol) -> List[rdkit.Chem.Mol]:
-        return EnumerateStereoisomers(molecule, options=self.opts)
+    def call(self, molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
+        # return EnumerateStereoisomers(molecule, options=self.opts)
+
+        smiles_in = rdkit.Chem.MolToSmiles(molecule)
+        for out in EnumerateStereoisomers(molecule, options=self.opts):
+
+            smiles_out = rdkit.Chem.MolToSmiles(out)
+            stereo_count = count_stereocenters(smiles_out)
+            if stereo_count['atom_unassigned'] != 0:
+                print(f'{smiles_in}: {smiles_out}')
+            # if stereo_count['bond_unassigned'] == 0, f'{smiles_in}: {smiles_out}'
+
+            yield out
 
 
 class SAScoreFilter(MoleculeFilter):
@@ -340,3 +333,28 @@ class GdbFilter(MoleculeFilter):
         except Exception as ex:
             logger.warning(f"Issue with GDBFilter and molecule {Chem.MolToSmiles(molecule)}: {ex}")
             return False
+
+
+def count_stereocenters(smiles: str) -> Dict:
+    """ Returns a count of both assigned and unassigned stereocenters in the
+    given molecule. Mainly used for testing """
+
+    mol = rdkit.Chem.MolFromSmiles(smiles)
+    rdkit.Chem.FindPotentialStereoBonds(mol)
+
+    stereocenters = rdkit.Chem.FindMolChiralCenters(mol, includeUnassigned=True)
+    stereobonds = [bond for bond in mol.GetBonds() if bond.GetStereo() is not
+                   rdkit.Chem.rdchem.BondStereo.STEREONONE]
+
+    atom_assigned = len([center for center in stereocenters if center[1] != '?'])
+    atom_unassigned = len([center for center in stereocenters if center[1] == '?'])
+
+    bond_assigned = len([bond for bond in stereobonds if bond.GetStereo() is not
+                         rdkit.Chem.rdchem.BondStereo.STEREOANY])
+    bond_unassigned = len([bond for bond in stereobonds if bond.GetStereo() is
+                           rdkit.Chem.rdchem.BondStereo.STEREOANY])
+
+    return {'atom_assigned': atom_assigned,
+            'atom_unassigned': atom_unassigned,
+            'bond_assigned': bond_assigned,
+            'bond_unassigned': bond_unassigned}

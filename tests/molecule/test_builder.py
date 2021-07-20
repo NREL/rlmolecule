@@ -3,7 +3,7 @@ from tempfile import TemporaryDirectory
 import rdkit
 from rdkit.Chem.rdmolfiles import MolFromSmiles, MolToSmiles
 
-from rlmolecule.molecule.builder.builder import MoleculeBuilder
+from rlmolecule.molecule.builder.builder import MoleculeBuilder, count_stereocenters
 from rlmolecule.molecule.molecule_state import MoleculeState
 
 
@@ -119,3 +119,26 @@ def test_eagle_error2():
     mol = rdkit.Chem.MolFromSmiles('Cc1nc(-c2cc(=O)[nH][nH]2)c[nH]1')
     state = MoleculeState(mol, builder=builder)
     actions = state.get_next_actions()
+
+
+def test_eagle_error3():
+    """This one makes sure that stereoisomers and tautomerization work together"""
+
+    builder = MoleculeBuilder(max_atoms=15,
+                              min_atoms=4,
+                              try_embedding=True,
+                              sa_score_threshold=None,
+                              stereoisomers=True,
+                              canonicalize_tautomers=True,
+                              atom_additions=['C', 'N', 'O', 'S'],
+                              )
+
+    mol = rdkit.Chem.MolFromSmiles('CC(N)S')
+    state = MoleculeState(mol, builder=builder)
+    actions = state.get_next_actions()
+    smiles = to_smiles((state.molecule for state in actions))
+    action_length = len(smiles)
+    for action in actions[:-1]:
+        stereo_count = count_stereocenters(action.smiles)
+        assert stereo_count['atom_unassigned'] == 0, f"{action.smiles}"
+        assert stereo_count['bond_unassigned'] == 0, f"{action.smiles}"
