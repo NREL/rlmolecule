@@ -186,8 +186,9 @@ def construct_problem(run_config: RunConfig, stability_model: pathlib.Path, redo
                             canonicalize_tautomers=prob_config.get('canonicalize_tautomers', True),
                             atom_additions=prob_config.get('atom_additions', ('C', 'N', 'O', 'S')),
                             cache_dir=cache_dir,
-                            num_shards=prob_config.get('num_shards', 1))
-
+                            num_shards=prob_config.get('num_shards', 1),
+                            parallel=prob_config.get('parallel', True))
+    
     engine = run_config.start_engine()
 
     run_id = run_config.run_id
