@@ -29,10 +29,10 @@ class MoleculeGraphProblem(GraphProblem):
 
         # TODO: check ranges on these
         self._observation_space: gym.Space = gym.spaces.Dict({
-            'atom_class': gym.spaces.Box(
+            'atom': gym.spaces.Box(
                 low=0, high=self.preprocessor.atom_classes,
                 shape=(self.builder.max_atoms,), dtype=np.int),
-            'bond_class': gym.spaces.Box(
+            'bond': gym.spaces.Box(
                 low=0, high=self.preprocessor.bond_classes,
                 shape=(self.max_num_bonds,), dtype=np.int),
             'connectivity':

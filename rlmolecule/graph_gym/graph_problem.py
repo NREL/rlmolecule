@@ -1,3 +1,4 @@
+import math
 from abc import ABC, abstractmethod
 
 import gym
@@ -16,6 +17,10 @@ class GraphProblem(ABC):
     @abstractmethod
     def null_observation(self) -> any:
         pass
+
+    @property
+    def invalid_action_result(self) -> (float, bool, {}):
+        return -math.inf, False, {}
 
     @property
     @abstractmethod

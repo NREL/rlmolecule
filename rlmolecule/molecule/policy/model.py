@@ -48,7 +48,7 @@ def make_policy_model_internals(preprocessor: Optional[MolPreprocessor] = None,
                                   mask_zero=True)(bond_class)
 
     print(f'atom_class {atom_class.shape} bond_class {bond_class.shape} connectivity {connectivity.shape}')
-    print(f'atom_state {atom_state} bond_state {bond_state} connectivity {connectivity}')
+    # print(f'atom_state {atom_state} bond_state {bond_state} connectivity {connectivity}')
 
 
     units = features // num_heads

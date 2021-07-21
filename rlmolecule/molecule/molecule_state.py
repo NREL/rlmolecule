@@ -64,6 +64,7 @@ class MoleculeState(GraphSearchState):
             if self.num_atoms >= self.builder.min_atoms:
                 result.append(MoleculeState(self.molecule, self.builder, force_terminal=True))
 
+        print(f'get_next_actions() {self._smiles} {len(result)}')
         return result
 
     @property

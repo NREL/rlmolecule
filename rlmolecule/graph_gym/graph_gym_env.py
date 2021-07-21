@@ -1,4 +1,5 @@
 import logging
+import math
 from typing import Tuple, Dict
 
 import gym
@@ -31,22 +32,25 @@ class GraphGymEnv(gym.Env):
         return self.make_observation()
 
     def step(self, action: int) -> Tuple[Dict[str, np.ndarray], float, bool, dict]:
-        self.state = self.state.get_next_actions()[action]  # assumes get_next_actions is indexable
-        reward, is_terminal, info = self.problem.step(self.state)
+        next_actions = self.state.get_next_actions()
+
+        reward, is_terminal, info = self.problem.invalid_action_result
+        if action < len(next_actions):
+            self.state = next_actions[action]  # assumes get_next_actions is indexable
+            reward, is_terminal, info = self.problem.step(self.state)
+
         return self.make_observation(), reward, is_terminal, info
 
     def make_observation(self) -> {str: np.ndarray}:
-        action_mask = []
-        action_observations = []
+        max_num_actions = self.problem.max_num_actions
+        action_mask = [False] * max_num_actions
+        action_observations = [self.problem.null_observation] * max_num_actions
 
-        for successor in self.state.get_next_actions():
-            action_mask.append(True)
-            action_observations.append(self.problem.make_observation(successor))
-
-        null_observation = self.problem.null_observation
-        while len(action_mask) < self.problem.max_num_actions:
-            action_mask.append(False)
-            action_observations.append(null_observation)
+        for i, successor in enumerate(self.state.get_next_actions()):
+            if i >= max_num_actions:
+                break
+            action_mask[i] = True
+            action_observations[i] = self.problem.make_observation(successor)
 
         return {
             'action_mask': np.array(action_mask, dtype=np.bool),

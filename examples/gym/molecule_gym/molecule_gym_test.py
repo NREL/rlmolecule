@@ -46,9 +46,9 @@ if __name__ == "__main__":
                      name,
                      **kwargs):
             from examples.gym.molecule_gym.molecule_model import MoleculeModel
-            from rlmolecule.molecule.policy.model import make_policy_model_internals
-            # inner_action_model = policy_model()
-            per_action_model = MoleculeModel(make_policy_model_internals)
+            from rlmolecule.molecule.policy.model import policy_model
+            inner_action_model = policy_model()
+            per_action_model = MoleculeModel(inner_action_model)
             # super(ThisModel, self).__init__(
             #     obs_space, action_space, num_outputs, model_config, name,
             #     per_action_model,
@@ -85,8 +85,8 @@ if __name__ == "__main__":
             'num_gpus': 0.0,
             'num_gpus_per_worker': 0.0,
             'num_workers': 0,
-            # 'framework': 'tf2',
-            # 'eager_tracing': False,
+            'framework': 'tf2',
+            'eager_tracing': True,
             'rollout_fragment_length': int(1e2),
             'train_batch_size': int(1e3),
         },
