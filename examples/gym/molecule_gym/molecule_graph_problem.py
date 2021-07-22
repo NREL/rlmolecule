@@ -18,7 +18,7 @@ class MoleculeGraphProblem(GraphProblem):
                  builder: MoleculeBuilder,
                  preprocessor: Optional[MolPreprocessor] = None,
                  preprocessor_data: Optional[str] = None,
-                 max_num_actions: int = 32,
+                 max_num_actions: int = 64,
                  max_num_bonds: int = 40,
                  ) -> None:
         super().__init__()

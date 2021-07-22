@@ -76,19 +76,27 @@ if __name__ == "__main__":
     else:
         cfg = {}
 
+    num_workers = 3
     config = dict(
         {
             'env': 'molecule_graph_problem',
             'model': {
                 'custom_model': 'molecule_graph_problem_model',
             },
-            'num_gpus': 0.0,
-            'num_gpus_per_worker': 0.0,
-            'num_workers': 0,
+            'num_gpus': 0,
+            'num_gpus_per_worker': .1,
+            'num_workers': 2,
+            # 'num_gpus': 0,
+            # 'num_gpus_per_worker': 0,
+            # 'num_workers': 0,
+            # 'num_gpus': 0,
+            # 'num_gpus_per_worker': 0,
+            # 'num_workers': num_workers,
             'framework': 'tf2',
-            'eager_tracing': True,
+            # 'eager_tracing': True,
             'rollout_fragment_length': int(1e2),
             'train_batch_size': int(1e3),
+            # 'sgd_minibatch_size': 16,
         },
         **cfg)
 
