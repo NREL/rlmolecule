@@ -47,15 +47,15 @@ if __name__ == "__main__":
                      **kwargs):
             from examples.gym.molecule_gym.molecule_model import MoleculeModel
             from rlmolecule.molecule.policy.model import policy_model
-            inner_action_model = policy_model()
-            per_action_model = MoleculeModel(inner_action_model)
+            # inner_action_model = policy_model()
+            # per_action_model = MoleculeModel(inner_action_model)
             # super(ThisModel, self).__init__(
             #     obs_space, action_space, num_outputs, model_config, name,
             #     per_action_model,
             #     **kwargs)
             super(ThisModel, self).__init__(
                 obs_space, action_space, num_outputs, model_config, name,
-                per_action_model,
+                policy_model,
                 **kwargs)
 
 
@@ -83,9 +83,9 @@ if __name__ == "__main__":
             'model': {
                 'custom_model': 'molecule_graph_problem_model',
             },
-            'num_gpus': 0,
-            'num_gpus_per_worker': .1,
-            'num_workers': 2,
+            'num_gpus': .1,
+            'num_gpus_per_worker': 0.1,
+            'num_workers': 1,
             # 'num_gpus': 0,
             # 'num_gpus_per_worker': 0,
             # 'num_workers': 0,
@@ -93,10 +93,15 @@ if __name__ == "__main__":
             # 'num_gpus_per_worker': 0,
             # 'num_workers': num_workers,
             'framework': 'tf2',
-            # 'eager_tracing': True,
-            'rollout_fragment_length': int(1e2),
-            'train_batch_size': int(1e3),
-            # 'sgd_minibatch_size': 16,
+            'eager_tracing': True,
+            # 'framework': 'tf1',
+            # 'rollout_fragment_length': int(8),
+            # 'train_batch_size': int(16),
+            # 'sgd_minibatch_size': 8,
+            'rollout_fragment_length': int(16),
+            'train_batch_size': int(128),
+            'sgd_minibatch_size': 32,
+            "batch_mode": "truncate_episodes",
         },
         **cfg)
 

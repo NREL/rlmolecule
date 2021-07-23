@@ -21,10 +21,15 @@ class MoleculeModel:
         #                    action_observations['bond_class'],
         #                    action_observations['connectivity']))
 
+        # self.value, self.pi = self.policy_model(
+        #     [action_observations['atom'],
+        #      action_observations['bond'],
+        #      action_observations['connectivity']])
+
         self.value, self.pi = self.policy_model(
-            [action_observations['atom'],
-             action_observations['bond'],
-             action_observations['connectivity']])
+            {'atom':action_observations['atom'],
+             'bond':action_observations['bond'],
+             'connectivity':action_observations['connectivity']})
 
         # output_tensors = [o.output for o in self.policy_model.outputs]
         return self.value, self.pi

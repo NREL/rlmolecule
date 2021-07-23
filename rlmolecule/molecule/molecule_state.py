@@ -1,4 +1,4 @@
-from typing import Optional, Sequence
+from typing import Optional, Sequence, List
 
 from rdkit.Chem import Mol, MolToSmiles
 
@@ -32,6 +32,7 @@ class MoleculeState(GraphSearchState):
         self._molecule: Mol = molecule
         self._smiles: str = MolToSmiles(self._molecule) if smiles is None else smiles
         self._forced_terminal: bool = force_terminal
+        self._next_states : Optional[List[MoleculeState]] = None
 
     def __repr__(self) -> str:
         """
@@ -56,16 +57,17 @@ class MoleculeState(GraphSearchState):
 
     @collect_metrics
     def get_next_actions(self) -> Sequence['MoleculeState']:
-        result = []
-        if not self._forced_terminal:
-            if self.num_atoms < self.builder.max_atoms:
-                result.extend((MoleculeState(molecule, self.builder) for molecule in self.builder(self.molecule)))
+        if self._next_states is None:
+            next_states = []
+            if not self._forced_terminal:
+                if self.num_atoms < self.builder.max_atoms:
+                    next_states.extend((MoleculeState(molecule, self.builder) for molecule in self.builder(self.molecule)))
 
-            if self.num_atoms >= self.builder.min_atoms:
-                result.append(MoleculeState(self.molecule, self.builder, force_terminal=True))
+                if self.num_atoms >= self.builder.min_atoms:
+                    next_states.append(MoleculeState(self.molecule, self.builder, force_terminal=True))
+            self._next_states = next_states
 
-        print(f'get_next_actions() {self._smiles} {len(result)}')
-        return result
+        return self._next_states
 
     @property
     def forced_terminal(self) -> bool:
