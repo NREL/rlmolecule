@@ -1,12 +1,15 @@
 """
 
 """
+import sys
 
 import ray
 from ray import tune
 from ray.rllib.models import ModelCatalog
 from ray.rllib.utils.test_utils import check_learning_achieved
 from ray.tune.registry import register_env
+
+import command_line_tools
 
 if __name__ == "__main__":
     # args = parser.parse_args()
@@ -104,6 +107,8 @@ if __name__ == "__main__":
             "batch_mode": "truncate_episodes",
         },
         **cfg)
+
+    config = command_line_tools.parse_config_from_args(sys.argv[1:], config)
 
     # stop = {
     #     'training_iteration': args['stop_iters'],
