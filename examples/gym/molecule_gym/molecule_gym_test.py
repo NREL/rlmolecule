@@ -116,7 +116,7 @@ if __name__ == "__main__":
     #     'episode_reward_mean': args['stop_reward'],
     # }
 
-    results = tune.run(args['run'], config=config, verbose=3)
+    results = tune.run(args['run'], config=config, verbose=3, local_dir='.')
 
     if args['as_test']:
         check_learning_achieved(results, args['stop_reward'])
