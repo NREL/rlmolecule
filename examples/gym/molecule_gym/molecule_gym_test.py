@@ -82,13 +82,14 @@ if __name__ == "__main__":
     num_workers = 3
     config = dict(
         {
+            'local_dir' : '../log',
             'env': 'molecule_graph_problem',
             'model': {
                 'custom_model': 'molecule_graph_problem_model',
             },
-            'num_gpus': .1,
-            'num_gpus_per_worker': 0.1,
-            'num_workers': 1,
+            'num_gpus': 0,
+            'num_gpus_per_worker': 0,
+            'num_workers': 6,
             # 'num_gpus': 0,
             # 'num_gpus_per_worker': 0,
             # 'num_workers': 0,
@@ -96,15 +97,15 @@ if __name__ == "__main__":
             # 'num_gpus_per_worker': 0,
             # 'num_workers': num_workers,
             'framework': 'tf2',
-            'eager_tracing': True,
+            # 'eager_tracing': True,
             # 'framework': 'tf1',
             # 'rollout_fragment_length': int(8),
             # 'train_batch_size': int(16),
             # 'sgd_minibatch_size': 8,
-            'rollout_fragment_length': int(16),
-            'train_batch_size': int(128),
+            'rollout_fragment_length': 64,
+            'train_batch_size': 8192,
             'sgd_minibatch_size': 32,
-            "batch_mode": "truncate_episodes",
+            "batch_mode": 'truncate_episodes', #'"truncate_episodes",
         },
         **cfg)
 
@@ -116,7 +117,10 @@ if __name__ == "__main__":
     #     'episode_reward_mean': args['stop_reward'],
     # }
 
-    results = tune.run(args['run'], config=config, verbose=3, local_dir='.')
+    local_dir = config['local_dir']
+    del config['local_dir']
+
+    results = tune.run(args['run'], config=config, verbose=3, local_dir=local_dir)
 
     if args['as_test']:
         check_learning_achieved(results, args['stop_reward'])
