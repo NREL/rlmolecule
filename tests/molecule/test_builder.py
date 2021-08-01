@@ -82,8 +82,12 @@ def test_tautomers():
     mols_canonical = to_smiles(result)
     assert len(set(mols_canonical)) == 1
 
+    start = rdkit.Chem.MolFromSmiles('CC(=O)C')
     builder_tautomers = MoleculeBuilder(canonicalize_tautomers=True)
     products = to_smiles(builder_tautomers(start))
+    assert 'CCC(C)=O' in products
+    assert 'C=C(C)OC' in products
+
 
 
 def test_parallel_build():

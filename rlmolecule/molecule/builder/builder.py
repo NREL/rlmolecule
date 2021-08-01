@@ -33,26 +33,6 @@ from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.warning')
 
 
-# class SmilesMol(rdkit.Chem.Mol):
-#     def __init__(self, *args, **kwargs):
-#         super(SmilesMol, self).__init__(*args, **kwargs)
-#         self._smiles = None
-#
-#     def __hash__(self):
-#         return hash(self.smiles)
-#
-#     def __eq__(self, other: 'SmilesMol'):
-#         return self.smiles == other.smiles
-#
-#     @property
-#     def smiles(self):
-#         if self._smiles is not None:
-#             return self._smiles
-#         else:
-#             self._smiles = rdkit.Chem.MolToSmiles(self)
-#             return self._smiles
-
-
 class MoleculeBuilder:
     def __init__(self,
                  max_atoms: int = 10,
@@ -60,7 +40,7 @@ class MoleculeBuilder:
                  atom_additions: Optional[List] = None,
                  stereoisomers: bool = True,
                  canonicalize_tautomers: bool = False,
-                 sa_score_threshold: Optional[float] = 3.5,
+                 sa_score_threshold: Optional[float] = None,
                  try_embedding: bool = False,
                  cache_dir: Optional[str] = None,
                  num_shards: int = 1,
@@ -272,7 +252,11 @@ class AddNewAtomsAndBonds(MoleculeTransformer):
 
 class TautomerEnumerator(MoleculeTransformer):
     def call(self, molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
-        return tautomer_enumerator.Enumerate(molecule)
+        # return tautomer_enumerator.Enumerate(molecule)
+        for mol in tautomer_enumerator.Enumerate(molecule):
+            # Unfortunate to have to round-trip SMILES here, but appears otherwise the
+            # valences aren't updated correctly
+            yield rdkit.Chem.MolFromSmiles(rdkit.Chem.MolToSmiles(mol))
 
 
 class TautomerCanonicalizer(MoleculeTransformer):
