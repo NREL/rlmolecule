@@ -10,9 +10,7 @@ from rlmolecule.molecule.policy.preprocessor import MolPreprocessor, load_prepro
 def policy_model(preprocessor: Optional[MolPreprocessor] = None,
                  features: int = 64,
                  num_heads: int = 4,
-                 num_messages: int = 3,
-                 input_tensors: Optional[Tuple[tf.keras.Input, tf.keras.Input, tf.keras.Input]] = None,
-                 ) -> tf.keras.Model:
+                 num_messages: int = 3) -> tf.keras.Model:
     """ Constructs a policy model that predicts value, pi_logits from a batch of molecule inputs. Main model used in
     policy training and loading weights
 
@@ -22,41 +20,23 @@ def policy_model(preprocessor: Optional[MolPreprocessor] = None,
     :param num_messages: Number of message passing layers
     :return: The constructed policy model
     """
-
     if preprocessor is None:
         preprocessor = load_preprocessor()
 
-    if input_tensors is None:
-        # Define inputs
-        input_tensors = (
-            layers.Input(shape=[None], dtype=tf.int32, name='atom'),  # batch_size, num_atoms
-            layers.Input(shape=[None], dtype=tf.int32, name='bond'),  # batch_size, num_bonds
-            layers.Input(shape=[None, 2], dtype=tf.int32, name='connectivity'),  # batch_size, num_bonds, 2
-        )
+    # Define inputs
+    atom_class = layers.Input(shape=[None], dtype=tf.int64, name='atom')  # batch_size, num_atoms
+    bond_class = layers.Input(shape=[None], dtype=tf.int64, name='bond')  # batch_size, num_bonds
+    connectivity = layers.Input(shape=[None, 2], dtype=tf.int64, name='connectivity')  # batch_size, num_bonds, 2
 
-    atom_class, bond_class, connectivity = input_tensors
+    input_tensors = [atom_class, bond_class, connectivity]
 
-    if atom_class.dtype is not tf.int32:
-        atom_class = tf.cast(atom_class, tf.int32)
-
-    if bond_class.dtype is not tf.int32:
-        bond_class = tf.cast(bond_class, tf.int32)
-
-    if connectivity.dtype is not tf.int32:
-        connectivity = tf.cast(connectivity, tf.int32)
-
-    # print(f'make_policy_model_internals 1 {tf.executing_eagerly()}')
     # Initialize the atom states
     atom_state = layers.Embedding(preprocessor.atom_classes, features, name='atom_embedding',
                                   mask_zero=True)(atom_class)
 
-    # print('make_policy_model_internals 2')
     # Initialize the bond states
     bond_state = layers.Embedding(preprocessor.bond_classes, features, name='bond_embedding',
                                   mask_zero=True)(bond_class)
-
-    print(f'atom_class {atom_class.shape} bond_class {bond_class.shape} connectivity {connectivity.shape}', flush=True)
-    # print(f'atom_state {atom_state} bond_state {bond_state} connectivity {connectivity}')
 
     units = features // num_heads
     global_state = nfp.GlobalUpdate(units=units, num_heads=num_heads)([atom_state, bond_state, connectivity])
@@ -75,7 +55,9 @@ def policy_model(preprocessor: Optional[MolPreprocessor] = None,
     value_logit = layers.Dense(1)(global_state)
     pi_logit = layers.Dense(1)(global_state)
 
-    return tf.keras.Model(list(input_tensors), [value_logit, pi_logit], name='policy_model')
+    return tf.keras.Model(input_tensors, [value_logit, pi_logit], name='policy_model')
+
+
 #
 #
 # class PolicyWrapper(layers.Layer):
