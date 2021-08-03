@@ -80,9 +80,9 @@ if __name__ == "__main__":
             'model': {
                 'custom_model': 'parametric_gridworld_model',
             },
-            'num_gpus': 0.0,
-            'num_gpus_per_worker': 0.0,
-            'num_workers': 6,
+            'num_gpus': 0.2,
+            'num_gpus_per_worker': 0.1,
+            'num_workers': 4,
             'framework': 'tf2',
             'rollout_fragment_length': int(1e2),
             'train_batch_size': int(1e3),

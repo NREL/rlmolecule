@@ -19,7 +19,9 @@ class GraphGymModel(DistributionalQTFModel):
         super(GraphGymModel, self).__init__(
             obs_space, action_space, num_outputs, model_config, name, **kw)
 
-        self.per_action_model = MoleculeModel(per_action_model())
+        self.per_action_model = MoleculeModel(per_action_model(
+            features=8, num_heads=1, num_messages=1
+        ))
         self.total_value = None
 
     def forward(self, input_dict, state, seq_lens):

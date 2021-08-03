@@ -1,6 +1,13 @@
 """
 
 """
+import tensorflow as tf
+
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
+
 import sys
 
 import ray
@@ -25,9 +32,16 @@ if __name__ == "__main__":
 
 
     def make_env(_):
+        import tensorflow as tf
+        gpus = tf.config.list_physical_devices('GPU')
+        if gpus:
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+
         from examples.gym.molecule_gym.molecule_graph_problem import MoleculeGraphProblem
         from rlmolecule.graph_gym.graph_gym_env import GraphGymEnv
         from rlmolecule.molecule.builder.builder import MoleculeBuilder
+
         return GraphGymEnv(MoleculeGraphProblem(MoleculeBuilder()))
 
 
@@ -48,6 +62,12 @@ if __name__ == "__main__":
                      model_config,
                      name,
                      **kwargs):
+            import tensorflow as tf
+            gpus = tf.config.list_physical_devices('GPU')
+            if gpus:
+                for gpu in gpus:
+                    tf.config.experimental.set_memory_growth(gpu, True)
+
             from examples.gym.molecule_gym.molecule_model import MoleculeModel
             from rlmolecule.molecule.policy.model import policy_model
             # inner_action_model = policy_model()
@@ -82,13 +102,13 @@ if __name__ == "__main__":
     num_workers = 3
     config = dict(
         {
-            'local_dir' : '../log',
+            'local_dir': '../log',
             'env': 'molecule_graph_problem',
             'model': {
                 'custom_model': 'molecule_graph_problem_model',
             },
-            'num_gpus': 0,
-            'num_gpus_per_worker': 0,
+            'num_gpus': .2,
+            'num_gpus_per_worker': .1,
             'num_workers': 6,
             # 'num_gpus': 0,
             # 'num_gpus_per_worker': 0,
@@ -105,7 +125,7 @@ if __name__ == "__main__":
             'rollout_fragment_length': 64,
             'train_batch_size': 8192,
             'sgd_minibatch_size': 32,
-            "batch_mode": 'truncate_episodes', #'"truncate_episodes",
+            "batch_mode": 'truncate_episodes',  # '"truncate_episodes",
         },
         **cfg)
 
