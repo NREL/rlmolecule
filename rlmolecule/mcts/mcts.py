@@ -1,16 +1,17 @@
 import logging
 import math
 import random
+from time import time
 from typing import Callable, List, Optional, Type
 
 import numpy as np
 
-from rlmolecule.tree_search.dfs import dfs
-from rlmolecule.tree_search.reward import Reward
 from rlmolecule.mcts.mcts_problem import MCTSProblem
 from rlmolecule.mcts.mcts_vertex import MCTSVertex
+from rlmolecule.tree_search.dfs import dfs
 from rlmolecule.tree_search.graph_search import GraphSearch
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
+from rlmolecule.tree_search.reward import Reward
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +35,13 @@ class MCTS(GraphSearch[MCTSVertex]):
         return self._problem
 
     def run(
-        self,
-        state: Optional[GraphSearchState] = None,
-        num_mcts_samples: int = 256,
-        max_depth: int = 1000000,
-        action_selection_function: Optional[Callable[[MCTSVertex], MCTSVertex]] = None,
-        reset_canonicalizer: bool = True,
+            self,
+            state: Optional[GraphSearchState] = None,
+            num_mcts_samples: int = 256,
+            timeout: Optional[float] = None,
+            max_depth: int = 1000000,
+            action_selection_function: Optional[Callable[[MCTSVertex], MCTSVertex]] = None,
+            reset_canonicalizer: bool = True,
     ) -> ([], float):
         """
         Run the MCTS search from the given starting state (or the root node if not provided). This function runs a
@@ -66,7 +68,7 @@ class MCTS(GraphSearch[MCTSVertex]):
         path: [] = []
         for _ in range(max_depth):
             # todo: this loop is odd, we're sampling terminal nodes a whole bunch of extra times
-            self.sample(vertex, num_mcts_samples)
+            self.sample(vertex, num_mcts_samples, timeout=timeout)
             self._accumulate_path_data(vertex, path)
             if len(vertex.children) == 0:
                 return path, self.problem.reward_wrapper(vertex)
@@ -79,25 +81,33 @@ class MCTS(GraphSearch[MCTSVertex]):
         return path, math.nan  # todo: make sure this returns a reward class
 
     def sample(
-        self,
-        vertex: MCTSVertex,
-        num_mcts_samples: int = 1,
+            self,
+            vertex: MCTSVertex,
+            num_mcts_samples: int = 1,
+            timeout: Optional[float] = None,
     ) -> None:
         """
         Perform MCTS sampling from the given vertex.
         """
+        start_time = time()
         for _ in range(num_mcts_samples):
             search_path = self._select(vertex)
             value = self._evaluate(search_path)
             self._backpropagate(search_path, value)
+
+            if timeout:
+                # Break the iterations if we're running for a fixed time
+                if (time() - start_time) > timeout:
+                    return
+
 
     # noinspection PyMethodMayBeStatic
     def _accumulate_path_data(self, vertex: MCTSVertex, path: []):
         path.append(vertex)
 
     def _select(
-        self,
-        root: MCTSVertex,
+            self,
+            root: MCTSVertex,
     ) -> [MCTSVertex]:
         """
         Selection step of MCTS
@@ -143,8 +153,8 @@ class MCTS(GraphSearch[MCTSVertex]):
                     dfs(set(), child, leaf)
 
     def _evaluate(
-        self,
-        search_path: [MCTSVertex],
+            self,
+            search_path: [MCTSVertex],
     ) -> Reward:
         """
         Estimates the value of a leaf vertex.

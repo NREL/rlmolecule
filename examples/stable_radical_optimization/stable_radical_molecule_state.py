@@ -1,12 +1,19 @@
+import gzip
+import os
+import pickle
 from typing import Optional, Sequence
 
 import rdkit
 from rdkit import Chem
-from rdkit.Chem import Mol
+from rdkit.Chem import Mol, FragmentCatalog
 
-from rlmolecule.molecule.builder.builder import MoleculeBuilder, AddNewAtomsAndBonds
+from rlmolecule.molecule.builder.builder import MoleculeBuilder, AddNewAtomsAndBonds, MoleculeFilter
 from rlmolecule.molecule.molecule_state import MoleculeState
 from rlmolecule.tree_search.metrics import collect_metrics
+
+fcgen = FragmentCatalog.FragCatGenerator()
+fpgen = FragmentCatalog.FragFPGenerator()
+dir_path = os.path.dirname(os.path.realpath(__file__))
 
 
 class AddNewAtomsAndBondsProtectRadical(AddNewAtomsAndBonds):
@@ -16,10 +23,38 @@ class AddNewAtomsAndBondsProtectRadical(AddNewAtomsAndBonds):
         return fv - atom.GetNumRadicalElectrons()
 
 
-class MoleculeBuilderProtectRadical(MoleculeBuilder):
+class MoleculeBuilderWithFingerprint(MoleculeBuilder):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.transformation_stack += [FingerprintFilter()]
+
+
+class MoleculeBuilderProtectRadical(MoleculeBuilderWithFingerprint):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.transformation_stack[0] = AddNewAtomsAndBondsProtectRadical(kwargs['atom_additions'])
+
+
+class FingerprintFilter(MoleculeFilter):
+    def __init__(self):
+        super(FingerprintFilter, self).__init__()
+        with gzip.open(os.path.join(dir_path, 'redox_fragment_data.pz')) as f:
+            data = pickle.load(f)
+        self.fcat = data['fcat']
+        self.valid_fps = set(data['valid_fps'])
+
+    def get_fingerprint(self, mol):
+        fcgen.AddFragsFromMol(mol, self.fcat)
+        fp = fpgen.GetFPForMol(mol, self.fcat)
+        for i in fp.GetOnBits():
+            yield self.fcat.GetEntryDescription(i)
+
+    def filter(self, molecule: rdkit.Chem.Mol) -> bool:
+        fps = set(self.get_fingerprint(molecule))
+        if fps.difference(self.valid_fps) == set():
+            return True
+        else:
+            return False
 
 
 class StableRadMoleculeState(MoleculeState):

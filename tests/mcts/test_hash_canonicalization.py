@@ -10,7 +10,7 @@ from tests.qed_optimization_problem import QEDWithRandomPolicy
 def test_get_successors(engine):
     builder = MoleculeBuilder(max_atoms=4,
                               min_atoms=1,
-                              tryEmbedding=False,
+                              try_embedding=False,
                               sa_score_threshold=None,
                               stereoisomers=False)
 
@@ -27,11 +27,14 @@ def test_get_successors(engine):
     game._expand(successor1)
     successor1.update(1.0)
 
-    random.seed(42)
-    game.sample(root, 5)
+    CN = root.children[[vertex.state.smiles for vertex in root.children].index('CN')]
+    CC = root.children[[vertex.state.smiles for vertex in root.children].index('CC')]
 
-    child1 = root.children[1].children[0]  # CCN
-    child2 = root.children[0].children[1]  # CCN
+    game._expand(CC)
+    game._expand(CN)
+
+    child1 = CC.children[[vertex.state.smiles for vertex in CC.children].index('CCN')]
+    child2 = CN.children[[vertex.state.smiles for vertex in CN.children].index('CCN')]
 
     assert (child1 == child2)
     assert (child1.value == child2.value)

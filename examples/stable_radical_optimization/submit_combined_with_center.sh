@@ -1,15 +1,14 @@
 #!/bin/bash
 #SBATCH --account=bpms
 #SBATCH --time=4:00:00
-#SBATCH --job-name=stable_rad_opt
-#SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --mail-user=jlaw@nrel.gov
+#SBATCH --job-name=stable_rad_opt_no
+#SBATCH --output=/scratch/pstjohn/slurm.%j.out
 # --- Policy Trainer ---
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:2
 # --- MCTS Rollouts ---
 #SBATCH hetjob
-#SBATCH -N 10
+#SBATCH -N 50
 
 export WORKING_DIR=/scratch/${USER}/rlmolecule/stable_radical_optimization/
 mkdir -p $WORKING_DIR
@@ -20,8 +19,9 @@ export PYTHONPATH="$(readlink -e ../../):$PYTHONPATH"
 
 model_dir="/projects/rlmolecule/pstjohn/models/"; 
 stability_model="$model_dir/20210214_radical_stability_new_data/"
-redox_model="$model_dir/20210214_redox_new_data/"
+redox_model="$model_dir/20210602_redox_tempo/"
 bde_model="$model_dir/20210216_bde_new_nfp/"
+config="config/config_eagle_no.yaml"
 
 cat << EOF > "$START_POLICY_SCRIPT"
 #!/bin/bash
@@ -29,7 +29,9 @@ source $HOME/.bashrc
 module use /nopt/nrel/apps/modules/test/modulefiles/
 module load cudnn/8.1.1/cuda-11.2
 conda activate rlmol
-python -u stable_radical_opt_from_initial_center.py --train-policy \
+python -u stable_radical_opt.py \
+    --train-policy \
+    --config="$config" \
     --stability-model="$stability_model" \
     --redox-model="$redox_model" \
     --bde-model="$bde_model" 
@@ -39,7 +41,9 @@ cat << EOF > "$START_ROLLOUT_SCRIPT"
 #!/bin/bash
 source $HOME/.bashrc
 conda activate rlmol
-python -u stable_radical_opt_from_initial_center.py --rollout \
+python -u stable_radical_opt.py \
+    --rollout \
+    --config="$config" \
     --stability-model="$stability_model" \
     --redox-model="$redox_model" \
     --bde-model="$bde_model" 
@@ -53,7 +57,7 @@ srun --pack-group=0 \
      "$START_POLICY_SCRIPT" &
 
 srun --pack-group=1 \
-     --ntasks-per-node=18 \
+     --ntasks-per-node=9 \
      --job-name="az-rollout" \
      --output=$WORKING_DIR/mcts.%j.out \
      "$START_ROLLOUT_SCRIPT"

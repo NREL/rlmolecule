@@ -16,12 +16,14 @@ def prepare_for_bde(mol: rdkit.Chem.Mol) -> pd.Series:
     radical_index = None
     for i, atom in enumerate(mol.GetAtoms()):
         if atom.GetNumRadicalElectrons() != 0:
-            assert radical_index == None
+            assert radical_index is None
             radical_index = i
 
             atom.SetNumExplicitHs(atom.GetNumExplicitHs() + 1)
             atom.SetNumRadicalElectrons(0)
             break
+    else:
+        raise RuntimeError(f"No radical found: {Chem.MolToSmiles(mol)}")
 
     radical_rank = Chem.CanonicalRankAtoms(mol, includeChirality=True)[radical_index]
 

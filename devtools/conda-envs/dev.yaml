@@ -20,6 +20,9 @@ dependencies:
   - cclib
   - openbabel
   - networkx
+  - diskcache
+  - lazy_import
+  - scikit-learn
   - pip
   - pip:
     - nfp

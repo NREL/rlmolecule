@@ -15,6 +15,7 @@ dependencies:
   - pytest-cov
   - lazy_import
   - networkx
+  - diskcache
   - pip
   - pip:
     - nfp
