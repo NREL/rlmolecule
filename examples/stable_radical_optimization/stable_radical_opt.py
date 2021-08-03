@@ -30,6 +30,7 @@ def run_games(run_config: RunConfig, **kwargs) -> None:
     while True:
         path, reward = game.run(
             num_mcts_samples=config.get('num_mcts_samples', 50),
+            timeout=config.get('timeout', None),
             max_depth=config.get('max_depth', 1000000),
         )
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')

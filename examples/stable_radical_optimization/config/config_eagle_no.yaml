@@ -37,8 +37,8 @@ train_config:
   # https://stackoverflow.com/a/49924566/7483950
   # learning rate
   lr: 1E-3
-  # number times that the learning algorithm will work through the entire training dataset
-  epochs: 1E4
+  # number times that the learning algorithm will work through the entire training dataset (PSJ -- we actually never want training to stop)
+  epochs: 1E6
   # number of batch iterations before a training epoch is considered finished
   steps_per_epoch: 100
   # number of seconds to wait to check if enough games have been played
