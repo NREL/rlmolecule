@@ -1,6 +1,6 @@
 # Config file for stable_radical_opt.py
 
-run_id: 'stable_rad_c_tautomers_fp3'
+run_id: 'stable_rad_c_tautomers_fp2'
 
 # Parameters for setting up the problem
 problem_config:
