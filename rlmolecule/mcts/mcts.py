@@ -20,10 +20,14 @@ class MCTS(GraphSearch[MCTSVertex]):
                  problem: MCTSProblem,
                  ucb_constant: float = math.sqrt(2),
                  vertex_class: Optional[Type[MCTSVertex]] = None,
+                 state_builder: any = None,
                  **kwargs) -> None:
         super().__init__(MCTSVertex if vertex_class is None else vertex_class)
         self._problem: MCTSProblem = problem
         self.ucb_constant: float = ucb_constant
+        #:param state_builder: In some cases, a state uses a complex state_builder to select the next actions.
+        #If passed in here, it will be passed to the state's get_next_actions() function
+        self.state_builder = state_builder
 
     @property
     def problem(self) -> MCTSProblem:
@@ -126,7 +130,11 @@ class MCTS(GraphSearch[MCTSVertex]):
             return [x for x in seq if not (x in seen or seen_add(x))]
 
         if leaf.children is None:
-            leaf.children = dedupe((self.get_vertex_for_state(state) for state in leaf.state.get_next_actions()))
+            if self.state_builder:
+                children = leaf.state.get_next_actions(self.state_builder)
+            else:
+                children = leaf.state.get_next_actions()
+            leaf.children = dedupe((self.get_vertex_for_state(state) for state in children))
 
             for child in leaf.children:
                 # child.children is initialized to None, so this only checks nodes where a transposition pointed
@@ -156,7 +164,10 @@ class MCTS(GraphSearch[MCTSVertex]):
 
         state = leaf.state
         while True:
-            children = state.get_next_actions()
+            if self.state_builder:
+                children = state.get_next_actions(self.state_builder)
+            else:
+                children = state.get_next_actions()
             if len(children) == 0:
                 return self.problem.reward_wrapper(self.get_vertex_for_state(state))
             state = random.choice(children)

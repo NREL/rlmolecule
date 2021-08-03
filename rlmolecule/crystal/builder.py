@@ -30,6 +30,8 @@ class CrystalBuilder:
                                  delimiter='\t',
                                  data=False,
                                  create_using=nx.DiGraph())
+            # some of the nodes are meant to be tuples. Fix that here
+            nx.relabel_nodes(G, {n: eval(n) for n in G.nodes(data=False) if '(' in n}, copy=False)
 
         if G2 is None:
             G2 = nx.read_edgelist(action_graph2_file,
@@ -73,7 +75,6 @@ class CrystalBuilder:
                     comp_type = self.comp_to_comp_type.get(neighbor)
                     composition = neighbor if comp_type is not None else None
                     next_state = CrystalState(action_node=neighbor,
-                                              builder=self,
                                               composition=composition,
                                               terminal=False,
                                               )
@@ -93,14 +94,7 @@ class CrystalBuilder:
                     structure = None
                     if self.G2.out_degree(neighbor) == 0:
                         terminal = True
-                        # TODO cache the decorated structuers?
-                        # There could be over 15M which would take a lot of RAM
-                        # instead of caching the structes, I can just cache the end reward value
-                        # decorated_structure = self.decorated_structures.get()
-                        # structure_key = crystal_state.composition + '|' + crystal_state.action_node
-                        # icsd_prototype = self.icsd_structures[structure_key]
                     next_state = CrystalState(action_node=neighbor,
-                                              builder=self,
                                               composition=crystal_state.composition,
                                               # structure=decorated_structure,
                                               terminal=terminal,

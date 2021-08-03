@@ -1,13 +1,11 @@
+import argparse
 import math
 import pandas as pd
 import random
 import gzip
 
+from rlmolecule.crystal.crystal_state import CrystalState
 from examples.crystal_volume import optimize_crystal_volume as ocv
-#from examples.crystal_volume.crystal_problem import CrystalTFAlphaZeroProblem
-from examples.crystal_volume.crystal_state import CrystalState
-
-#from rlmolecule.tree_search.reward import RankedRewardFactory
 
 
 # these should have different decorations and different crystal volumes
@@ -40,3 +38,15 @@ for action_node in nodes_to_check:
     out_file = f"outputs/POSCAR_{action_node.replace('|','-')}"
     print(f"writing {out_file}")
     decorated_structure.to(filename=out_file)
+
+
+#if __name__ == "__main__":
+#
+#    parser = argparse.ArgumentParser(description='Compute the fraction of volume for the conducting ion of a given structure file',)
+#    parser.add_argument('--structure-file', type=str, help='Configuration file')
+#    parser.add_argument('--train-policy', action="store_true", default=False,
+#                        help='Train the policy model only (on GPUs)')
+#    parser.add_argument('--rollout', action="store_true", default=False, help='Run the game simulations only (on CPUs)')
+#
+#    args = parser.parse_args()
+

@@ -1,7 +1,7 @@
 import itertools
 import re
 from copy import deepcopy
-from typing import Iterable, Optional, Sequence, Tuple
+from typing import Iterable, Optional, Sequence, Tuple, Union
 
 import numpy as np
 from pymatgen.core import Composition, Structure
@@ -11,7 +11,7 @@ from rlmolecule.tree_search.graph_search_state import GraphSearchState
 from rlmolecule.tree_search.metrics import collect_metrics
 
 
-# import pdb
+crystal_systems = {'triclinic', 'monoclinic', 'orthorhombic', 'tetragonal', 'trigonal', 'hexagonal', 'cubic'}
 
 
 class CrystalState(GraphSearchState):
@@ -25,18 +25,16 @@ class CrystalState(GraphSearchState):
     def __init__(
             self,
             action_node: any,
-            builder: any,
             composition: Optional[str] = None,
             # structure: Optional[Structure] = None,
             terminal: bool = False,
     ) -> None:
         """
         :param action_node: A representation of the current state in one of the action graphs
-        :param builder: A CrystalBuilder class
+            e.g., 'Zn1Hg1Al1F1Cl6' in the first graph, or '1_1_1_1_6|cubic' of the second graph
         :param terminal: Whether this state is a decoration of a specific structure (i.e., final state)
         """
         self._action_node: any = action_node
-        self._builder: any = builder
         self._composition: str = composition
         # self._structure: Optional[Structure] = structure
         self._terminal: bool = terminal
@@ -47,7 +45,7 @@ class CrystalState(GraphSearchState):
         """
         comp_str = self._composition + '|' if self._composition is not None else ""
         comp_str = "" if self._composition == self._action_node else comp_str
-        return comp_str + self._action_node
+        return comp_str + str(self._action_node)
 
     # noinspection PyUnresolvedReferences
     def equals(self, other: any) -> bool:
@@ -64,10 +62,15 @@ class CrystalState(GraphSearchState):
         return hash_to_integer(self.__repr__().encode())
 
     @collect_metrics
-    def get_next_actions(self) -> Sequence['CrystalState']:
+    # Storing the builder as part of the crystal state was really slowing down the serialization step.
+    # so just pass the builder here
+    def get_next_actions(self, builder) -> Sequence['CrystalState']:
+        """
+        :param builder: A CrystalBuilder class
+        """
         result = []
         if not self._terminal:
-            result.extend(self.builder(self))
+            result.extend(builder(self))
 
         return result
 
@@ -159,17 +162,25 @@ class CrystalState(GraphSearchState):
     #     return self._comp_type
 
     @property
-    def action_node(self) -> str:
+    def action_node(self) -> Union[str, tuple]:
         return self._action_node
 
-    # @property
-    # def structure(self) -> Structure:
-    #     return self._structure
+    def get_crystal_sys(self) -> str:
+        if '|' not in self.action_node:
+            return None
+        # extract the crystal system str from the action node
+        crystal_sys_str = self.action_node.split('|')[1]
+        assert crystal_sys_str in crystal_systems
+        return crystal_sys_str
+
+    def get_proto_strc(self) -> str:
+        if '|' not in self.action_node or len(self.action_node.split('|')) < 3:
+            return None
+        # extract the prototype structure str from the action node
+        proto_strc_str = self.action_node.split('|')[2]
+        # TODO add a check here to ensure this is a valid prototype structure string e.g., POSCAR_sg14_icsd_083588
+        return proto_strc_str
 
     @property
     def terminal(self) -> bool:
         return self._terminal
-
-    @property
-    def builder(self) -> any:
-        return self._builder

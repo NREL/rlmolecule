@@ -3,6 +3,7 @@
 
 import argparse
 import logging
+import math
 import os
 import time
 import pandas as pd
@@ -15,12 +16,11 @@ from pymatgen.core import Structure
 from pymatgen.analysis import local_env
 
 from rlmolecule.crystal.builder import CrystalBuilder
-#from examples.crystal_volume.crystal_problem import CrystalTFAlphaZeroProblem
-from examples.crystal_volume.crystal_problem import CrystalProblem
-from examples.crystal_volume.crystal_state import CrystalState
+from rlmolecule.crystal.crystal_problem import CrystalTFAlphaZeroProblem
+from rlmolecule.crystal.crystal_state import CrystalState
 from rlmolecule.sql.run_config import RunConfig
-#from rlmolecule.tree_search.reward import RankedRewardFactory
-from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
+# from rlmolecule.tree_search.reward import RankedRewardFactory
+from rlmolecule.tree_search.reward import LinearBoundedRewardFactory, RankedRewardFactory
 from rlmolecule.sql import Base, Session
 from rlmolecule.sql.tables import GameStore
 
@@ -42,10 +42,10 @@ def read_structures_file(structures_file):
 def write_structures_file(structures_file, structures_dict):
     logger.info(f"writing {structures_file}")
     with gzip.open(structures_file, 'w') as out:
-            out.write(json.dumps(structures_dict, indent=2).encode())
+        out.write(json.dumps(structures_dict, indent=2).encode())
 
 
-def compute_structure_vol(structure: Structure):
+def compute_structure_vol(structure: Structure, state=None):
     """ compute the total volume and the volume of just the conducting ions
     """
     # if the voronoi search fails, could try increasing the cutoff here
@@ -53,16 +53,19 @@ def compute_structure_vol(structure: Structure):
         try:
             voronoi_stats = nn.get_all_voronoi_polyhedra(structure)
             break
+        # this function often fails for large or spaced out structures
         except ValueError as e:
-            # TODO log these as warnings
-            #print(f"ValueError: {e}. ({descriptor})")
-            return 0,0
+            if state:
+                logger.warning(f"compute_structure_vol:ValueError: {e}  -  {state}")
+            return 0, 0
         except MemoryError as e:
-            #print(f"MemoryError: {e}")
-            return 0,0
+            if state:
+                logger.warning(f"compute_structure_vol:MemoryError: {e}  -  {state}")
+            return 0, 0
         except RuntimeError as e:
-            logger.warning(f"RuntimeError: {e}  -  {repr(structure)}")
-            return 0,0
+            if state:
+                logger.warning(f"compute_structure_vol:RuntimeError: {e}  -  {state}")
+            return 0, 0
 
     total_vol = 0
     conducting_ion_vol = defaultdict(int)
@@ -90,22 +93,13 @@ def compute_structure_vol(structure: Structure):
     return conducting_ion_vol, total_vol
 
 
-class CrystalVolOptimizationProblem(CrystalProblem):
-    #def get_initial_state(self) -> CrystalState:
+class CrystalVolOptimizationProblem(CrystalTFAlphaZeroProblem):
+    # def get_initial_state(self) -> CrystalState:
     #    return CrystalState(rdkit.Chem.MolFromSmiles('C'), self._config)
 
     def get_reward(self, state: CrystalState) -> (float, {}):
-        #if state.forced_terminal:
-        #    return qed(state.molecule), {'forced_terminal': True, 'smiles': state.smiles}
         if state.terminal:
-            # if this has already been computed, then skip it
-            descriptor = repr(state)
-            comp_type = state.action_node.split('|')[0]
-            if descriptor in volume_stats:
-                stats = volume_stats[descriptor]
-                return stats[2], {'terminal': True, 'state_repr': repr(state)}
-
-            # Now create the decoration of this composition onto this prototype structure
+            # Create the decoration of this composition onto this prototype structure
             # the 'action_node' string has the following format at this point:
             # comp_type|prototype_structure|decoration_idx
             # we just need 'comp_type|prototype_structure' to get the icsd structure
@@ -115,14 +109,12 @@ class CrystalVolOptimizationProblem(CrystalProblem):
             try:
                 decorated_structure, comp = CrystalState.decorate_prototype_structure(
                     icsd_prototype, state.composition, decoration_idx=decoration_idx)
-                decorations[descriptor] = decorated_structure.as_dict()
             except AssertionError as e:
                 print(f"AssertionError: {e}")
-                volume_stats[descriptor] = (-1, -1, 0, comp_type)
                 return 0.0, {'terminal': True, 'state_repr': repr(state)}
 
             # Compute the volume of the conducting ions.
-            conducting_ion_vol, total_vol = compute_structure_vol(decorated_structure)
+            conducting_ion_vol, total_vol = compute_structure_vol(decorated_structure, state=str(state))
             frac_conducting_ion_vol = conducting_ion_vol / total_vol if total_vol != 0 else 0
             info = {
                 'terminal': True,
@@ -130,83 +122,75 @@ class CrystalVolOptimizationProblem(CrystalProblem):
                 'total_vol': total_vol,
                 'state_repr': repr(state),
             }
-            #if total_vol != 0:
-            volume_stats[descriptor] = (conducting_ion_vol, total_vol, frac_conducting_ion_vol, comp_type)
             return frac_conducting_ion_vol, info
-            ## For now, set a dummy reward which is the length of the string representation
-            #return len(repr(state)), {'terminal': True, 'state_repr': repr(state)}
         return 0.0, {'terminal': False, 'state_repr': repr(state)}
 
 
 def create_problem():
     prob_config = run_config.problem_config
 
-    builder = CrystalBuilder(G, G2)
-
     run_id = run_config.run_id
     train_config = run_config.train_config
 
-    # reward_factory = RankedRewardFactory(engine=engine,
-    #                                      run_id=run_id,
-    #                                      reward_buffer_min_size=train_config.get('reward_buffer_min_size', 10),
-    #                                      reward_buffer_max_size=train_config.get('reward_buffer_max_size', 50),
-    #                                      ranked_reward_alpha=train_config.get('ranked_reward_alpha', 0.75))
+    reward_factory = RankedRewardFactory(engine=engine,
+                                         run_id=run_id,
+                                         reward_buffer_min_size=train_config.get('reward_buffer_min_size', 10),
+                                         reward_buffer_max_size=train_config.get('reward_buffer_max_size', 50),
+                                         ranked_reward_alpha=train_config.get('ranked_reward_alpha', 0.75))
 
-    reward_factory = LinearBoundedRewardFactory(min_reward=train_config.get('min_reward', 0),
-                                                max_reward=train_config.get('max_reward', 1))
+    # reward_factory = LinearBoundedRewardFactory(min_reward=train_config.get('min_reward', 0),
+    #                                             max_reward=train_config.get('max_reward', 1))
 
-    problem = CrystalVolOptimizationProblem(#engine,
-                                     builder,
-                                     #run_id=run_id,
-                                     reward_class=reward_factory,
-                                     #num_messages=train_config.get('num_messages', 1),
-                                     #num_heads=train_config.get('num_heads', 2),
-                                     #features=train_config.get('features', 8),
-                                     #max_buffer_size=train_config.get('max_buffer_size', 200),
-                                     #min_buffer_size=train_config.get('min_buffer_size', 15),
-                                     #batch_size=train_config.get('batch_size', 32),
-                                     #policy_checkpoint_dir=train_config.get('policy_checkpoint_dir',
-                                     #                                       'policy_checkpoints'))
-                                            )
+    problem = CrystalVolOptimizationProblem(engine,
+                                            run_id=run_id,
+                                            reward_class=reward_factory,
+                                            features=train_config.get('features', 64),
+                                            max_buffer_size=train_config.get('max_buffer_size', 200),
+                                            min_buffer_size=train_config.get('min_buffer_size', 15),
+                                            batch_size=train_config.get('batch_size', 32),
+                                            policy_checkpoint_dir=train_config.get('policy_checkpoint_dir',
+                                                                                  'policy_checkpoints'))
 
     return problem
 
 
 def run_games():
-    # from rlmolecule.alphazero.alphazero import AlphaZero
+    from rlmolecule.alphazero.alphazero import AlphaZero
+
+    builder = CrystalBuilder()
     config = run_config.mcts_config
-    # game = AlphaZero(
-    #     create_problem(),
-    #     min_reward=config.get('min_reward', 0.0),
-    #     pb_c_base=config.get('pb_c_base', 1.0),
-    #     pb_c_init=config.get('pb_c_init', 1.25),
-    #     dirichlet_noise=config.get('dirichlet_noise', True),
-    #     dirichlet_alpha=config.get('dirichlet_alpha', 1.0),
-    #     dirichlet_x=config.get('dirichlet_x', 0.25),
-    #     # MCTS parameters
-    #     ucb_constant=config.get('ucb_constant', math.sqrt(2)),
-    # )
-    from rlmolecule.mcts.mcts import MCTS
-    game = MCTS(
+    game = AlphaZero(
         create_problem(),
+        min_reward=config.get('min_reward', 0.0),
+        pb_c_base=config.get('pb_c_base', 1.0),
+        pb_c_init=config.get('pb_c_init', 1.25),
+        dirichlet_noise=config.get('dirichlet_noise', True),
+        dirichlet_alpha=config.get('dirichlet_alpha', 1.0),
+        dirichlet_x=config.get('dirichlet_x', 0.25),
+        # MCTS parameters
+        ucb_constant=config.get('ucb_constant', math.sqrt(2)),
+        state_builder=builder,
     )
-    i = 0
+    from rlmolecule.mcts.mcts import MCTS
+    #game = MCTS(
+    #    create_problem(),
+    #)
+    # i = 0
     while True:
         path, reward = game.run(
-            num_mcts_samples=config.get('num_mcts_samples', 1),
+            num_mcts_samples=config.get('num_mcts_samples', 5),
             max_depth=config.get('max_depth', 1000000),
-            reset_canonicalizer=False,
         )
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1]}')
 
-        i += 1
-        if i % 10 == 0:
-            df = pd.DataFrame(volume_stats).T
-            df.columns = ['conducting_ion_vol', 'total_vol', 'fraction', 'comp_type']
-            df = df.sort_index()
-            print(f"writing current stats to {out_file}")
-            df.to_csv(out_file, sep='\t')
-            write_structures_file(decorations_file, decorations)
+        # i += 1
+        # if i % 10 == 0:
+        #     df = pd.DataFrame(volume_stats).T
+        #     df.columns = ['conducting_ion_vol', 'total_vol', 'fraction', 'comp_type']
+        #     df = df.sort_index()
+        #     print(f"writing current stats to {out_file}")
+        #     df.to_csv(out_file, sep='\t')
+            # write_structures_file(decorations_file, decorations)
 
 
 def train_model():
@@ -239,8 +223,8 @@ def monitor():
     problem = create_problem()
 
     while True:
-        #best_reward = problem.session.query(RewardStore) \
-            #.filter_by(run_id=problem.run_id) \
+        # best_reward = problem.session.query(RewardStore) \
+        # .filter_by(run_id=problem.run_id) \
         best_reward = session.query(RewardStore) \
             .filter_by(run_id=run_id) \
             .order_by(RewardStore.reward.desc()).first()
@@ -258,7 +242,8 @@ def monitor():
 # want to maximize the volume around only the conducting ions
 conducting_ions = set(['Li', 'Na', 'K', 'Mg', 'Zn'])
 anions = set(['F', 'Cl', 'Br', 'I', 'O', 'S', 'N', 'P'])
-framework_cations = set(['Sc', 'Y', 'La', 'Ti', 'Zr', 'Hf', 'W', 'Zn', 'Cd', 'Hg', 'B', 'Al', 'Si', 'Ge', 'Sn', 'P', 'Sb'])
+framework_cations = set(
+    ['Sc', 'Y', 'La', 'Ti', 'Zr', 'Hf', 'W', 'Zn', 'Cd', 'Hg', 'B', 'Al', 'Si', 'Ge', 'Sn', 'P', 'Sb'])
 
 # Many structures fail with the default cutoff radius in Angstrom to look for near-neighbor atoms (13.0)
 # with the error: "No Voronoi neighbors found for site".
@@ -266,46 +251,34 @@ framework_cations = set(['Sc', 'Y', 'La', 'Ti', 'Zr', 'Hf', 'W', 'Zn', 'Cd', 'Hg
 # Increasing the cutoff takes longer. If I bump it up to 1000, it can take over 100 Gb of Memory!
 nn13 = local_env.VoronoiNN(cutoff=13, compute_adj_neighbors=False)
 
-# load the action graphs for the search space
-G = nx.DiGraph()
-G2 = nx.DiGraph()
-action_graph_file = "../../rlmolecule/crystal/inputs/elements_to_compositions.edgelist.gz"
-logger.info(f"reading {action_graph_file}")
-G = nx.read_edgelist(action_graph_file, delimiter='\t', data=False, create_using=G)
-logger.info(f'\t{G.number_of_nodes()} nodes, {G.number_of_edges()} edges')
-
-action_graph2_file = "../../rlmolecule/crystal/inputs/comp_type_to_decorations.edgelist.gz"
-logger.info(f"reading {action_graph2_file}")
-G2 = nx.read_edgelist(action_graph2_file, delimiter='\t', data=False, create_using=G2)
-logger.info(f'\t{G2.number_of_nodes()} nodes, {G2.number_of_edges()} edges')
-
 # also load the icsd prototype structures
 # https://pymatgen.org/usage.html#side-note-as-dict-from-dict
 icsd_prototypes_file = "../../rlmolecule/crystal/inputs/icsd_prototypes.json.gz"
 structures = read_structures_file(icsd_prototypes_file)
 
-# Temporary caching approach:
-# store the computed structures in a json file
-decorations = {}
-run_id = "2021-06-22"
-base_dir = f"/projects/rlmolecule/jlaw/crystals/{run_id}"
-decorations_file = f"{base_dir}/decorations.json.gz"
-if os.path.isfile(decorations_file):
-    decorations = read_structures_file(decorations_file)
-# keep track of the composition volume and total volume for each decoration
-volume_stats = {}
-errored = set()
-# shubham said they didn't consider prototypes with more than 50 atoms when calculating the DFT relaxed structures.
-max_atoms = 50
-skipped_max_atoms = []
-skipped_prototypes = set()
-out_file = f"{base_dir}/volume-stats.tsv"
-if os.path.isfile(out_file):
-    logger.info(f"reading {out_file}")
-    df = pd.read_csv(out_file, sep='\t', index_col=0)
-    volume_stats = dict(zip(df.index, df.values))
-    logger.info(f"\tread {len(volume_stats)} values")
-
+# # Temporary caching approach:
+# # store the computed structures in a json file
+# decorations = {}
+# run_id = "2021-07-01"
+# # base_dir = f"/projects/rlmolecule/jlaw/crystals/{run_id}"
+# base_dir = f"./{run_id}"
+# os.makedirs(base_dir, exist_ok=True)
+# decorations_file = f"{base_dir}/decorations.json.gz"
+# if os.path.isfile(decorations_file):
+#     decorations = read_structures_file(decorations_file)
+# # keep track of the composition volume and total volume for each decoration
+# volume_stats = {}
+# errored = set()
+# # shubham said they didn't consider prototypes with more than 50 atoms when calculating the DFT relaxed structures.
+# max_atoms = 50
+# skipped_max_atoms = []
+# skipped_prototypes = set()
+# out_file = f"{base_dir}/volume-stats.tsv"
+# # if os.path.isfile(out_file):
+# #     logger.info(f"reading {out_file}")
+# #     df = pd.read_csv(out_file, sep='\t', index_col=0)
+# #     volume_stats = dict(zip(df.index, df.values))
+# #     logger.info(f"\tread {len(volume_stats)} values")
 
 if __name__ == "__main__":
 
@@ -327,8 +300,7 @@ if __name__ == "__main__":
     session = Session()
 
     if args.train_policy:
-        print("policy model not yet implemented")
-    #     train_model()
+        train_model()
     if args.rollout:
         # make sure the rollouts do not use the GPU
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
