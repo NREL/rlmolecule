@@ -38,7 +38,7 @@ class MoleculeBuilder:
                  max_atoms: int = 10,
                  min_atoms: int = 4,
                  atom_additions: Optional[List] = None,
-                 stereoisomers: bool = True,
+                 stereoisomers: bool = False,
                  canonicalize_tautomers: bool = False,
                  sa_score_threshold: Optional[float] = None,
                  try_embedding: bool = False,
