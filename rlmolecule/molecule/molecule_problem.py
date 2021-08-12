@@ -9,7 +9,7 @@ from rlmolecule.alphazero.tensorflow.tfalphazero_problem import TFAlphaZeroProbl
 from rlmolecule.mcts.mcts_problem import MCTSProblem
 from rlmolecule.molecule.molecule_state import MoleculeState
 from rlmolecule.molecule.policy.model import policy_model
-from rlmolecule.molecule.policy.preprocessor import MolPreprocessor, load_preprocessor
+from rlmolecule.molecule.policy.preprocessor import load_preprocessor
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class MoleculeTFAlphaZeroProblem(MoleculeProblem, TFAlphaZeroProblem, ABC):
     def __init__(self,
                  engine: sqlalchemy.engine.Engine,
                  builder: 'MoleculeBuilder',
-                 preprocessor: Optional[MolPreprocessor] = None,
+                 preprocessor: Optional['MolPreprocessor'] = None,
                  preprocessor_data: Optional[str] = None,
                  features: int = 64,
                  num_heads: int = 4,

@@ -4,10 +4,10 @@ import nfp
 import tensorflow as tf
 from tensorflow.keras import layers
 
-from rlmolecule.molecule.policy.preprocessor import MolPreprocessor, load_preprocessor
+from rlmolecule.molecule.policy.preprocessor import load_preprocessor
 
 
-def policy_model(preprocessor: Optional[MolPreprocessor] = None,
+def policy_model(preprocessor: Optional[nfp.MolPreprocessor] = None,
                  features: int = 64,
                  num_heads: int = 4,
                  num_messages: int = 3) -> tf.keras.Model:
@@ -24,9 +24,9 @@ def policy_model(preprocessor: Optional[MolPreprocessor] = None,
         preprocessor = load_preprocessor()
 
     # Define inputs
-    atom_class = layers.Input(shape=[None], dtype=tf.int64, name='atom')  # batch_size, num_atoms
-    bond_class = layers.Input(shape=[None], dtype=tf.int64, name='bond')  # batch_size, num_bonds
-    connectivity = layers.Input(shape=[None, 2], dtype=tf.int64, name='connectivity')  # batch_size, num_bonds, 2
+    atom_class = layers.Input(shape=[None], dtype=tf.int32, name='atom')  # batch_size, num_atoms
+    bond_class = layers.Input(shape=[None], dtype=tf.int32, name='bond')  # batch_size, num_bonds
+    connectivity = layers.Input(shape=[None, 2], dtype=tf.int32, name='connectivity')  # batch_size, num_bonds, 2
 
     input_tensors = [atom_class, bond_class, connectivity]
 
