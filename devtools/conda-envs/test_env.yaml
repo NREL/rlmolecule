@@ -17,4 +17,4 @@ dependencies:
   - diskcache
   - pip
   - pip:
-    - nfp<0.3.0
+    - nfp>=0.3.0
