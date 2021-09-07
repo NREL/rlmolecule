@@ -1,3 +1,6 @@
+import time
+import traceback
+
 import tensorflow as tf
 from ray.rllib.agents.dqn.distributional_q_tf_model import DistributionalQTFModel
 
@@ -20,11 +23,13 @@ class GraphGymModel(DistributionalQTFModel):
             obs_space, action_space, num_outputs, model_config, name, **kw)
 
         self.per_action_model = MoleculeModel(per_action_model(
-            features=8, num_heads=1, num_messages=1
+            # features=8, num_heads=1, num_messages=1
         ))
         self.total_value = None
 
     def forward(self, input_dict, state, seq_lens):
+        start = time.perf_counter()
+
         # Extract the available actions tensor from the observation.
         action_mask = input_dict['obs']['action_mask']
         if action_mask.dtype != tf.dtypes.bool:
@@ -66,6 +71,12 @@ class GraphGymModel(DistributionalQTFModel):
 
         # print(f'action_values {action_values}\naction_weights {action_weights}')
         # print(f'action_values {action_values.shape}\naction_weights {action_weights.shape}')
+
+        print(f'GraphGymModel::forward() {(time.perf_counter() - start) * 1000}')
+        try:
+            raise TypeError("Oups!")
+        except Exception:
+            traceback.print_stack(limit=40)
         return action_weights, state
 
     # def forward(self, input_dict, state, seq_lens):

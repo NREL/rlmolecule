@@ -6,6 +6,8 @@ from rlmolecule.sql import hash_to_integer
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 from rlmolecule.tree_search.metrics import collect_metrics
 
+import time
+
 
 class MoleculeState(GraphSearchState):
     """
@@ -15,12 +17,13 @@ class MoleculeState(GraphSearchState):
     Molecules are stored as rdkit Mol instances, and the rdkit-generated SMILES string is also stored for
     efficient hashing.
     """
+
     def __init__(
-        self,
-        molecule: Mol,
-        builder: any,
-        force_terminal: bool = False,
-        smiles: Optional[str] = None,
+            self,
+            molecule: Mol,
+            builder: any,
+            force_terminal: bool = False,
+            smiles: Optional[str] = None,
     ) -> None:
         """
         :param molecule: an RDKit molecule specifying the current state
@@ -28,17 +31,19 @@ class MoleculeState(GraphSearchState):
         :param force_terminal: Whether to force this molecule to be a terminal state
         :param smiles: An optional smiles string for the molecule; must match `molecule`.
         """
+        # start = time.perf_counter()
         self._builder: any = builder
         self._molecule: Mol = molecule
         self._smiles: str = MolToSmiles(self._molecule) if smiles is None else smiles
         self._forced_terminal: bool = force_terminal
-        self._next_states : Optional[List[MoleculeState]] = None
+        self._next_states: Optional[List[MoleculeState]] = None
+        # print(f'MoleculeState::__init__() {self.smiles} {time.perf_counter() - start}')
 
     def __repr__(self) -> str:
         """
         delegates to the SMILES string
         """
-        return f"{self._smiles}{' (t)' if self._forced_terminal else ''}"
+        return f"{self.smiles}{' (t)' if self._forced_terminal else ''}"
 
     # noinspection PyUnresolvedReferences
     def equals(self, other: any) -> bool:
@@ -58,13 +63,17 @@ class MoleculeState(GraphSearchState):
     @collect_metrics
     def get_next_actions(self) -> Sequence['MoleculeState']:
         if self._next_states is None:
+            # print(f'get_next_actions() {self.smiles}')
+            start = time.perf_counter()
             next_states = []
             if not self._forced_terminal:
                 if self.num_atoms < self.builder.max_atoms:
-                    next_states.extend((MoleculeState(molecule, self.builder) for molecule in self.builder(self.molecule)))
+                    next_states.extend(
+                        (MoleculeState(molecule, self.builder) for molecule in self.builder(self.molecule)))
 
                 if self.num_atoms >= self.builder.min_atoms:
                     next_states.append(MoleculeState(self.molecule, self.builder, force_terminal=True))
+            print(f'MoleculeState::get_next_actions() {self.smiles} {(time.perf_counter() - start) * 1000}')
             self._next_states = next_states
 
         return self._next_states

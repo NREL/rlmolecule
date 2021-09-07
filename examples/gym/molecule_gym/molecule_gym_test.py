@@ -1,6 +1,7 @@
 """
 
 """
+# print('******************* import tensorflow as tf - 0')
 import tensorflow as tf
 
 gpus = tf.config.list_physical_devices('GPU')
@@ -31,8 +32,12 @@ if __name__ == "__main__":
     }
 
 
+
     def make_env(_):
+        # print('begin make_env()')
+        # print('******************* import tensorflow as tf - 1')
         import tensorflow as tf
+
         gpus = tf.config.list_physical_devices('GPU')
         if gpus:
             for gpu in gpus:
@@ -42,7 +47,10 @@ if __name__ == "__main__":
         from rlmolecule.graph_gym.graph_gym_env import GraphGymEnv
         from rlmolecule.molecule.builder.builder import MoleculeBuilder
 
-        return GraphGymEnv(MoleculeGraphProblem(MoleculeBuilder()))
+        # return GraphGymEnv(MoleculeGraphProblem(MoleculeBuilder(max_atoms=4, min_atoms=2)))
+        result = GraphGymEnv(MoleculeGraphProblem(MoleculeBuilder()))
+        # print('end make_env()')
+        return result
 
 
     # def make_parametric_gridworld(_):
@@ -62,6 +70,7 @@ if __name__ == "__main__":
                      model_config,
                      name,
                      **kwargs):
+            # print('******************* import tensorflow as tf - 2')
             import tensorflow as tf
             gpus = tf.config.list_physical_devices('GPU')
             if gpus:
@@ -107,9 +116,9 @@ if __name__ == "__main__":
             'model': {
                 'custom_model': 'molecule_graph_problem_model',
             },
-            'num_gpus': .2,
-            'num_gpus_per_worker': .1,
-            'num_workers': 6,
+            'num_gpus': .5,
+            'num_gpus_per_worker': .25,
+            'num_workers': 0,
             # 'num_gpus': 0,
             # 'num_gpus_per_worker': 0,
             # 'num_workers': 0,
@@ -117,13 +126,13 @@ if __name__ == "__main__":
             # 'num_gpus_per_worker': 0,
             # 'num_workers': num_workers,
             'framework': 'tf2',
-            # 'eager_tracing': True,
+            'eager_tracing': False,
             # 'framework': 'tf1',
             # 'rollout_fragment_length': int(8),
             # 'train_batch_size': int(16),
             # 'sgd_minibatch_size': 8,
-            'rollout_fragment_length': 64,
-            'train_batch_size': 8192,
+            'rollout_fragment_length': 16,
+            'train_batch_size': 128,
             'sgd_minibatch_size': 32,
             "batch_mode": 'truncate_episodes',  # '"truncate_episodes",
         },
