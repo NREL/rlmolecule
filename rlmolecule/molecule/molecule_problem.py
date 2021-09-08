@@ -4,12 +4,13 @@ from typing import Dict, Optional
 
 import rdkit
 import sqlalchemy
+from nfp import MolPreprocessor
 
 from rlmolecule.alphazero.tensorflow.tfalphazero_problem import TFAlphaZeroProblem
 from rlmolecule.mcts.mcts_problem import MCTSProblem
 from rlmolecule.molecule.molecule_state import MoleculeState
 from rlmolecule.molecule.policy.model import policy_model
-from rlmolecule.molecule.policy.preprocessor import MolPreprocessor, load_preprocessor
+from rlmolecule.molecule.policy.preprocessor import load_preprocessor
 
 logger = logging.getLogger(__name__)
 
