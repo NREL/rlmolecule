@@ -10,9 +10,9 @@ run_id: 'qed_example_local'
 # Parameters for setting up the problem
 problem_config:
     # maximum number of heavy atoms
-    max_atoms: 25
+    max_atoms: 10
     # minimum number of heavy atoms
-    min_atoms: 1
+    min_atoms: 4
     # atoms to use when building the molecule
     atom_additions: ['C', 'N', 'O']
     # if set, don't construct molecules greater than a given Synthetic Accessibility (SA) score
@@ -21,7 +21,7 @@ problem_config:
     # whether to consider stereoisomers different molecules
     stereoisomers: False
     # try to get a 3D embedding of the molecule, and if this fails, remote it.
-    try_embedding: True
+    try_embedding: False
     # Amount of time (in seconds) to run the multiprocessing jobs
     timeout: 300
 

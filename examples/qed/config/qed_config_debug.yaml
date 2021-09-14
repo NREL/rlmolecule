@@ -84,8 +84,17 @@ mcts_config:
 
 # Database settings for the Object Relational Model (ORM)
 # Used to store games and communicate between the policy model (run on GPUs) and rollout (run on CPUs)
-sql_database:
+# sql_database:
    # default database settings:
-   drivername: "sqlite"
-   db_file: "qed_data.db"
+#    drivername: "sqlite"
+#    db_file: "qed_data.db"
 
+sql_database:
+   # settings to connect to NREL's yuma database
+   drivername: "postgresql+psycopg2"
+   dbname: "bde"
+   port: "5432"
+   host: "yuma.hpc.nrel.gov"
+   user: "rlops"
+   # read the password from a file
+   passwd_file: '/projects/rlmolecule/rlops_pass'
