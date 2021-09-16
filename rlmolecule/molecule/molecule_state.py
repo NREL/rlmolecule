@@ -63,8 +63,6 @@ class MoleculeState(GraphSearchState):
     @collect_metrics
     def get_next_actions(self) -> Sequence['MoleculeState']:
         if self._next_states is None:
-            # print(f'get_next_actions() {self.smiles}')
-            start = time.perf_counter()
             next_states = []
             if not self._forced_terminal:
                 if self.num_atoms < self.builder.max_atoms:
@@ -73,7 +71,6 @@ class MoleculeState(GraphSearchState):
 
                 if self.num_atoms >= self.builder.min_atoms:
                     next_states.append(MoleculeState(self.molecule, self.builder, force_terminal=True))
-            print(f'MoleculeState::get_next_actions() {self.smiles} {(time.perf_counter() - start) * 1000}')
             self._next_states = next_states
 
         return self._next_states

@@ -32,7 +32,6 @@ if __name__ == "__main__":
     }
 
 
-
     def make_env(_):
         # print('begin make_env()')
         # print('******************* import tensorflow as tf - 1')
@@ -44,11 +43,11 @@ if __name__ == "__main__":
                 tf.config.experimental.set_memory_growth(gpu, True)
 
         from examples.gym.molecule_gym.molecule_graph_problem import MoleculeGraphProblem
-        from rlmolecule.graph_gym.graph_gym_env import GraphGymEnv
+        from rlmolecule.graph_gym.flat_graph_gym_env import FlatGraphGymEnv
         from rlmolecule.molecule.builder.builder import MoleculeBuilder
 
         # return GraphGymEnv(MoleculeGraphProblem(MoleculeBuilder(max_atoms=4, min_atoms=2)))
-        result = GraphGymEnv(MoleculeGraphProblem(MoleculeBuilder()))
+        result = FlatGraphGymEnv(MoleculeGraphProblem(MoleculeBuilder()))
         # print('end make_env()')
         return result
 
@@ -59,10 +58,10 @@ if __name__ == "__main__":
     #     print('make_parametric_gridworld()')
     #     return ParametricGridWorldEnv(GridWorldEnv(make_doorway_grid()))
 
-    from rlmolecule.graph_gym.graph_gym_model import GraphGymModel
+    from rlmolecule.graph_gym.flat_graph_gym_model import FlatGraphGymModel
 
 
-    class ThisModel(GraphGymModel):
+    class ThisModel(FlatGraphGymModel):
         def __init__(self,
                      obs_space,
                      action_space,
