@@ -3,7 +3,8 @@
 run_id: 'crystal_vol_example'
 
 # Parameters for setting up the problem
-#problem_config:
+problem_config:
+    actions_to_ignore: {'_1_1', '_1_2', '_1_3'}
 
 # Parameters for training the policy model
 train_config:
