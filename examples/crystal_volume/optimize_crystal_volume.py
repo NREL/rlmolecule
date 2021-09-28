@@ -18,6 +18,7 @@ from pymatgen.analysis import local_env
 from rlmolecule.crystal.builder import CrystalBuilder
 from rlmolecule.crystal.crystal_problem import CrystalTFAlphaZeroProblem
 from rlmolecule.crystal.crystal_state import CrystalState
+from rlmolecule.crystal import utils
 from rlmolecule.sql.run_config import RunConfig
 # from rlmolecule.tree_search.reward import RankedRewardFactory
 from rlmolecule.tree_search.reward import LinearBoundedRewardFactory, RankedRewardFactory
@@ -26,23 +27,6 @@ from rlmolecule.sql.tables import GameStore
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-def read_structures_file(structures_file):
-    logger.info(f"reading {structures_file}")
-    with gzip.open(structures_file, 'r') as f:
-        structures_dict = json.loads(f.read().decode())
-    structures = {}
-    for key, structure_dict in structures_dict.items():
-        structures[key] = Structure.from_dict(structure_dict)
-    logger.info(f"\t{len(structures)} structures read")
-    return structures
-
-
-def write_structures_file(structures_file, structures_dict):
-    logger.info(f"writing {structures_file}")
-    with gzip.open(structures_file, 'w') as out:
-        out.write(json.dumps(structures_dict, indent=2).encode())
 
 
 def compute_structure_vol(structure: Structure, state=None):
@@ -93,26 +77,31 @@ def compute_structure_vol(structure: Structure, state=None):
     return conducting_ion_vol, total_vol
 
 
+def generate_decoration(state: CrystalState) -> Structure:
+    # Create the decoration of this composition onto this prototype structure
+    # the 'action_node' string has the following format at this point:
+    # comp_type|prototype_structure|decoration_idx
+    # we just need 'comp_type|prototype_structure' to get the icsd structure
+    structure_key = '|'.join(state.action_node.split('|')[:-1])
+    icsd_prototype = structures[structure_key]
+    decoration_idx = int(state.action_node.split('|')[-1]) - 1
+    decorated_structure, stoich = CrystalState.decorate_prototype_structure(
+        icsd_prototype, state.composition, decoration_idx=decoration_idx)
+    return decorated_structure
+
+
 class CrystalVolOptimizationProblem(CrystalTFAlphaZeroProblem):
-    # def get_initial_state(self) -> CrystalState:
-    #    return CrystalState(rdkit.Chem.MolFromSmiles('C'), self._config)
 
     def get_reward(self, state: CrystalState) -> (float, {}):
         if state.terminal:
-            # Create the decoration of this composition onto this prototype structure
-            # the 'action_node' string has the following format at this point:
-            # comp_type|prototype_structure|decoration_idx
-            # we just need 'comp_type|prototype_structure' to get the icsd structure
-            structure_key = '|'.join(state.action_node.split('|')[:-1])
-            icsd_prototype = structures[structure_key]
-            decoration_idx = int(state.action_node.split('|')[-1]) - 1
+            if str(state) in self.actions_to_ignore:
+                return 0.0, {'terminal': False, 'state_repr': repr(state)}
+            # generate the decoration for this state
             try:
-                decorated_structure, comp = CrystalState.decorate_prototype_structure(
-                    icsd_prototype, state.composition, decoration_idx=decoration_idx)
+                decorated_structure = generate_decoration(state)
             except AssertionError as e:
                 print(f"AssertionError: {e}")
                 return 0.0, {'terminal': True, 'state_repr': repr(state)}
-
             # Compute the volume of the conducting ions.
             conducting_ion_vol, total_vol = compute_structure_vol(decorated_structure, state=str(state))
             frac_conducting_ion_vol = conducting_ion_vol / total_vol if total_vol != 0 else 0
@@ -149,7 +138,9 @@ def create_problem():
                                             min_buffer_size=train_config.get('min_buffer_size', 15),
                                             batch_size=train_config.get('batch_size', 32),
                                             policy_checkpoint_dir=train_config.get('policy_checkpoint_dir',
-                                                                                  'policy_checkpoints'))
+                                                                                  'policy_checkpoints'),
+                                            actions_to_ignore=prob_config.get('actions_to_ignore', None),
+                                            )
 
     return problem
 
@@ -157,7 +148,10 @@ def create_problem():
 def run_games():
     from rlmolecule.alphazero.alphazero import AlphaZero
 
-    builder = CrystalBuilder()
+    prob_config = run_config.problem_config
+                                            
+    builder = CrystalBuilder(
+                             actions_to_ignore=prob_config.get('actions_to_ignore', None))
     config = run_config.mcts_config
     game = AlphaZero(
         create_problem(),
@@ -254,7 +248,7 @@ nn13 = local_env.VoronoiNN(cutoff=13, compute_adj_neighbors=False)
 # also load the icsd prototype structures
 # https://pymatgen.org/usage.html#side-note-as-dict-from-dict
 icsd_prototypes_file = "../../rlmolecule/crystal/inputs/icsd_prototypes.json.gz"
-structures = read_structures_file(icsd_prototypes_file)
+structures = utils.read_structures_file(icsd_prototypes_file)
 
 # # Temporary caching approach:
 # # store the computed structures in a json file
