@@ -33,11 +33,13 @@ class CrystalTFAlphaZeroProblem(CrystalProblem, TFAlphaZeroProblem, ABC):
                  features: int = 64,
                  num_heads: int = 4,
                  num_messages: int = 3,
+                 actions_to_ignore: Optional[set] = None,
                  **kwargs) -> None:
         self.num_messages = num_messages
         self.num_heads = num_heads
         self.features = features
         self.preprocessor = preprocessor if preprocessor else CrystalPreprocessor()
+        self.actions_to_ignore = actions_to_ignore
         super(CrystalTFAlphaZeroProblem, self).__init__(engine=engine, **kwargs)
 
     def policy_model(self,

@@ -16,12 +16,14 @@ class CrystalBuilder:
     def __init__(self,
                  G: Optional[nx.DiGraph] = None,
                  G2: Optional[nx.DiGraph] = None,
+                 actions_to_ignore: Optional[set] = None,
                  ) -> None:
         """A class to build crystals according to a number of different options
 
         G: The first networkx graph going from element combinations to compositions
         G2: The second networkx graph going from composition types to decorations
-        comp_to_comp_type: Mapping from a composition string to the composition type
+        actions_to_ignore: Action nodes included in this set will not be explored further
+            e.g., '_1_2', 'Zn', '1_1_1_1_6|cubic'
         structures: Mapping from a decoration string to a pymatgen structure object
         """
 
@@ -41,6 +43,7 @@ class CrystalBuilder:
 
         self.G = G
         self.G2 = G2
+        self.actions_to_ignore = set() if actions_to_ignore is None else actions_to_ignore
         # Update: build the comp_to_comp_type dictionary on the fly
         # the first action graph G ends in the compositions, so we can extract those using the out degree
         compositions = [n for n in G.nodes() if G.out_degree(n) == 0]
@@ -74,9 +77,11 @@ class CrystalBuilder:
                 for neighbor in self.G.neighbors(n):
                     comp_type = self.comp_to_comp_type.get(neighbor)
                     composition = neighbor if comp_type is not None else None
+                    # if this is not a branch of the tree we want to follow, then stop here
+                    terminal = False if neighbor not in self.actions_to_ignore else True
                     next_state = CrystalState(action_node=neighbor,
                                               composition=composition,
-                                              terminal=False,
+                                              terminal=terminal,
                                               )
                     next_states.append(next_state)
                 return next_states
@@ -92,7 +97,8 @@ class CrystalBuilder:
                 for neighbor in self.G2.neighbors(n):
                     terminal = False
                     structure = None
-                    if self.G2.out_degree(neighbor) == 0:
+                    if self.G2.out_degree(neighbor) == 0 or \
+                            neighbor in self.actions_to_ignore:
                         terminal = True
                     next_state = CrystalState(action_node=neighbor,
                                               composition=crystal_state.composition,
