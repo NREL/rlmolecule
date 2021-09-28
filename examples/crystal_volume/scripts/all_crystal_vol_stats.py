@@ -5,11 +5,17 @@
 #from dask_jobqueue import SLURMCluster
 import json
 import logging
+import gzip
 import os
 import pandas as pd
+# Apparently there's an issue with the latest version of pandas. 
+# Got this fix from here:
+# https://github.com/pandas-profiling/pandas-profiling/issues/662#issuecomment-803673639
+pd.set_option("display.max_columns", None)
 import numpy as np
 import time
 from collections import defaultdict
+import itertools
 
 from tqdm import tqdm
 from pymatgen.core import Composition, Structure
@@ -42,9 +48,6 @@ framework_cations = set(
 nn13 = local_env.VoronoiNN(cutoff=13, compute_adj_neighbors=False)
 
 structures = ocv.structures
-
-# for a given starting ICSD prototype, pymatgen computed the same voronoi volume values for all decorations. Apparently the atom types in the structure don't matter!
-volume_stats = {}
 
 
 def compute_structure_vol(structure: Structure, comp=None):
@@ -125,14 +128,19 @@ def generate_decoration(state: CrystalState) -> Structure:
     return decorated_structure, comp
 
 
-def generate_decorations_from_icsd(builder, state, icsd_strc_vols):
+def generate_decorations_from_icsd(builder, state, visited, progress_bar):
     """ DFS to extract the volume stats for all decorations from the precomputed icsd structure volumes
     """
+    if str(state) in visited:
+        return
     children = state.get_next_actions(builder)
     for c in children:
-        yield from generate_decorations_full(builder, c)
+        #yield from generate_decorations_from_icsd(builder, c)
+        generate_decorations_from_icsd(builder, c, visited, progress_bar)
+        visited.add(str(c))
 
     if len(children) == 0:
+        progress_bar.update(1) 
         # This is a terminal state, so return the decorated structure.
         # The 'action_node' string has the following format at this point:
         # comp_type|prototype_structure|decoration_idx
@@ -142,17 +150,16 @@ def generate_decorations_from_icsd(builder, state, icsd_strc_vols):
         icsd_prototype = structures[structure_key]
         decoration_idx = int(state.action_node.split('|')[-1]) - 1
         start_time = time.process_time()
-        try:
-            decorated_structure, comp = CrystalState.decorate_prototype_structure(
-                icsd_prototype, state.composition, decoration_idx=decoration_idx)
-        except AssertionError as e:
-            print(f"AssertionError: {e}")
-            time_taken = time.process_time() - start_time
-            yield [0.0, 0.0, 0.0, repr(state), time_taken]
+        comp = decorate_prototype_structure(
+            icsd_prototype, state.composition, decoration_idx=decoration_idx)
+        # if the decoration failed, skip
+        if comp is None:
+            return
 
         # now line up the elements of this decoration with the icsd structure volumes
-        icsd_elements = ()
-        decorated_elements = ()
+        icsd_comp = icsd_prototype.composition.reduced_composition.alphabetical_formula.replace(' ','')
+        icsd_elements = state.get_eles_from_comp(icsd_comp)
+        decorated_elements = state.get_eles_from_comp(comp)
         ele_mapping = {e: icsd_elements[i] for i, e in enumerate(decorated_elements)}
         # now extract the volume of the conducting ions
         icsd_ele_vols = icsd_strc_vols.get(structure_key)
@@ -166,10 +173,12 @@ def generate_decorations_from_icsd(builder, state, icsd_strc_vols):
 
         frac_conducting_ion_vol = conducting_ion_vol / total_vol if total_vol != 0 else 0
 
-        time_taken = time.process_time() - start_time
-        stats = [frac_conducting_ion_vol, conducting_ion_vol, total_vol, repr(state), time_taken]
-        volume_stats[structure_key] = stats
-        yield stats
+        time_taken = time.process_time() - start_time + icsd_strc_vols.get(structure_key + '-time', 0)
+        stats = [str(round(x, 4)) for x in (conducting_ion_vol, total_vol, frac_conducting_ion_vol, time_taken)]
+        #volume_stats[str(state)] = stats
+        out.write('\t'.join([str(state)] + stats) + '\n')
+        return
+        #yield stats
 
 
 def extract_conducting_ion_vol(ele_mapping, icsd_ele_vols):
@@ -193,55 +202,88 @@ def extract_conducting_ion_vol(ele_mapping, icsd_ele_vols):
     return conducting_ion_vol
 
 
-# This function was meant to loop through all of the structures, but since the volume does not change when changing the
-# element types inside of a structure, I'm computing the volume stats for the ICSD structures once at the start and then
-# extracting the decoration volumes from that.
-def generate_decorations_full(builder, state):
-    """ DFS to generate all of the decorations
+def decorate_prototype_structure(icsd_prototype: Structure,
+                                 composition: str,
+                                 decoration_idx: int,
+                                 ) -> Structure:
     """
-    children = state.get_next_actions(builder)
-    for c in children:
-        yield from generate_decorations_full(builder, c)
+    Replace the atoms in the icsd prototype structure with the elements of this composition.
+    The decoration index is used to figure out which combination of
+    elements in this composition should replace the elements in the icsd prototype
+    """
+    comp = Composition(composition)
 
-    if len(children) == 0:
-        # This is a terminal state, so return the decorated structure.
-        # The 'action_node' string has the following format at this point:
-        # comp_type|prototype_structure|decoration_idx
-        # we just need 'comp_type|prototype_structure' to get the icsd structure
-        structure_key = '|'.join(state.action_node.split('|')[:-1])
-        # if there's only one possibe stoichiometry for the conducting ion of this composition,
-        # then we already know what the voronoi volume value will be 
-        stoichiometries = state.get_stoich_from_comp(state.composition)
-        cond_ion_stoich = stoichiometries[0]
-        one_possible = cond_ion_stoich in stoichiometries[1:]
-        if one_possible and structure_key in volume_stats:
-            stats = volume_stats[structure_key]
-            yield stats[:3] + [repr(state)] + [stats[4]]
+    prototype_comp = Composition(icsd_prototype.formula).reduced_composition
+    prototype_stoic = tuple([int(p) for p in prototype_comp.formula if p.isdigit()])
 
-        # If this ICSD structure hasn't been seen yet, or there are multiple decorations
-        # then compute from scratch
-        start_time = time.process_time()
-        try:
-            decorated_structure = ocv.generate_decoration(state)
-        except AssertionError as e:
-            print(f"AssertionError: {e}")
-            time_taken = time.process_time() - start_time
-            yield [0.0, 0.0, 0.0, repr(state), time_taken]
-        # Compute the volume of the conducting ions.
-        conducting_ion_vol, total_vol = ocv.compute_structure_vol(decorated_structure, state=str(state))
-        frac_conducting_ion_vol = conducting_ion_vol / total_vol if total_vol != 0 else 0
+    # create permutations of order of elements within a composition
+    # e.g., for K1Br1: [('K1', 'Br1'), ('Br1', 'K1')]
+    comp_permutations = itertools.permutations(comp.formula.split(' '))
+    # only keep the permutations that match the stoichiometry of the prototype structure
+    valid_comp_permutations = []
+    for comp_permu in comp_permutations:
+        comp_stoich = CrystalState.get_stoich_from_comp(''.join(comp_permu))
+        if comp_stoich == prototype_stoic:
+            valid_comp_permutations.append(''.join(comp_permu))
 
-        time_taken = time.process_time() - start_time
-        stats = [frac_conducting_ion_vol, conducting_ion_vol, total_vol, repr(state), time_taken]
-        volume_stats[structure_key] = stats
-        yield stats
+    if decoration_idx >= len(valid_comp_permutations):
+        return None
+
+    # now build the decorated structure for the specific index passed in
+    # since we don't need the structure, just return the composition
+    return valid_comp_permutations[decoration_idx]
+
+
+## This function was meant to loop through all of the structures, but since the volume does not change when changing the
+## element types inside of a structure, I'm computing the volume stats for the ICSD structures once at the start and then
+## extracting the decoration volumes from that.
+#def generate_decorations_full(builder, state):
+#    """ DFS to generate all of the decorations
+#    """
+#    children = state.get_next_actions(builder)
+#    for c in children:
+#        yield from generate_decorations_full(builder, c)
+#
+#    if len(children) == 0:
+#        # This is a terminal state, so return the decorated structure.
+#        # The 'action_node' string has the following format at this point:
+#        # comp_type|prototype_structure|decoration_idx
+#        # we just need 'comp_type|prototype_structure' to get the icsd structure
+#        structure_key = '|'.join(state.action_node.split('|')[:-1])
+#        # for a given starting ICSD prototype, pymatgen computed the same voronoi volume values for all decorations. Apparently the atom types in the structure don't matter!
+#        # if there's only one possibe stoichiometry for the conducting ion of this composition,
+#        # then we already know what the voronoi volume value will be 
+#        stoichiometries = state.get_stoich_from_comp(state.composition)
+#        cond_ion_stoich = stoichiometries[0]
+#        one_possible = cond_ion_stoich in stoichiometries[1:]
+#        if one_possible and structure_key in volume_stats:
+#            stats = volume_stats[structure_key]
+#            yield stats[:3] + [repr(state)] + [stats[4]]
+#
+#        # If this ICSD structure hasn't been seen yet, or there are multiple decorations
+#        # then compute from scratch
+#        start_time = time.process_time()
+#        try:
+#            decorated_structure = ocv.generate_decoration(state)
+#        except AssertionError as e:
+#            print(f"AssertionError: {e}")
+#            time_taken = time.process_time() - start_time
+#            yield [0.0, 0.0, 0.0, repr(state), time_taken]
+#        # Compute the volume of the conducting ions.
+#        conducting_ion_vol, total_vol = ocv.compute_structure_vol(decorated_structure, state=str(state))
+#        frac_conducting_ion_vol = conducting_ion_vol / total_vol if total_vol != 0 else 0
+#
+#        time_taken = time.process_time() - start_time
+#        stats = [conducting_ion_vol, total_vol, frac_conducting_ion_vol, repr(state), time_taken]
+#        volume_stats[structure_key] = stats
+#        yield stats
 
 
 icsd_strc_vols_file = "outputs/icsd_strc_vols.json"
 if os.path.isfile(icsd_strc_vols_file):
     print(f"reading {icsd_strc_vols_file}")
     with open(icsd_strc_vols_file, 'r') as f:
-        icsd_strc_vols = json.loads(f)
+        icsd_strc_vols = json.load(f)
     print(f"\t{len([key for key in icsd_strc_vols if 'time' not in key])} structures read")
 else:
     print(f"computing the element volumes for {len(structures)} structures")
@@ -253,11 +295,27 @@ else:
         out.write(json.dumps(icsd_strc_vols, indent=2, sort_keys=True))
 
 
-#root_state = CrystalState('root')
+root_state = CrystalState('root')
+# use a composition as the starting state for testing:
 #root_state = CrystalState('K2O1', composition='K2O1')
-#builder = CrystalBuilder()
-#results = list(generate_decorations(builder, root_state))
+builder = CrystalBuilder()
+
+n = 16*10**6
+progress_bar = tqdm(total=n)
+visited = set()
+# results will be stored in volume_stats
+#volume_stats = {}
+out_file = "outputs/2021-07-16-all-decoration-vol-stats.tsv"
+print(f"writing to {out_file}")
+with open(out_file, 'w') as out:
+    generate_decorations_from_icsd(builder, root_state, visited, progress_bar)
 #print(results)
+print("Finished")
+#df = pd.DataFrame(volume_stats).T
+#df.columns = ['conducting_ion_vol', 'total_vol', 'fraction', 'time_taken']
+#df = df.sort_values('fraction')
+#print(f"writing {out_file}")
+#df.to_csv(out_file, sep='\t')
 
 
 #n_processes = 36  # number of processes to run on each node
