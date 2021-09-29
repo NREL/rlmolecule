@@ -4,7 +4,7 @@ if [ `hostname` != $DB_HOST ]; then
 fi
 echo "Running postgres on `hostname`"
 module load conda
-conda activate /scratch/hsorense/conda/rlmolecule
+conda activate $CONDA_ENV
 initdb -D qed_data_psql.db
 # Add all hosts to pg_hba.conf
 for h in `scontrol show hostnames`; do
