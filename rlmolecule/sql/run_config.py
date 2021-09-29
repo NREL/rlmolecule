@@ -43,7 +43,7 @@ class RunConfig:
 
     @staticmethod
     def start_db_engine(**kwargs):
-        """ Connect to the sql database that will store the game and reward data 
+        """ Connect to the sql database that will store the game and reward data
         used by the policy model and game runner
         """
         drivername = kwargs.get('drivername', 'sqlite')
@@ -68,6 +68,9 @@ class RunConfig:
                                passwd_file=None,
                                passwd=None,
                                **kwargs):
+        # By default, use the host defined in the environment
+        host = os.getenv('DB_HOST', host)
+
         # add the ':' to separate host from port
         port = ":" + str(port) if port is not None else ""
 
