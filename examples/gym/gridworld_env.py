@@ -1,13 +1,10 @@
 import logging
 import random
-import sys
 from copy import copy
 from enum import IntEnum
-from typing import Tuple
-
-import numpy as np
 
 import gym
+import numpy as np
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -78,7 +75,8 @@ class GridWorldEnv(gym.Env):
         self.observation_space: gym.spaces.Box = gym.spaces.Box(
             low=low, high=high, shape=obs_shape, dtype=dtype)
 
-        print(f'ospace: {self.observation_space} dims: {num_dims} mode: {self.observation_type}, low {low}, high {high}')
+        print(
+            f'ospace: {self.observation_space} dims: {num_dims} mode: {self.observation_type}, low {low}, high {high}')
 
         self.action_space: gym.spaces.Discrete = gym.spaces.Discrete(4)
 

@@ -6,15 +6,14 @@ from typing import Tuple, Optional
 import numpy as np
 from sqlalchemy import create_engine
 
-from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
+from gridworld_env import GridWorldEnv as GridEnv
+from gridworld_env import make_empty_grid
 from rlmolecule.alphazero.tensorflow.tfalphazero_problem import TFAlphaZeroProblem
 from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
 from rlmolecule.gym.gym_problem import GymProblem
 from rlmolecule.gym.gym_state import GymEnvState
-
+from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
 from tf_model import gridworld_scalar_policy as policy
-from gridworld_env import GridWorldEnv as GridEnv
-from gridworld_env import make_empty_grid
 
 logger = logging.getLogger(__name__)
 
@@ -44,11 +43,10 @@ class GridWorldProblem(GymProblem, TFAlphaZeroProblem):
         # )
         return policy(size)
 
-
     def get_policy_inputs(self, state: GymEnvState) -> dict:
         return {
             "obs": state.env.make_observation(),
-            #"steps": np.array([np.float64(self.env.episode_steps / self.env.max_episode_steps)])
+            # "steps": np.array([np.float64(self.env.episode_steps / self.env.max_episode_steps)])
         }
 
     def get_reward(self, state: GymEnvState) -> Tuple[float, dict]:
@@ -82,7 +80,7 @@ def construct_problem(size):
     engine = create_engine(engine_str, execution_options={"isolation_level": "AUTOCOMMIT"})
 
     grid = make_empty_grid(size=size)
-    env = GridEnv(grid, obs_type="scalar", max_episode_steps=2*size+2)
+    env = GridEnv(grid, obs_type="scalar", max_episode_steps=2 * size + 2)
 
     # reward_class = RankedRewardFactory(
     #         engine=engine,
@@ -91,7 +89,7 @@ def construct_problem(size):
     #         reward_buffer_max_size=100,
     #         ranked_reward_alpha=0.9
     # )
-    reward_class=LinearBoundedRewardFactory(min_reward=-env.size*2, max_reward=0.)
+    reward_class = LinearBoundedRewardFactory(min_reward=-env.size * 2, max_reward=0.)
 
     run_id = "gridworld_{}_{}".format(size, type(reward_class).__name__)
     policy_checkpoint_dir = "{}_policy_checkpoints".format(run_id)
@@ -129,8 +127,9 @@ def run_games(size, use_mcts=False, num_mcts_samples=64, num_games=None, seed=No
         elapsed = time.time() - start_time
         print("Worker {} | REWARD: {}   ".format(seed, reward.__dict__))
         logger.info(('Worker {} | Game {} Finished -- Reward {:.3f}'.format(seed, _, reward.raw_reward) +
-                      #' -- Final state {}'.format(path[-1]) +
-                      ' -- CPU time {:1.3f} (s)'.format(elapsed)))
+                     # ' -- Final state {}'.format(path[-1]) +
+                     ' -- CPU time {:1.3f} (s)'.format(elapsed)))
+
 
 def train_model(size):
     construct_problem(size).train_policy_model(
@@ -167,7 +166,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
         description='Solve the Hallway problem (move from one side of the hallway to the other). ' +
-        'Default is to run multiple games and training using multiprocessing')
+                    'Default is to run multiple games and training using multiprocessing')
 
     parser.add_argument("--size", type=int, default=8)
     parser.add_argument('--train-policy',
@@ -200,7 +199,7 @@ if __name__ == "__main__":
 
         import multiprocessing
 
-        jobs = [multiprocessing.Process(target=monitor, args=(args.size, ))]
+        jobs = [multiprocessing.Process(target=monitor, args=(args.size,))]
         jobs[0].start()
         time.sleep(1)
 
@@ -212,12 +211,10 @@ if __name__ == "__main__":
                 )
             ]
 
-        jobs += [multiprocessing.Process(target=train_model, args=(args.size, ))]
+        jobs += [multiprocessing.Process(target=train_model, args=(args.size,))]
 
         for job in jobs[1:]:
             job.start()
 
         for job in jobs:
             job.join(300)
-
-        

@@ -1,14 +1,13 @@
 from copy import deepcopy
 from typing import Tuple
 
-from rlmolecule.tree_search.reward import RewardFactory
-from rlmolecule.mcts.mcts_problem import MCTSProblem
 from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
 from rlmolecule.gym.gym_state import GymEnvState
+from rlmolecule.mcts.mcts_problem import MCTSProblem
 
 
 class GymProblem(MCTSProblem):
-    def __init__(self, 
+    def __init__(self,
                  env: AlphaZeroGymEnv,
                  **kwargs):
         self.env = deepcopy(env)

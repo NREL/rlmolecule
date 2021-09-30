@@ -16,8 +16,6 @@ from ray.rllib.models import ModelCatalog
 from ray.rllib.utils.test_utils import check_learning_achieved
 from ray.tune.registry import register_env
 
-
-
 if __name__ == "__main__":
     # args = parser.parse_args()
     ray.init()
@@ -40,6 +38,8 @@ if __name__ == "__main__":
     example_env = make_env(None)
 
     from examples.gym.parametric_gridworld_actions_model import ParametricGridworldActionsModel
+
+
     class ModelForThisGridworld(ParametricGridworldActionsModel):
         def __init__(self,
                      obs_space,

@@ -1,12 +1,10 @@
 import logging
-from typing import Tuple, Union, Dict
-
-import numpy as np
+from typing import Tuple, Dict
 
 import gym
+import numpy as np
 from gym.spaces import Box
 
-from examples.gym import gridworld_env
 from examples.gym.gridworld_env import GridWorldEnv
 
 logging.basicConfig(level=logging.INFO)

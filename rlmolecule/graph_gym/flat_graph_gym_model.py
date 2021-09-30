@@ -1,5 +1,4 @@
 import time
-import traceback
 
 import tensorflow as tf
 from ray.rllib.agents.dqn.distributional_q_tf_model import DistributionalQTFModel

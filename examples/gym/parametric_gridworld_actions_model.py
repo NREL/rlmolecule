@@ -1,10 +1,6 @@
-import copy
-
-import gym
-import numpy as np
 import tensorflow as tf
 from ray.rllib.agents.dqn.distributional_q_tf_model import DistributionalQTFModel
-from ray.rllib.models.tf import TFModelV2, FullyConnectedNetwork
+from ray.rllib.models.tf import FullyConnectedNetwork
 
 
 class ParametricGridworldActionsModel(DistributionalQTFModel):
@@ -43,14 +39,14 @@ class ParametricGridworldActionsModel(DistributionalQTFModel):
 
         flattened_action_features = tf.reshape(
             tf.stack(action_observations, axis=1),
-            (batch_size * self.num_actions, ) + self.action_feature_shape)
+            (batch_size * self.num_actions,) + self.action_feature_shape)
 
         flat_action_weights = self.per_action_model({'obs': flattened_action_features})[0]
         action_weights = tf.reshape(flat_action_weights, (batch_size, self.num_actions))
 
         self.action_mask = action_mask
         masked_action_weights = tf.where(action_mask != 0, action_weights,
-                                       tf.ones_like(action_weights) * action_weights.dtype.min)
+                                         tf.ones_like(action_weights) * action_weights.dtype.min)
         return masked_action_weights, state
 
     def value_function(self):
@@ -58,6 +54,6 @@ class ParametricGridworldActionsModel(DistributionalQTFModel):
         batch_size = inner_vf.shape[0] // self.num_actions
         action_values = tf.reshape(inner_vf, (batch_size, self.num_actions))
         masked_action_values = tf.where(self.action_mask != 0, action_values,
-                                         tf.ones_like(action_values) * action_values.dtype.min)
+                                        tf.ones_like(action_values) * action_values.dtype.min)
         total_value = tf.reduce_max(masked_action_values, axis=1)
         return total_value

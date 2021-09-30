@@ -32,7 +32,6 @@ if __name__ == "__main__":
     }
 
 
-
     def make_env(_):
         # print('begin make_env()')
         # print('******************* import tensorflow as tf - 1')
@@ -77,7 +76,6 @@ if __name__ == "__main__":
                 for gpu in gpus:
                     tf.config.experimental.set_memory_growth(gpu, True)
 
-            from examples.gym.molecule_gym.molecule_model import MoleculeModel
             from rlmolecule.molecule.policy.model import policy_model
             # inner_action_model = policy_model()
             # per_action_model = MoleculeModel(inner_action_model)
