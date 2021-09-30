@@ -1,4 +1,5 @@
 {
+  "output_dtype": "int64",
   "atom_tokenizer": {
     "_data": {
       "unk": 1,

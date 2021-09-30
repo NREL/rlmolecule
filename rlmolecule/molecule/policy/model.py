@@ -2,15 +2,17 @@ from typing import Optional, Tuple
 
 import nfp
 import tensorflow as tf
+from nfp import MolPreprocessor
 from tensorflow.keras import layers
 
-from rlmolecule.molecule.policy.preprocessor import MolPreprocessor, load_preprocessor
+from rlmolecule.molecule.policy.preprocessor import load_preprocessor
 
 
 def policy_model(preprocessor: Optional[MolPreprocessor] = None,
                  features: int = 64,
                  num_heads: int = 4,
-                 num_messages: int = 3) -> tf.keras.Model:
+                 num_messages: int = 3,
+                 input_dtype: str = 'int64') -> tf.keras.Model:
     """ Constructs a policy model that predicts value, pi_logits from a batch of molecule inputs. Main model used in
     policy training and loading weights
 
@@ -18,15 +20,16 @@ def policy_model(preprocessor: Optional[MolPreprocessor] = None,
     :param features: Size of network hidden layers
     :param num_heads: Number of global state attention heads. Must be a factor of `features`
     :param num_messages: Number of message passing layers
+    :param input_dtype: the datatype of the input arrays
     :return: The constructed policy model
     """
     if preprocessor is None:
         preprocessor = load_preprocessor()
 
     # Define inputs
-    atom_class = layers.Input(shape=[None], dtype=tf.int64, name='atom')  # batch_size, num_atoms
-    bond_class = layers.Input(shape=[None], dtype=tf.int64, name='bond')  # batch_size, num_bonds
-    connectivity = layers.Input(shape=[None, 2], dtype=tf.int64, name='connectivity')  # batch_size, num_bonds, 2
+    atom_class = layers.Input(shape=[None], dtype=input_dtype, name='atom')  # batch_size, num_atoms
+    bond_class = layers.Input(shape=[None], dtype=input_dtype, name='bond')  # batch_size, num_bonds
+    connectivity = layers.Input(shape=[None, 2], dtype=input_dtype, name='connectivity')  # batch_size, num_bonds, 2
 
     input_tensors = [atom_class, bond_class, connectivity]
 
