@@ -5,6 +5,7 @@ import sys
 import time
 from pprint import pprint
 from typing import Optional
+
 from . import command_line_config
 
 

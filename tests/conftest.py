@@ -2,8 +2,6 @@ import tempfile
 
 import pytest
 
-from .sql import engine
-
 
 @pytest.fixture(scope='class')
 def tmpdirname():

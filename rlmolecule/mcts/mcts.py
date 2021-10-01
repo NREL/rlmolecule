@@ -27,7 +27,7 @@ class MCTS(GraphSearch[MCTSVertex]):
         self._problem: MCTSProblem = problem
         self.ucb_constant: float = ucb_constant
         #:param state_builder: In some cases, a state uses a complex state_builder to select the next actions.
-        #If passed in here, it will be passed to the state's get_next_actions() function
+        # If passed in here, it will be passed to the state's get_next_actions() function
         self.state_builder = state_builder
 
     @property
@@ -99,7 +99,6 @@ class MCTS(GraphSearch[MCTSVertex]):
                 # Break the iterations if we're running for a fixed time
                 if (time() - start_time) > timeout:
                     return
-
 
     # noinspection PyMethodMayBeStatic
     def _accumulate_path_data(self, vertex: MCTSVertex, path: []):

@@ -143,9 +143,9 @@ def kl_with_logits(y_true, y_pred) -> tf.Tensor:
 class KLWithLogits(LossFunctionWrapper):
     """ Keras sometimes wants these loss function wrappers to define how to
     reduce the loss over variable batch sizes """
+
     def __init__(self, reduction=losses_utils.ReductionV2.AUTO, name='kl_with_logits'):
         super(KLWithLogits, self).__init__(kl_with_logits, name=name, reduction=reduction)
-
 
 # def get_input_mask_dict(inputs: list,
 #                         mask_dict: dict = {},

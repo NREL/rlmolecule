@@ -5,25 +5,22 @@ import argparse
 import logging
 import math
 import os
-import time
-import pandas as pd
-import networkx as nx
 import random
-import json
-import gzip
+import time
 from collections import defaultdict
-from pymatgen.core import Structure
-from pymatgen.analysis import local_env
 
+from pymatgen.analysis import local_env
+from pymatgen.core import Structure
+
+from rlmolecule.crystal import utils
 from rlmolecule.crystal.builder import CrystalBuilder
 from rlmolecule.crystal.crystal_problem import CrystalTFAlphaZeroProblem
 from rlmolecule.crystal.crystal_state import CrystalState
-from rlmolecule.crystal import utils
-from rlmolecule.sql.run_config import RunConfig
-# from rlmolecule.tree_search.reward import RankedRewardFactory
-from rlmolecule.tree_search.reward import LinearBoundedRewardFactory, RankedRewardFactory
 from rlmolecule.sql import Base, Session
+from rlmolecule.sql.run_config import RunConfig
 from rlmolecule.sql.tables import GameStore
+# from rlmolecule.tree_search.reward import RankedRewardFactory
+from rlmolecule.tree_search.reward import RankedRewardFactory
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -138,7 +135,7 @@ def create_problem():
                                             min_buffer_size=train_config.get('min_buffer_size', 15),
                                             batch_size=train_config.get('batch_size', 32),
                                             policy_checkpoint_dir=train_config.get('policy_checkpoint_dir',
-                                                                                  'policy_checkpoints'),
+                                                                                   'policy_checkpoints'),
                                             actions_to_ignore=prob_config.get('actions_to_ignore', None),
                                             )
 
@@ -149,9 +146,9 @@ def run_games():
     from rlmolecule.alphazero.alphazero import AlphaZero
 
     prob_config = run_config.problem_config
-                                            
+
     builder = CrystalBuilder(
-                             actions_to_ignore=prob_config.get('actions_to_ignore', None))
+        actions_to_ignore=prob_config.get('actions_to_ignore', None))
     config = run_config.mcts_config
     game = AlphaZero(
         create_problem(),
@@ -165,10 +162,9 @@ def run_games():
         ucb_constant=config.get('ucb_constant', math.sqrt(2)),
         state_builder=builder,
     )
-    from rlmolecule.mcts.mcts import MCTS
-    #game = MCTS(
+    # game = MCTS(
     #    create_problem(),
-    #)
+    # )
     # i = 0
     while True:
         path, reward = game.run(
@@ -184,7 +180,7 @@ def run_games():
         #     df = df.sort_index()
         #     print(f"writing current stats to {out_file}")
         #     df.to_csv(out_file, sep='\t')
-            # write_structures_file(decorations_file, decorations)
+        # write_structures_file(decorations_file, decorations)
 
 
 def train_model():

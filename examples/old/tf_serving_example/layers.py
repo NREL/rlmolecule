@@ -1,19 +1,18 @@
 # Some draft layers, I'd like to eventually add these to the nfp repo
 
+import nfp
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-
-from tensorflow.python.keras.layers.pooling import GlobalPooling1D
 from tensorflow.python.keras import backend
-from tensorflow.python.ops import math_ops
+from tensorflow.python.keras.layers.pooling import GlobalPooling1D
 from tensorflow.python.ops import array_ops
-
-import nfp
+from tensorflow.python.ops import math_ops
 
 
 class ConcatDense(layers.Layer):
     """ Layer to combine the concatenation and two dense layers """
+
     def build(self, input_shape):
         num_features = input_shape[0][-1]
         self.concat = layers.Concatenate()
@@ -21,7 +20,6 @@ class ConcatDense(layers.Layer):
         self.dense2 = layers.Dense(num_features)
 
     def call(self, inputs, mask=None):
-
         output = self.concat(inputs)
         output = self.dense1(output)
         output = self.dense2(output)
@@ -30,6 +28,7 @@ class ConcatDense(layers.Layer):
 
 class GraphLayer(layers.Layer):
     """ Base class for all GNN layers """
+
     def __init__(self, dropout: float = 0.0, **kwargs):
         super().__init__(**kwargs)
         self.dropout = dropout

@@ -6,18 +6,16 @@ from functools import partial
 from pathlib import Path
 from typing import Dict, Optional
 
-from numpy import array
-
 import sqlalchemy
 import tensorflow as tf
+from model import build_policy_trainer
+from numpy import array
 from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 
+from hallway_state import HallwayState
 from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from rlmolecule.alphazero.tensorflow.tf_keras_policy import KLWithLogits, TimeCsvLogger
-
-from hallway_state import HallwayState
-from model import build_policy_trainer
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +65,7 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
         network
         """
         policy_inputs = [
-            self._get_network_inputs(vertex.state) for vertex in itertools.chain((parent, ), parent.children)
+            self._get_network_inputs(vertex.state) for vertex in itertools.chain((parent,), parent.children)
         ]
         return {
             key: pad_sequences([elem[key] for elem in policy_inputs], padding='post')
@@ -93,7 +91,7 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
         parent = HallwayState.deserialize(serialized_parent.numpy().decode())
 
         policy_inputs = [
-            self._get_network_inputs(parent) for state in itertools.chain((parent, ), parent.get_next_actions())
+            self._get_network_inputs(parent) for state in itertools.chain((parent,), parent.get_next_actions())
         ]
 
         policy_inputs = {
@@ -110,6 +108,7 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
         :param problem:
         :return:
         """
+
         def get_policy_inputs_tf(parent, reward, visit_probabilities, problem: HallwayAlphaZeroProblem) -> {}:
             position, steps = tf.py_function(problem._get_network_inputs_from_serialized_parent,
                                              inp=[parent],
@@ -120,7 +119,7 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
 
         dataset = tf.data.Dataset.from_generator(
             self.iter_recent_games,
-            output_shapes=((), (), (None, )),
+            output_shapes=((), (), (None,)),
             output_types=(tf.string, tf.float32, tf.float32)) \
             .repeat() \
             .shuffle(self.max_buffer_size) \
@@ -128,7 +127,7 @@ class HallwayAlphaZeroProblem(AlphaZeroProblem):
                  num_parallel_calls=tf.data.experimental.AUTOTUNE) \
             .padded_batch(self.batch_size,
                           padding_values=(
-                              {"position": tf.constant(0, dtype=tf.int64), # Not sure what this should be
+                              {"position": tf.constant(0, dtype=tf.int64),  # Not sure what this should be
                                "steps": tf.constant(0, dtype=tf.int64)},
                               (0., 0.))) \
             .prefetch(tf.data.experimental.AUTOTUNE)

@@ -99,5 +99,4 @@ class CrystalTFAlphaZeroProblem(CrystalProblem, TFAlphaZeroProblem, ABC):
         return tf.keras.Model(input_tensors, [value_logit, pi_logit], name='policy_model')
 
     def get_policy_inputs(self, state: CrystalState) -> Dict:
-
         return self.preprocessor.construct_feature_matrices(state)

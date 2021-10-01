@@ -2,10 +2,8 @@ import os
 from typing import List
 
 import numpy as np
-import tensorflow as tf
 
 from rlmolecule.crystal.crystal_state import CrystalState
-
 
 conducting_ions = {'Li', 'Na', 'K', 'Mg', 'Zn'}
 anions = {'F', 'Cl', 'Br', 'I', 'O', 'S', 'N', 'P'}
@@ -34,7 +32,7 @@ class CrystalPreprocessor:
         self.proto_strc_names = proto_strc_names if proto_strc_names is not None else default_proto_strc_names
         self.max_stoich = max_stoich
 
-    #def build_preprocessor(self):
+        # def build_preprocessor(self):
         elements_and_soich = [(ele + str(i)).replace('0', '')
                               for ele in self.elements
                               for i in range(self.max_stoich + 1)]
@@ -82,7 +80,6 @@ class CrystalPreprocessor:
                 'crystal_sys': np.asarray([crystal_sys], dtype=np.int64),
                 'proto_strc': np.asarray([proto_strc], dtype=np.int64),
                 }
-
 
         # return {'eles_and_stoich': np.asarray([element_features]),
         #         # pad zeros to the end so they're all the same size.

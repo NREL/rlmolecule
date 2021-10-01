@@ -6,8 +6,6 @@ from rlmolecule.sql import hash_to_integer
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 from rlmolecule.tree_search.metrics import collect_metrics
 
-import time
-
 
 class MoleculeState(GraphSearchState):
     """

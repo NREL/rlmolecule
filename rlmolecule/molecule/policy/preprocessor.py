@@ -42,7 +42,6 @@ def load_preprocessor(saved_preprocessor_file: Optional[str] = None) -> nfp.prep
     :return: a MolPreprocessor instance for the molecule policy network
     """
     preprocessor = nfp.preprocessing.MolPreprocessor(atom_features=atom_featurizer, bond_features=bond_featurizer)
-    # preprocessor = MolPreprocessor(atom_features=atom_featurizer, bond_features=bond_featurizer, explicit_hs=False)
 
     if not saved_preprocessor_file:
         saved_preprocessor_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'preprocessor.json')

@@ -80,7 +80,7 @@ def construct_problem(size):
     engine = create_engine(engine_str, execution_options={"isolation_level": "AUTOCOMMIT"})
 
     grid = make_empty_grid(size=size)
-    env = GridEnv(grid, obs_type="scalar", max_episode_steps=2 * size + 2)
+    env = GridEnv(grid, observation_type="scalar", max_episode_steps=2 * size + 2)
 
     # reward_class = RankedRewardFactory(
     #         engine=engine,

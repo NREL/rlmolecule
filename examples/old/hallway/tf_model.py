@@ -3,7 +3,6 @@ from tensorflow.keras import layers
 
 
 def policy_model(hidden_layers: int, hidden_dim: int) -> tf.keras.Model:
-
     # Position input
     position = layers.Input([
         1,
@@ -26,7 +25,6 @@ def policy_model(hidden_layers: int, hidden_dim: int) -> tf.keras.Model:
     pi_logit = layers.Dense(1, name="prior")(x)
 
     return tf.keras.Model([position, steps], [value_logit, pi_logit], name="policy_model")
-
 
 # class PolicyWrapper(layers.Layer):
 

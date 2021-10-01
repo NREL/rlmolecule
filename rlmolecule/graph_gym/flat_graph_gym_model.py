@@ -1,5 +1,3 @@
-import time
-
 import tensorflow as tf
 from ray.rllib.agents.dqn.distributional_q_tf_model import DistributionalQTFModel
 
@@ -27,8 +25,6 @@ class FlatGraphGymModel(DistributionalQTFModel):
         self.total_value = None
 
     def forward(self, input_dict, state, seq_lens):
-        start = time.perf_counter()
-
         # Extract the available actions tensor from the observation.
         observation = input_dict['obs']
         action_mask = observation['action_mask']

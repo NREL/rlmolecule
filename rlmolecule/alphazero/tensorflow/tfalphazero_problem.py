@@ -16,7 +16,6 @@ from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from rlmolecule.tree_search.metrics import collect_metrics
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -75,7 +74,7 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
         """
         # Get the list of policy inputs
         return self._batch_policy_inputs(
-            [self.policy_input_wrapper(vertex) for vertex in itertools.chain((parent, ), parent.children)])
+            [self.policy_input_wrapper(vertex) for vertex in itertools.chain((parent,), parent.children)])
 
     def _batch_policy_inputs(self, list_of_policy_inputs: [{str: np.ndarray}]) -> {str: np.ndarray}:
         return {
@@ -117,6 +116,7 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
         """
         Creates a tensorflow dataset pipeline to batch game positions from the replay buffer into
         """
+
         def get_policy_inputs_tf(policy_digests, reward_and_visit_probs, problem: TFAlphaZeroProblem):
             input_layers = self.batched_policy_model.inputs
 

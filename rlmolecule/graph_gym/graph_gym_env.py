@@ -1,4 +1,3 @@
-import time
 from typing import Tuple, Dict
 
 import gym
@@ -31,7 +30,6 @@ class GraphGymEnv(gym.Env):
         return self.make_observation()
 
     def step(self, action: int) -> Tuple[Dict[str, np.ndarray], float, bool, dict]:
-        start = time.perf_counter()
         next_actions = self.state.get_next_actions()
 
         reward, is_terminal, info = self.problem.invalid_action_result
@@ -40,11 +38,9 @@ class GraphGymEnv(gym.Env):
             reward, is_terminal, info = self.problem.step(self.state)
 
         result = (self.make_observation(), reward, is_terminal, info)
-        print(f'GraphGymEnv::step() {(time.perf_counter() - start) * 1000}')
         return result
 
     def make_observation(self) -> {str: np.ndarray}:
-        start = time.perf_counter()
         max_num_actions = self.problem.max_num_actions
         action_mask = [False] * max_num_actions
         action_observations = [self.problem.null_observation] * max_num_actions
@@ -59,5 +55,4 @@ class GraphGymEnv(gym.Env):
             'action_mask': np.array(action_mask, dtype=np.bool),
             'action_observations': tuple(action_observations),
         }
-        print(f'GraphGymEnv::make_observation() {(time.perf_counter() - start) * 1000}')
         return result

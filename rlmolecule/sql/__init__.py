@@ -49,4 +49,4 @@ def hash_to_integer(binary_data: bytes) -> int:
     :return: an integer hash
     """
     digest = hashlib.blake2s(binary_data, digest_size=8).hexdigest()
-    return int(digest, 16) % 2**63
+    return int(digest, 16) % 2 ** 63
