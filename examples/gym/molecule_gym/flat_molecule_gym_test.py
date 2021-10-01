@@ -1,7 +1,6 @@
 """
 
 """
-# print('******************* import tensorflow as tf - 0')
 import tensorflow as tf
 
 gpus = tf.config.list_physical_devices('GPU')
@@ -33,8 +32,6 @@ if __name__ == "__main__":
 
 
     def make_env(_):
-        # print('begin make_env()')
-        # print('******************* import tensorflow as tf - 1')
         import tensorflow as tf
 
         gpus = tf.config.list_physical_devices('GPU')
@@ -46,17 +43,9 @@ if __name__ == "__main__":
         from rlmolecule.graph_gym.flat_graph_gym_env import FlatGraphGymEnv
         from rlmolecule.molecule.builder.builder import MoleculeBuilder
 
-        # return GraphGymEnv(MoleculeGraphProblem(MoleculeBuilder(max_atoms=4, min_atoms=2)))
         result = FlatGraphGymEnv(MoleculeGraphProblem(MoleculeBuilder()))
-        # print('end make_env()')
         return result
 
-
-    # def make_parametric_gridworld(_):
-    #     from examples.gym.gridworld_env import GridWorldEnv, make_doorway_grid
-    #     from examples.gym.parametric_gridworld_env import ParametricGridWorldEnv
-    #     print('make_parametric_gridworld()')
-    #     return ParametricGridWorldEnv(GridWorldEnv(make_doorway_grid()))
 
     from rlmolecule.graph_gym.flat_graph_gym_model import FlatGraphGymModel
 
@@ -69,7 +58,6 @@ if __name__ == "__main__":
                      model_config,
                      name,
                      **kwargs):
-            # print('******************* import tensorflow as tf - 2')
             import tensorflow as tf
             gpus = tf.config.list_physical_devices('GPU')
             if gpus:
@@ -77,12 +65,7 @@ if __name__ == "__main__":
                     tf.config.experimental.set_memory_growth(gpu, True)
 
             from rlmolecule.molecule.policy.model import policy_model
-            # inner_action_model = policy_model()
-            # per_action_model = MoleculeModel(inner_action_model)
-            # super(ThisModel, self).__init__(
-            #     obs_space, action_space, num_outputs, model_config, name,
-            #     per_action_model,
-            #     **kwargs)
+
             super(ThisModel, self).__init__(
                 obs_space, action_space, num_outputs, model_config, name,
                 policy_model,
@@ -90,7 +73,6 @@ if __name__ == "__main__":
 
 
     register_env('molecule_graph_problem', make_env)
-    # register_env('parametric_gridworld', make_parametric_gridworld)
 
     ModelCatalog.register_custom_model('molecule_graph_problem_model', ThisModel)
 
