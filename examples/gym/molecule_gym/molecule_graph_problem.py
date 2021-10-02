@@ -4,7 +4,6 @@ import gym
 import numpy as np
 import rdkit
 from nfp.preprocessing import MolPreprocessor
-from rdkit import Chem
 from rdkit.Chem.QED import qed
 
 from rlmolecule.graph_gym.graph_problem import GraphProblem
