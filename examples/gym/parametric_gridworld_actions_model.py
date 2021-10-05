@@ -41,10 +41,20 @@ class ParametricGridworldActionsModel(DistributionalQTFModel):
         action_observations = input_dict['obs']['action_observations']
         batch_size = action_observations[0].shape[0]
 
+        # print(
+        #     "OOPS",
+        #     type(action_observations),
+        #     type(action_observations[0]),
+        #     len(action_observations),
+        #     type(batch_size),
+        #     self.num_actions, 
+        #     self.action_feature_shape
+        # )
+
         flattened_action_features = tf.reshape(
             tf.stack(action_observations, axis=1),
             (batch_size * self.num_actions, ) + self.action_feature_shape)
-
+            
         flat_action_weights = self.per_action_model({'obs': flattened_action_features})[0]
         action_weights = tf.reshape(flat_action_weights, (batch_size, self.num_actions))
 

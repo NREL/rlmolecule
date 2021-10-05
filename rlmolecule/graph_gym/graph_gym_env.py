@@ -40,9 +40,10 @@ class GraphGymEnv(gym.Env):
         if action < len(next_actions):
             self.state = next_actions[action]  # assumes get_next_actions is indexable
             reward, is_terminal, info = self.problem.step(self.state)
+        reward = max(reward, 0.)
 
         result = (self.make_observation(), reward, is_terminal, info)
-        print(f'GraphGymEnv::step() {(time.perf_counter() - start) * 1000}')
+        #print(f'GraphGymEnv::step() {(time.perf_counter() - start) * 1000}')
         return result
 
     def make_observation(self) -> {str: np.ndarray}:
@@ -61,5 +62,5 @@ class GraphGymEnv(gym.Env):
             'action_mask': np.array(action_mask, dtype=np.bool),
             'action_observations': tuple(action_observations),
         }
-        print(f'GraphGymEnv::make_observation() {(time.perf_counter() - start) * 1000}')
+        #print(f'GraphGymEnv::make_observation() {(time.perf_counter() - start) * 1000}')
         return result

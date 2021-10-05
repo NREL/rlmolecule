@@ -16,7 +16,7 @@ class MoleculeGraphProblem(GraphProblem):
     def __init__(self,
                  builder: MoleculeBuilder,
                  pca: PCA,
-                 obs_bounds: Tuple[float, float] = None,
+                 obs_bounds: Tuple[float, float] = (-1., 1.),
                  max_num_actions: int = 64,
                  max_num_bonds: int = 40,
                  ) -> None:
@@ -29,23 +29,26 @@ class MoleculeGraphProblem(GraphProblem):
         self.pca_dim = pca.n_components_
         self.fp_size = pca.n_features_
         self.obs_bounds = obs_bounds
-        if obs_bounds is None:
-            _x = pca.transform(np.ones((1, self.fp_size)))
-            self.obs_bounds = (_x.min(), _x.max())
 
-        self._observation_space = gym.spaces.Dict({
-            "fingerprint": gym.spaces.Box(
+        # self._observation_space = gym.spaces.Dict({
+        #     "fingerprint": gym.spaces.Box(
+        #         low=self.obs_bounds[0], 
+        #         high=self.obs_bounds[1],
+        #         shape=(self.pca_dim,),
+        #         dtype=np.float32)
+        # })
+        self._observation_space = gym.spaces.Box(
                 low=self.obs_bounds[0], 
                 high=self.obs_bounds[1],
                 shape=(self.pca_dim,),
                 dtype=np.float32
-            )
-        })
+        )
 
         self._action_space: gym.Space = gym.spaces.Discrete(self.max_num_actions)
 
         self._null_observation = self._observation_space.sample()
-        for v in self._null_observation.values():
+        #for v in self._null_observation.values():
+        for v in self._null_observation:
             v *= 0
 
     @property
@@ -67,7 +70,10 @@ class MoleculeGraphProblem(GraphProblem):
     def make_observation(self, state: MoleculeState) -> Dict[str, np.ndarray]:
         fp = np.array(Chem.RDKFingerprint(state.molecule, fpSize=self.fp_size))
         fp = fp.reshape(1, -1)
-        return {"fingerprint": self.pca.transform(fp).squeeze().astype(np.float32)}
+        fp = self.pca.transform(fp).squeeze()
+        fp = np.clip(fp, *self.obs_bounds)
+        #return {"fingerprint": fp.astype(np.float32)}
+        return np.array(fp.astype(np.float32))
 
     def get_initial_state(self) -> MoleculeState:
         return MoleculeState(rdkit.Chem.MolFromSmiles('C'), self.builder)

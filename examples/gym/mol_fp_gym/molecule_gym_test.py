@@ -37,9 +37,9 @@ if __name__ == "__main__":
     args = {
         'run': 'PPO',
         'as_test': True,
-        'stop_iters': 64,
-        'stop_timesteps': int(1e6),
-        'stop_reward': 100.0,
+        'stop_iters': int(1e3),
+        'stop_timesteps': int(1e5),
+        'stop_reward': 1.0,
     }
 
 
@@ -72,10 +72,15 @@ if __name__ == "__main__":
         return result
 
 
-    from rlmolecule.graph_gym.graph_gym_model import GraphGymModel
+    #from rlmolecule.graph_gym.graph_gym_model import GraphGymModel
+    from examples.gym.parametric_gridworld_actions_model import ParametricGridworldActionsModel
 
+    example_env = make_env(None)
+    #print("ENV ACTION SPACE", example_env.action_space)
+    #print("ENV OBS SPACE", example_env.observation_space)
 
-    class ThisModel(GraphGymModel):
+    #class ThisModel(GraphGymModel):
+    class ThisModel(ParametricGridworldActionsModel):
         def __init__(self,
                      obs_space,
                      action_space,
@@ -91,11 +96,12 @@ if __name__ == "__main__":
                     tf.config.experimental.set_memory_growth(gpu, True)
 
             # from examples.gym.mol_fp_gym.molecule_model import MoleculeModel
-            from examples.gym.mol_fp_gym.policy import policy_model
+            # from examples.gym.mol_fp_gym.policy import policy_model
 
             super(ThisModel, self).__init__(
                 obs_space, action_space, num_outputs, model_config, name,
-                policy_model,
+                #policy_model,
+                example_observation_space=example_env.observation_space,
                 **kwargs)
 
 
@@ -117,7 +123,8 @@ if __name__ == "__main__":
     else:
         cfg = {}
 
-    num_workers = 3
+    num_workers = 34
+    rollout_fragment_length = 12
     config = dict(
         {
             'local_dir': '../log',
@@ -127,41 +134,42 @@ if __name__ == "__main__":
             },
             'num_gpus': 1,
             'num_gpus_per_worker': 0,
-            'num_workers': 34,
-            "lr": tune.grid_search([1e-3, 1e-4, 1e-5]),
-            # 'num_gpus': 0,
-            # 'num_gpus_per_worker': 0,
-            # 'num_workers': 0,
-            # 'num_gpus': 0,
-            # 'num_gpus_per_worker': 0,
-            # 'num_workers': num_workers,
+            'num_workers': num_workers,
+            "lr": tune.grid_search([1e-4]),
             'framework': 'tf2',
-            'eager_tracing': True,
-            # 'framework': 'tf1',
-            # 'rollout_fragment_length': int(8),
-            # 'train_batch_size': int(16),
-            # 'sgd_minibatch_size': 8,
-            "num_sgd_iter": tune.grid_search([5, 10]),
-            "entropy_coeff": 0.05,
-            'rollout_fragment_length': 12,
-            'train_batch_size': 34*12,
-            'sgd_minibatch_size': 34*12,
+            'eager_tracing': False,
+            "num_sgd_iter": 10,
+            "entropy_coeff": tune.grid_search([0.0]),
+            'rollout_fragment_length': rollout_fragment_length,
+            'train_batch_size': num_workers*rollout_fragment_length,
+            'sgd_minibatch_size': num_workers*rollout_fragment_length,
             "batch_mode": 'complete_episodes',  # '"truncate_episodes",
+            "log_level": "WARN"
         },
         **cfg)
 
     config = command_line_tools.parse_config_from_args(sys.argv[1:], config)
 
-    # stop = {
-    #     'training_iteration': args['stop_iters'],
-    #     'timesteps_total': args['stop_timesteps'],
-    #     'episode_reward_mean': args['stop_reward'],
-    # }
+    stop = {
+        'training_iteration': args['stop_iters'],
+        'timesteps_total': args['stop_timesteps'],
+        'episode_reward_mean': args['stop_reward'],
+    }
 
     local_dir = config['local_dir']
     del config['local_dir']
 
-    results = tune.run(args['run'], config=config, verbose=3, local_dir=local_dir)
+    results = tune.run(
+        args['run'],
+        stop=stop,
+        num_samples=3,
+        checkpoint_freq=1,
+        checkpoint_at_end=True,
+        checkpoint_score_attr="episode_reward_mean",
+        keep_checkpoints_num=10,
+        config=config,
+        verbose=3,
+        local_dir=local_dir)
 
     if args['as_test']:
         check_learning_achieved(results, args['stop_reward'])

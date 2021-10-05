@@ -20,7 +20,7 @@ class GraphProblem(ABC):
 
     @property
     def invalid_action_result(self) -> (float, bool, {}):
-        return -math.inf, False, {}
+        return -math.inf, True, {}
 
     @property
     @abstractmethod
