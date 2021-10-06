@@ -23,6 +23,7 @@ class GraphGymEnv(gym.Env):
         self.observation_space: gym.Space = gym.spaces.Dict({
             'action_mask': Box(False, True, shape=(problem.max_num_actions,), dtype=np.bool),
             'action_observations': gym.spaces.Tuple((problem.observation_space,) * problem.max_num_actions),
+            'state_observation': problem.observation_space
         })
 
     def reset(self) -> {str: np.ndarray}:
@@ -38,6 +39,7 @@ class GraphGymEnv(gym.Env):
             reward, is_terminal, info = self.problem.step(self.state)
 
         result = (self.make_observation(), reward, is_terminal, info)
+        print(f'GraphGymEnv: {reward} {is_terminal}, {info}, {len(next_actions)}')
         return result
 
     def make_observation(self) -> {str: np.ndarray}:
@@ -51,8 +53,8 @@ class GraphGymEnv(gym.Env):
             action_mask[i] = True
             action_observations[i] = self.problem.make_observation(successor)
 
-        result = {
+        return {
             'action_mask': np.array(action_mask, dtype=np.bool),
             'action_observations': tuple(action_observations),
+            'state_observation': self.problem.make_observation(self.state),
         }
-        return result

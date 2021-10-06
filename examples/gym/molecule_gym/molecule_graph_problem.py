@@ -76,5 +76,12 @@ class MoleculeGraphProblem(GraphProblem):
     def step(self, state: MoleculeState) -> (float, bool, dict):
         is_terminal = len(state.get_next_actions()) == 0
         if state.forced_terminal:
-            return qed(state.molecule), is_terminal, {'forced_terminal': True, 'smiles': state.smiles}
+            r = qed(state.molecule)
+            print(r)
+            return r, is_terminal, {'forced_terminal': True, 'smiles': state.smiles}
+            # return qed(state.molecule), is_terminal, {'forced_terminal': True, 'smiles': state.smiles}
         return 0.0, is_terminal, {'forced_terminal': False, 'smiles': state.smiles}
+
+    @property
+    def invalid_action_result(self) -> (float, bool, {}):
+        return -1.0, False, {}

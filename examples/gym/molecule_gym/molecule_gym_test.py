@@ -3,6 +3,7 @@
 """
 import tensorflow as tf
 
+
 gpus = tf.config.list_physical_devices('GPU')
 if gpus:
     for gpu in gpus:
@@ -43,8 +44,7 @@ if __name__ == "__main__":
         from rlmolecule.graph_gym.graph_gym_env import GraphGymEnv
         from rlmolecule.molecule.builder.builder import MoleculeBuilder
 
-        result = GraphGymEnv(MoleculeGraphProblem(MoleculeBuilder()))
-        return result
+        return GraphGymEnv(MoleculeGraphProblem(MoleculeBuilder()))
 
 
     from rlmolecule.graph_gym.graph_gym_model import GraphGymModel
@@ -58,6 +58,7 @@ if __name__ == "__main__":
                      model_config,
                      name,
                      **kwargs):
+
             import tensorflow as tf
             gpus = tf.config.list_physical_devices('GPU')
             if gpus:
@@ -65,10 +66,11 @@ if __name__ == "__main__":
                     tf.config.experimental.set_memory_growth(gpu, True)
 
             from rlmolecule.molecule.policy.model import policy_model
+            from examples.gym.molecule_gym.molecule_model import MoleculeModel
 
             super(ThisModel, self).__init__(
                 obs_space, action_space, num_outputs, model_config, name,
-                policy_model,
+                MoleculeModel(policy_model()),
                 **kwargs)
 
 
@@ -96,9 +98,9 @@ if __name__ == "__main__":
             'model': {
                 'custom_model': 'molecule_graph_problem_model',
             },
-            'num_gpus': 0,
+            'num_gpus': 1,
             'num_gpus_per_worker': 0,
-            'num_workers': 0,
+            'num_workers': 6,
             # 'num_gpus': 0,
             # 'num_gpus_per_worker': 0,
             # 'num_workers': 0,
@@ -111,10 +113,15 @@ if __name__ == "__main__":
             # 'rollout_fragment_length': int(8),
             # 'train_batch_size': int(16),
             # 'sgd_minibatch_size': 8,
-            'rollout_fragment_length': 16,
-            'train_batch_size': 128,
-            'sgd_minibatch_size': 32,
-            "batch_mode": 'truncate_episodes',  # '"truncate_episodes",
+            'rollout_fragment_length': 32,
+            'train_batch_size': 6 * 4 * 32,
+            'sgd_minibatch_size': 32 * 8,
+            'kl_target': 1e-4,
+            'kl_coeff': 1e-5,
+            'use_gae': False,
+            # 'lambda': 0.99,
+            'vf_clip_param': 1.0,
+            "batch_mode": 'complete_episodes',  # '"truncate_episodes",
         },
         **cfg)
 

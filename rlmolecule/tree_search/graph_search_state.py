@@ -25,15 +25,6 @@ class GraphSearchState(ABC):
         pass
 
     @abstractmethod
-    def get_next_actions(self) -> Sequence['GraphSearchState']:
-        """
-        Defines the next possible states that are reachable from the current state. Should return nothing if the
-        state is a final or terminal state, where a reward should be calculated.
-        :return: the state's successors as an iterable.
-        """
-        pass
-
-    @abstractmethod
     def hash(self) -> int:
         """
         Hash method which must be implemented by subclasses. Used when memoizing and traversing the graph structure
@@ -63,6 +54,15 @@ class GraphSearchState(ABC):
         :return: An initialized GraphSearchState instance
         """
         return pickle.loads(zlib.decompress(data))
+
+    @abstractmethod
+    def get_next_actions(self) -> Sequence['GraphSearchState']:
+        """
+        Defines the next possible states that are reachable from the current state. Should return nothing if the
+        state is a final or terminal state, where a reward should be calculated.
+        :return: the state's successors as an iterable.
+        """
+        pass
 
     # @final
     def __eq__(self, other: any) -> bool:

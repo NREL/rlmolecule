@@ -45,12 +45,12 @@ class GridWorldEnv(gym.Env):
 
         self.player_position: np.ndarray = np.zeros(len(self.shape))
 
-        num_dims = len(self.shape)
+        self.num_dims = len(self.shape)
 
         self.action_map: [(int, ...)] = []
-        for d in range(num_dims):
-            self.action_map.append(tuple((1 * (i == d) for i in range(num_dims))))
-            self.action_map.append(tuple((-1 * (i == d) for i in range(num_dims))))
+        for d in range(self.num_dims):
+            self.action_map.append(tuple((1 * (i == d) for i in range(self.num_dims))))
+            self.action_map.append(tuple((-1 * (i == d) for i in range(self.num_dims))))
 
         low = 0
         high = 1
@@ -60,8 +60,8 @@ class GridWorldEnv(gym.Env):
             obs_shape = (1,)
             high = np.prod(self.shape) - 1
         elif self.observation_type == 'scalar':  # (row, col)
-            obs_shape = (num_dims,)
-            low = np.array([0] * num_dims)
+            obs_shape = (self.num_dims,)
+            low = np.array([0] * self.num_dims)
             high = np.array([d - 1 for d in self.shape])
         elif self.observation_type == 'rgb':  # binary matrices of [obstacle, goal, start]
             obs_shape = tuple(list(self.shape) + [3])
@@ -76,9 +76,9 @@ class GridWorldEnv(gym.Env):
             low=low, high=high, shape=obs_shape, dtype=dtype)
 
         print(
-            f'ospace: {self.observation_space} dims: {num_dims} mode: {self.observation_type}, low {low}, high {high}')
+            f'ospace: {self.observation_space} dims: {self.num_dims} mode: {self.observation_type}, low {low}, high {high}')
 
-        self.action_space: gym.spaces.Discrete = gym.spaces.Discrete(4)
+        self.action_space: gym.spaces.Discrete = gym.spaces.Discrete(len(self.action_map))
 
     def make_next(self, action: int) -> ('GridWorldEnv', bool):
         next = copy(self)
@@ -164,6 +164,9 @@ class GridWorldEnv(gym.Env):
             grid: np.ndarray,
             action: int,
     ) -> (np.ndarray, bool):
+        if any((player_position == goal for goal in self.goals)):
+            return player_position, False  # already reached goal
+
         # for make_next to work without additional trickery, this needs to be a new object
         new_position: np.ndarray = player_position + self.action_map[action]
 
@@ -179,6 +182,12 @@ class GridWorldEnv(gym.Env):
     def apply_action(self, action: int) -> bool:
         self.player_position, valid_move = self.get_next_position(self.player_position, self.grid, action)
         return valid_move
+
+    def equals(self, other: 'GridWorldEnv') -> bool:
+        return self.player_position == other.player_position and self.goals == other.goals and self.grid == other.grid
+
+    def hash(self) -> int:
+        return hash(self.player_position.data.to_bytes())
 
 
 def make_empty_grid(size=5):
