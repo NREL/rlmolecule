@@ -1,8 +1,9 @@
 """
 
 """
-import tensorflow as tf
+from math import ceil
 
+import tensorflow as tf
 
 gpus = tf.config.list_physical_devices('GPU')
 if gpus:
@@ -66,12 +67,13 @@ if __name__ == "__main__":
                     tf.config.experimental.set_memory_growth(gpu, True)
 
             from rlmolecule.molecule.policy.model import policy_model
-            from examples.gym.molecule_gym.molecule_model import MoleculeModel
 
+            # super(ThisModel, self).__init__(
+            #     obs_space, action_space, num_outputs, model_config, name,
+            #     MoleculeModel(policy_model()))
             super(ThisModel, self).__init__(
                 obs_space, action_space, num_outputs, model_config, name,
-                MoleculeModel(policy_model()),
-                **kwargs)
+                policy_model())
 
 
     register_env('molecule_graph_problem', make_env)
@@ -90,7 +92,8 @@ if __name__ == "__main__":
     else:
         cfg = {}
 
-    num_workers = 3
+    num_workers = 11
+    rollout_fragment_length = 12
     config = dict(
         {
             'local_dir': '../log',
@@ -98,9 +101,9 @@ if __name__ == "__main__":
             'model': {
                 'custom_model': 'molecule_graph_problem_model',
             },
-            'num_gpus': 1,
+            'num_gpus': .8,
             'num_gpus_per_worker': 0,
-            'num_workers': 6,
+            'num_workers': num_workers,
             # 'num_gpus': 0,
             # 'num_gpus_per_worker': 0,
             # 'num_workers': 0,
@@ -113,9 +116,9 @@ if __name__ == "__main__":
             # 'rollout_fragment_length': int(8),
             # 'train_batch_size': int(16),
             # 'sgd_minibatch_size': 8,
-            'rollout_fragment_length': 32,
-            'train_batch_size': 6 * 4 * 32,
-            'sgd_minibatch_size': 32 * 8,
+            'rollout_fragment_length': rollout_fragment_length,
+            'train_batch_size': int(ceil(64 / num_workers) * rollout_fragment_length),
+            'sgd_minibatch_size': 64,  # 32 * num_workers / 2,
             'kl_target': 1e-4,
             'kl_coeff': 1e-5,
             'use_gae': False,

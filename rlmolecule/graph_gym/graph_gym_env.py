@@ -42,7 +42,7 @@ class GraphGymEnv(gym.Env):
         print(f'GraphGymEnv: {reward} {is_terminal}, {info}, {len(next_actions)}')
         return result
 
-    def make_observation(self) -> {str: np.ndarray}:
+    def make_observation(self) -> {str: any}:
         max_num_actions = self.problem.max_num_actions
         action_mask = [False] * max_num_actions
         action_observations = [self.problem.null_observation] * max_num_actions
