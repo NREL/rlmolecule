@@ -15,23 +15,11 @@ class GraphGymModel(TFModelV2):
                  per_action_model):
         super(GraphGymModel, self).__init__(
             obs_space, action_space, num_outputs, model_config, name)
-
-        # print(f"obs_space {obs_space}")
-        # print(f"obs_space.original_space {obs_space.original_space}")
-        # print(f"action_space {action_space}")
-        # print(f"num_outputs {num_outputs}")
-
         self.per_action_model = per_action_model
-        # self.total_value = None
         self.action_values = None
-        # observation_space = obs_space.original_space
+        self.discount_rate = tf.constant(.99)
 
     def forward(self, input_dict, state, seq_lens):
-        # print(f'forward() {state}')
-        # print(f'input_dict {input_dict}')
-        # print(f"input_dict['obs'] {input_dict['obs']}")
-        # print(f"input_dict['obs']['action_observations'] {input_dict['obs']['action_observations']}")
-
         # Extract the available actions tensor from the observation.
         observation = input_dict['obs']
         action_mask = observation['action_mask']
@@ -61,6 +49,32 @@ class GraphGymModel(TFModelV2):
                                   flat_weights.dtype.min)
 
         self.action_values = tf.reshape(flat_values, composite_shape)[:, 0]
+
+        # unnormalized_action_distribution = tf.maximum(tf.exp(action_weights), 1e-12)
+        # action_distribution = \
+        #     tf.divide(unnormalized_action_distribution,
+        #               tf.expand_dims(tf.reduce_sum(unnormalized_action_distribution, axis=1), axis=1))
+        # acton_values = tf.reshape(flat_values, composite_shape)[:, 1:]
+        # expected_npv = tf.reduce_sum(tf.multiply(action_distribution, acton_values), axis=1) * self.discount_rate
+        # self.action_values = tf.where(tf.reduce_any(action_mask, axis=1),
+        #                               expected_npv,
+        #                               tf.reshape(flat_values, composite_shape)[:, 0])
+        # self.action_values = tf.where(tf.reduce_any(action_mask, axis=1),
+        #                               .5 * tf.reshape(flat_values, composite_shape)[:, 0] + .5 * expected_npv,
+        #                               tf.reshape(flat_values, composite_shape)[:, 0])
+
+
+        # action_values = tf.reshape(flat_values, composite_shape)
+        # self.action_values = tf.where(tf.reduce_any(action_mask, axis=1),
+        #                               self.discount_rate * tf.reduce_max(action_values[:, 1:], axis=1),
+        #                               action_values[:, 0])
+
+        # self.action_values = \
+        #     tf.reshape(flat_values, composite_shape)[:, 0] * .5 + \
+        #     .5 * .99 * tf.reduce_max(
+        #         tf.where(action_mask,
+        #                  tf.reshape(flat_values, composite_shape)[:, 1:],
+        #                  flat_weights.dtype.min), axis=1)
 
         # print(
         #     f"action_mask {tf.shape(action_mask)} {action_mask}\n"

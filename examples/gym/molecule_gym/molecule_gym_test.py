@@ -92,7 +92,7 @@ if __name__ == "__main__":
     else:
         cfg = {}
 
-    num_workers = 11
+    num_workers = 8
     rollout_fragment_length = 12
     config = dict(
         {
