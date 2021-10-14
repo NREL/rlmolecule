@@ -35,8 +35,7 @@ def bond_featurizer(bond: rdkit.Chem.Bond, flipped: bool = False) -> str:
     return " ".join([atoms, btype, ring, bstereo]).strip()
 
 
-def load_preprocessor(saved_preprocessor_file: Optional[str] = None,
-                      ) -> nfp.preprocessing.MolPreprocessor:
+def load_preprocessor(saved_preprocessor_file: Optional[str] = None) -> nfp.preprocessing.MolPreprocessor:
     """Load the MolPreprocessor object from either the default json file or a provided data file
 
     :param saved_preprocessor_file: directory of the saved nfp.Preprocessor json data

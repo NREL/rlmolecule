@@ -1,6 +1,6 @@
+import logging
 import os
 import sys
-import logging
 
 sys.path.append('../..')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -22,12 +22,11 @@ def predict(inputs):
 
 
 def get_ranked_rewards(reward):
-
     with psycopg2.connect(**config.dbparams) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "select count(*) from {table}_game where experiment_id = %s;".format(table=config.sql_basename),
-                (config.experiment_id, ))
+                (config.experiment_id,))
             n_games = cur.fetchone()[0]
 
         if n_games < config.reward_buffer_min_size:
@@ -67,7 +66,7 @@ class StabilityNode(Node):
             with conn.cursor() as cur:
                 cur.execute(
                     "select real_reward from {table}_reward where smiles = %s".format(table=config.sql_basename),
-                    (self.smiles, ))
+                    (self.smiles,))
                 result = cur.fetchone()
 
         if result:

@@ -35,7 +35,7 @@ class GymEnvState(GraphSearchState):
         return (self.env.get_obs(), self.step_count).__repr__()
 
     def equals(self, other: any) -> bool:
-        are_close = np.all(np.isclose(self.env.get_obs(), other.env.get_obs()))
+        are_close = np.all(np.isclose(self.env.get_obs(), other.env.make_observation()))
         same_time = (self.step_count == other.step_count)
         return are_close and same_time
 

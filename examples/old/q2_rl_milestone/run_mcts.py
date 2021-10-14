@@ -28,6 +28,7 @@ dbparams = {
     'options': f'-c search_path=rl',
 }
 
+
 ## This creates the table used to store the rewards
 ## But, we don't want this to run every time we run the script,
 ## just keeping it here as a reference
@@ -98,7 +99,7 @@ def run_game():
         for i, node in enumerate(game[:-1]):
             with conn.cursor() as cur:
                 cur.execute("""INSERT INTO Q2Replay (gameid, smiles, reward, position, data) values %s;""",
-                            ((gameid, node.smiles, reward, i, node.get_action_inputs_as_binary()), ))
+                            ((gameid, node.smiles, reward, i, node.get_action_inputs_as_binary()),))
 
     print(f'finishing game {gameid}', flush=True)
 

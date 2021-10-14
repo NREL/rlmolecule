@@ -1,18 +1,18 @@
 """ Brute-force compute the fractional volume of the conducting ions for all 15M decorations
 """
 
-#from dask.distributed import Client
-#from dask_jobqueue import SLURMCluster
+# from dask.distributed import Client
+# from dask_jobqueue import SLURMCluster
 import json
 import logging
-import gzip
 import os
+
 import pandas as pd
-# Apparently there's an issue with the latest version of pandas. 
+
+# Apparently there's an issue with the latest version of pandas.
 # Got this fix from here:
 # https://github.com/pandas-profiling/pandas-profiling/issues/662#issuecomment-803673639
 pd.set_option("display.max_columns", None)
-import numpy as np
 import time
 from collections import defaultdict
 import itertools
@@ -22,14 +22,11 @@ from pymatgen.core import Composition, Structure
 from pymatgen.analysis import local_env
 
 from examples.crystal_volume import optimize_crystal_volume as ocv
-    #read_structures_file, compute_structure_vol, generate_decoration
+# read_structures_file, compute_structure_vol, generate_decoration
 from rlmolecule.crystal.builder import CrystalBuilder
-from rlmolecule.crystal.crystal_problem import CrystalTFAlphaZeroProblem
 from rlmolecule.crystal.crystal_state import CrystalState
-from rlmolecule.sql.run_config import RunConfig
-# from rlmolecule.tree_search.reward import RankedRewardFactory
-from rlmolecule.tree_search.reward import LinearBoundedRewardFactory, RankedRewardFactory
 
+# from rlmolecule.tree_search.reward import RankedRewardFactory
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -84,7 +81,7 @@ def compute_structure_vol(structure: Structure, comp=None):
     total_vol = round(total_vol, 2)
     if vol_sum != total_vol:
         logger.warning(f"vol_sum != total_vol ({vol_sum} != {total_vol}) - {comp}")
-    #assert vol_sum == total_vol, f"ERROR: vol_sum != total_vol ({vol_sum} != {total_vol}"
+    # assert vol_sum == total_vol, f"ERROR: vol_sum != total_vol ({vol_sum} != {total_vol}"
 
     return element_vols
 
@@ -135,12 +132,12 @@ def generate_decorations_from_icsd(builder, state, visited, progress_bar):
         return
     children = state.get_next_actions(builder)
     for c in children:
-        #yield from generate_decorations_from_icsd(builder, c)
+        # yield from generate_decorations_from_icsd(builder, c)
         generate_decorations_from_icsd(builder, c, visited, progress_bar)
         visited.add(str(c))
 
     if len(children) == 0:
-        progress_bar.update(1) 
+        progress_bar.update(1)
         # This is a terminal state, so return the decorated structure.
         # The 'action_node' string has the following format at this point:
         # comp_type|prototype_structure|decoration_idx
@@ -157,7 +154,7 @@ def generate_decorations_from_icsd(builder, state, visited, progress_bar):
             return
 
         # now line up the elements of this decoration with the icsd structure volumes
-        icsd_comp = icsd_prototype.composition.reduced_composition.alphabetical_formula.replace(' ','')
+        icsd_comp = icsd_prototype.composition.reduced_composition.alphabetical_formula.replace(' ', '')
         icsd_elements = state.get_eles_from_comp(icsd_comp)
         decorated_elements = state.get_eles_from_comp(comp)
         ele_mapping = {e: icsd_elements[i] for i, e in enumerate(decorated_elements)}
@@ -175,10 +172,10 @@ def generate_decorations_from_icsd(builder, state, visited, progress_bar):
 
         time_taken = time.process_time() - start_time + icsd_strc_vols.get(structure_key + '-time', 0)
         stats = [str(round(x, 4)) for x in (conducting_ion_vol, total_vol, frac_conducting_ion_vol, time_taken)]
-        #volume_stats[str(state)] = stats
+        # volume_stats[str(state)] = stats
         out.write('\t'.join([str(state)] + stats) + '\n')
         return
-        #yield stats
+        # yield stats
 
 
 def extract_conducting_ion_vol(ele_mapping, icsd_ele_vols):
@@ -237,7 +234,7 @@ def decorate_prototype_structure(icsd_prototype: Structure,
 ## This function was meant to loop through all of the structures, but since the volume does not change when changing the
 ## element types inside of a structure, I'm computing the volume stats for the ICSD structures once at the start and then
 ## extracting the decoration volumes from that.
-#def generate_decorations_full(builder, state):
+# def generate_decorations_full(builder, state):
 #    """ DFS to generate all of the decorations
 #    """
 #    children = state.get_next_actions(builder)
@@ -294,34 +291,33 @@ else:
     with open(icsd_strc_vols_file, 'w') as out:
         out.write(json.dumps(icsd_strc_vols, indent=2, sort_keys=True))
 
-
 root_state = CrystalState('root')
 # use a composition as the starting state for testing:
-#root_state = CrystalState('K2O1', composition='K2O1')
+# root_state = CrystalState('K2O1', composition='K2O1')
 builder = CrystalBuilder()
 
-n = 16*10**6
+n = 16 * 10 ** 6
 progress_bar = tqdm(total=n)
 visited = set()
 # results will be stored in volume_stats
-#volume_stats = {}
+# volume_stats = {}
 out_file = "outputs/2021-07-16-all-decoration-vol-stats.tsv"
 print(f"writing to {out_file}")
 with open(out_file, 'w') as out:
     generate_decorations_from_icsd(builder, root_state, visited, progress_bar)
-#print(results)
+# print(results)
 print("Finished")
-#df = pd.DataFrame(volume_stats).T
-#df.columns = ['conducting_ion_vol', 'total_vol', 'fraction', 'time_taken']
-#df = df.sort_values('fraction')
-#print(f"writing {out_file}")
-#df.to_csv(out_file, sep='\t')
+# df = pd.DataFrame(volume_stats).T
+# df.columns = ['conducting_ion_vol', 'total_vol', 'fraction', 'time_taken']
+# df = df.sort_values('fraction')
+# print(f"writing {out_file}")
+# df.to_csv(out_file, sep='\t')
 
 
-#n_processes = 36  # number of processes to run on each node
-#memory = 90000  # to fit on a standard node; ask for 184,000 for a bigmem node
+# n_processes = 36  # number of processes to run on each node
+# memory = 90000  # to fit on a standard node; ask for 184,000 for a bigmem node
 #
-#cluster = SLURMCluster(
+# cluster = SLURMCluster(
 #    project='bpms',
 #    walltime='30',  # 30 minutes to fit in the debug queue; 180 to fit in short
 #    job_mem=str(memory),
@@ -332,13 +328,12 @@ print("Finished")
 #    processes=n_processes,
 #    memory='{}MB'.format(memory),
 #    queue='debug'  # Obviously this is limited to only a single job -- comment this out for larger runs
-#)
+# )
 #
-#print(cluster.job_script())
+# print(cluster.job_script())
 #
 ## Create the client
-#dask_client = Client(cluster)
+# dask_client = Client(cluster)
 #
-#n_nodes = 1 # set this to the number of nodes you would like to start as workers
-#cluster.scale(n_processes * n_nodes)
-
+# n_nodes = 1 # set this to the number of nodes you would like to start as workers
+# cluster.scale(n_processes * n_nodes)

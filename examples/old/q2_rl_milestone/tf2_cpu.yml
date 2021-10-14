@@ -17,4 +17,4 @@ dependencies:
   - psycopg2
   - pip
   - pip:
-    - nfp
+      - nfp

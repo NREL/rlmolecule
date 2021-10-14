@@ -12,12 +12,13 @@ import multiprocessing
 import os
 import sys
 import time
-import networkx as nx
 
+import networkx as nx
 import rdkit
 from rdkit import Chem, RDConfig
 from rdkit.Chem import Descriptors
-#from rdkit.Contrib import SA_Score
+
+# from rdkit.Contrib import SA_Score
 sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
 # noinspection PyUnresolvedReferences
 import sascorer
@@ -51,10 +52,10 @@ def num_long_cycles(mol):
 
 
 def penalized_logp(molecule):
-  log_p = Descriptors.MolLogP(molecule)
-  sas_score = sascorer.calculateScore(molecule)
-  cycle_score = num_long_cycles(molecule)
-  return log_p - sas_score + cycle_score
+    log_p = Descriptors.MolLogP(molecule)
+    sas_score = sascorer.calculateScore(molecule)
+    cycle_score = num_long_cycles(molecule)
+    return log_p - sas_score + cycle_score
 
 
 # copied from here: https://github.com/dbkgroup/prop_gen/blob/d17d935a534b6a667d2603b4d0c7b4add446d6bf/gym-molecule/gym_molecule/envs/molecule.py

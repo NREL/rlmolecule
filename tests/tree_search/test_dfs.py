@@ -58,7 +58,6 @@ class AcyclicProblem(CyclicProblem):
 
 
 def test_dfs():
-
     game = MCTS(CyclicProblem(reward_class=LinearBoundedRewardFactory(min_reward=0, max_reward=5)))
     with pytest.raises(GraphCycleError):
         game.run(num_mcts_samples=100)

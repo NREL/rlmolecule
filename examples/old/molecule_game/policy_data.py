@@ -1,10 +1,9 @@
 import io
 
+import molecule_game.config as config
 import nfp
 import numpy as np
 import tensorflow as tf
-
-import molecule_game.config as config
 
 
 def parse_binary_data(binary_data, reward):

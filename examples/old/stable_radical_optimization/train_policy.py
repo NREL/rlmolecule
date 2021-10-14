@@ -1,9 +1,9 @@
-from datetime import datetime
 import logging
 import os
-from pathlib import Path
 import sys
 import time
+from datetime import datetime
+from pathlib import Path
 
 sys.path.append('../..')
 
@@ -28,7 +28,6 @@ def psql_generator():
     """
 
     with psycopg2.connect(**config.dbparams) as conn:
-
         df = pd.read_sql_query("""
         with recent_replays as (
             select * from rl.{0}_replay where gameid in (

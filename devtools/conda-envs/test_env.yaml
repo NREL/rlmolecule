@@ -16,5 +16,5 @@ dependencies:
   - diskcache
   - pip
   - pip:
-    - tensorflow  
-    - nfp
+      - tensorflow
+      - nfp

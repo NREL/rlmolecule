@@ -4,8 +4,8 @@ from typing import Tuple
 
 import numpy as np
 import rdkit
-from rdkit.Chem.rdDistGeom import EmbedMolecule
 import tensorflow as tf
+from rdkit.Chem.rdDistGeom import EmbedMolecule
 
 from bde_utils import bde_get_inputs, prepare_for_bde
 from examples.stable_radical_optimization.stable_radical_molecule_state import StableRadMoleculeState, \
@@ -73,7 +73,7 @@ class StableRadOptProblem(MoleculeTFAlphaZeroProblem):
             return MoleculeState(rdkit.Chem.MolFromSmiles(self.initial_state), self._builder)
 
     def get_reward(self, state: MoleculeState) -> Tuple[float, dict]:
-        
+
         # Make sure the molecule has a 3D representation
         try:
             molH = rdkit.Chem.AddHs(state.molecule)
@@ -81,7 +81,7 @@ class StableRadOptProblem(MoleculeTFAlphaZeroProblem):
 
         except (AssertionError, RuntimeError):
             return 0.0, {'forced_terminal': False, 'smiles': state.smiles}
-        
+
         policy_inputs = self.get_policy_inputs(state)
 
         # Node is outside the domain of validity
@@ -177,7 +177,7 @@ def construct_problem(run_config: RunConfig, stability_model: pathlib.Path, redo
         cache_dir = os.path.join(prob_config['cache_dir'], run_config.run_id)
     else:
         cache_dir = None
-        
+
     builder = builder_class(max_atoms=prob_config.get('max_atoms', 15),
                             min_atoms=prob_config.get('min_atoms', 4),
                             try_embedding=prob_config.get('try_embedding', True),
@@ -188,7 +188,7 @@ def construct_problem(run_config: RunConfig, stability_model: pathlib.Path, redo
                             cache_dir=cache_dir,
                             num_shards=prob_config.get('num_shards', 1),
                             parallel=prob_config.get('parallel', True))
-    
+
     engine = run_config.start_engine()
 
     run_id = run_config.run_id

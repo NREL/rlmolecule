@@ -89,7 +89,6 @@ def test_tautomers():
     assert 'C=C(C)OC' in products
 
 
-
 def test_parallel_build():
     builder = MoleculeBuilder(max_atoms=15,
                               min_atoms=4,
@@ -109,7 +108,6 @@ def test_parallel_build():
 
 # Just make sure this runs in finite time...
 def test_eagle_error2():
-
     builder = MoleculeBuilder(max_atoms=15,
                               min_atoms=4,
                               try_embedding=True,

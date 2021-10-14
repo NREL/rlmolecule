@@ -1,8 +1,7 @@
 from typing import Tuple
 
-import numpy as np
-
 import gym
+import numpy as np
 
 
 class HallwayEnv(gym.Env):

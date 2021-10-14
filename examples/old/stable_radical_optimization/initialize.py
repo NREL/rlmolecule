@@ -19,7 +19,6 @@ args = parser.parse_args()
 
 with psycopg2.connect(**config.dbparams) as conn:
     with conn.cursor() as cur:
-
         if args.drop:
             cur.execute("""
             DROP TABLE IF EXISTS {table}_reward;

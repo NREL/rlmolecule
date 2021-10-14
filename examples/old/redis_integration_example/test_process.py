@@ -1,10 +1,11 @@
 import json
-import pandas as pd
+import os
 import random
 import re
-import redis
 import uuid
-import os
+
+import pandas as pd
+import redis
 
 PREFIX = os.getenv('JOB_SPECIFIC_PREFIX')
 

@@ -1,14 +1,14 @@
-from typing import Optional, Sequence
+from typing import Sequence
 
 from rlmolecule.tree_search.graph_search_state import GraphSearchState
 
 
 class HallwayState(GraphSearchState):
     def __init__(
-        self,
-        position: int,
-        steps: int,
-        config: any,
+            self,
+            position: int,
+            steps: int,
+            config: any,
     ) -> None:
 
         self._position: int = position
