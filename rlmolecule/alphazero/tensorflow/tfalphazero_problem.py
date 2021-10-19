@@ -46,8 +46,9 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
         for (x, y) in zip(initial_inputs.values(), model_inputs):
             types = (x.dtype, y.dtype.as_numpy_dtype)
             if not np.issubdtype(*types):
-                raise TypeError("State and policy input types must match, got", types)
-        return {key: np.array(0, dtype=val.dtype) for key, val in initial_inputs.items()}
+                logger.warning(f"State and policy input types must match, got {types}")
+        return {key: np.array(0, dtype=val.dtype.as_numpy_dtype)
+                for key, val in zip(initial_inputs.keys(), model_inputs)}
 
     def initialize_run(self):
         """
