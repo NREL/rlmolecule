@@ -58,20 +58,21 @@ if __name__ == "__main__":
         from rlmolecule.graph_gym.graph_gym_env import GraphGymEnv
         from rlmolecule.molecule.builder.builder import MoleculeBuilder
 
-        result = GraphGymEnv(
-            MoleculeGraphProblem(
-                MoleculeBuilder(
-                    max_atoms=args.max_atoms,
-                    min_atoms=args.min_atoms,
-                    sa_score_threshold=args.sa_score_threshold,
-                    atom_additions=['C', 'N', 'O'],
-                    stereoisomers=False,
-                    try_embedding=True,
-                ),
-                max_num_bonds=args.max_num_bonds,
-                max_num_actions=args.max_num_actions
-            )
-        )
+        # result = GraphGymEnv(
+        #     MoleculeGraphProblem(
+        #         MoleculeBuilder(
+        #             max_atoms=args.max_atoms,
+        #             min_atoms=args.min_atoms,
+        #             sa_score_threshold=args.sa_score_threshold,
+        #             atom_additions=['C', 'N', 'O'],
+        #             stereoisomers=False,
+        #             try_embedding=False,
+        #         ),
+        #         max_num_bonds=args.max_num_bonds,
+        #         max_num_actions=args.max_num_actions
+        #     )
+        # )
+        result = GraphGymEnv(MoleculeGraphProblem(MoleculeBuilder()))
 
         return result
 
