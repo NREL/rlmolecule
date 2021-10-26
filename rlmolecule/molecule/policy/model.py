@@ -2,8 +2,7 @@ from typing import Optional
 
 import nfp
 import tensorflow as tf
-# from nfp.preprocessing.mol_preprocessor import MolPreprocessor
-from nfp.preprocessing import MolPreprocessor
+from nfp.preprocessing.mol_preprocessor import MolPreprocessor
 from tensorflow.keras import layers
 
 from rlmolecule.molecule.policy.preprocessor import load_preprocessor
