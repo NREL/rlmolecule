@@ -3,7 +3,8 @@ from typing import Optional
 import gym
 import numpy as np
 import rdkit
-from nfp.preprocessing.mol_preprocessor import MolPreprocessor
+#from nfp.preprocessing.mol_preprocessor import MolPreprocessor
+from nfp.preprocessing import MolPreprocessor
 from rdkit.Chem.QED import qed
 
 from rlmolecule.graph_gym.graph_problem import GraphProblem

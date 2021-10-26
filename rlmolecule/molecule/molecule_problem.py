@@ -4,7 +4,8 @@ from typing import Dict, Optional
 
 import rdkit
 import sqlalchemy
-from nfp.preprocessing.mol_preprocessor import MolPreprocessor
+#  from nfp.preprocessing.mol_preprocessor import MolPreprocessor
+from nfp.preprocessing import MolPreprocessor
 
 from rlmolecule.alphazero.tensorflow.tfalphazero_problem import TFAlphaZeroProblem
 from rlmolecule.mcts.mcts_problem import MCTSProblem
