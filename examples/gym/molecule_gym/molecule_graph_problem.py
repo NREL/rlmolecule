@@ -3,7 +3,8 @@ from typing import Optional
 import gym
 import numpy as np
 import rdkit
-from nfp.preprocessing.mol_preprocessor import MolPreprocessor
+# from nfp.preprocessing.mol_preprocessor import MolPreprocessor
+from nfp.preprocessing import MolPreprocessor
 from rdkit.Chem.QED import qed
 
 from rlmolecule.graph_gym.graph_problem import GraphProblem
@@ -84,4 +85,4 @@ class MoleculeGraphProblem(GraphProblem):
 
     @property
     def invalid_action_result(self) -> (float, bool, {}):
-        return -1.0, False, {}
+        return -1.0, True, {}

@@ -1,7 +1,7 @@
 #!/bin/bash --login
 #SBATCH --account=rlmolecule
 #SBATCH --job-name=qed
-#SBATCH --time=1:00:00
+#SBATCH --time=4:00:00
 
 ##HEAD RAY NODE
 #SBATCH --tasks-per-node=1
@@ -10,7 +10,7 @@
 ##ROLLOUT NODES
 #SBATCH hetjob 
 #SBATCH --tasks-per-node=1
-#SBATCH --nodes=2
+#SBATCH --nodes=4
 
 ##TRAINING NODE (GPU)
 #SBATCH hetjob
@@ -82,8 +82,12 @@ sleep 60
 
 echo "calling PPO train script"
 python -u optimize_qed.py \
-    --redis-password $redis_password \
-    --num-cpus $rollout_num_cpus \
-    --num-gpus 1 \
-    --local-dir "/scratch/$USER/ray_results"
+     --max-atoms 25 \
+     --min-atoms 6 \
+     --max-num-bonds 100 \
+     --max-num-actions 64 \
+     --redis-password $redis_password \
+     --num-cpus $rollout_num_cpus \
+     --num-gpus 1 \
+     --local-dir "/scratch/$USER/ray_results/qed"
 

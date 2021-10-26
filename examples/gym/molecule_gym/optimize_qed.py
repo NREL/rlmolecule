@@ -58,21 +58,20 @@ if __name__ == "__main__":
         from rlmolecule.graph_gym.graph_gym_env import GraphGymEnv
         from rlmolecule.molecule.builder.builder import MoleculeBuilder
 
-        # result = GraphGymEnv(
-        #     MoleculeGraphProblem(
-        #         MoleculeBuilder(
-        #             max_atoms=args.max_atoms,
-        #             min_atoms=args.min_atoms,
-        #             sa_score_threshold=args.sa_score_threshold,
-        #             atom_additions=['C', 'N', 'O'],
-        #             stereoisomers=False,
-        #             try_embedding=False,
-        #         ),
-        #         max_num_bonds=args.max_num_bonds,
-        #         max_num_actions=args.max_num_actions
-        #     )
-        # )
-        result = GraphGymEnv(MoleculeGraphProblem(MoleculeBuilder()))
+        result = GraphGymEnv(
+            MoleculeGraphProblem(
+                MoleculeBuilder(
+                    max_atoms=args.max_atoms,
+                    min_atoms=args.min_atoms,
+                    sa_score_threshold=args.sa_score_threshold,
+                    atom_additions=['C', 'N', 'O', 'S'],
+                    stereoisomers=False,
+                    try_embedding=True,
+                ),
+                max_num_bonds=args.max_num_bonds,
+                max_num_actions=args.max_num_actions
+            )
+        )
 
         return result
 
@@ -99,7 +98,12 @@ if __name__ == "__main__":
 
             super(ThisModel, self).__init__(
                 obs_space, action_space, num_outputs, model_config, name,
-                policy_model())
+                policy_model(
+                    features=8,
+                    num_heads=2,
+                    num_messages=1
+                )
+            )
 
 
     register_env("molecule_graph_problem", make_env)
@@ -120,6 +124,7 @@ if __name__ == "__main__":
 
     num_workers = args.num_cpus
     rollout_fragment_length = args.max_atoms
+    train_batch_size = num_workers * rollout_fragment_length
     config = dict(
         {
             'env': "molecule_graph_problem",
@@ -128,14 +133,16 @@ if __name__ == "__main__":
             },
             'num_gpus': args.num_gpus,
             'num_workers': num_workers,
-            "lr": tune.grid_search([1e-4]),
+            "lr": tune.grid_search([1e-3, 1e-2]),
             'framework': 'tf2',
             'eager_tracing': False,   # does not work otherwise?
             "num_sgd_iter": 10,
-            "entropy_coeff": 0.0,
+            "entropy_coeff": tune.grid_search([0.0, 0.01]),
             'rollout_fragment_length': rollout_fragment_length,
-            'train_batch_size': num_workers * rollout_fragment_length,
-            'sgd_minibatch_size': num_workers * rollout_fragment_length,
+            'train_batch_size': train_batch_size,
+            # sgd_minibatch_size needs to be carefully tuned for the problem, 
+            # too small and it slows down the training iterations dramatically
+            'sgd_minibatch_size': min(train_batch_size, 500),
             "batch_mode": 'complete_episodes', 
             "log_level": args.log_level.upper()
         },

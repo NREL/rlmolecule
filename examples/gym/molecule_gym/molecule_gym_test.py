@@ -111,7 +111,7 @@ if __name__ == "__main__":
             # 'num_gpus_per_worker': 0,
             # 'num_workers': num_workers,
             'framework': 'tf2',
-            'eager_tracing': True,
+            'eager_tracing': False,
             # 'framework': 'tf1',
             # 'rollout_fragment_length': int(8),
             # 'train_batch_size': int(16),
