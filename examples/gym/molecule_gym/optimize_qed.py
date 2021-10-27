@@ -5,6 +5,7 @@ if gpus:
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
 
+import argparse
 import os
 
 import ray
@@ -13,29 +14,48 @@ from ray.rllib.models import ModelCatalog
 from ray.tune.registry import register_env
 
 
+def env_creator(args):
+
+    if isinstance(args, argparse.Namespace):
+        args = vars(args)
+
+    print("env_creator args", args)
+
+    import tensorflow as tf
+
+    gpus = tf.config.list_physical_devices('GPU')
+    if gpus:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+
+    from examples.gym.molecule_gym.molecule_graph_problem import MoleculeGraphProblem
+    from rlmolecule.graph_gym.graph_gym_env import GraphGymEnv
+    from rlmolecule.molecule.builder.builder import MoleculeBuilder
+
+    env = GraphGymEnv(
+            MoleculeGraphProblem(
+                MoleculeBuilder(
+                    max_atoms=args["max_atoms"],
+                    min_atoms=args["min_atoms"],
+                    sa_score_threshold=args["sa_score_threshold"],
+                    atom_additions=['C', 'N', 'O', 'S'],
+                    stereoisomers=False,
+                    try_embedding=True,
+                ),
+                max_num_bonds=args["max_num_bonds"],
+                max_num_actions=args["max_num_actions"]
+            )
+    )
+
+    return env
+
+
 if __name__ == "__main__":
-    from argparse import ArgumentParser
 
-    parser = ArgumentParser()
-    parser.add_argument("--min-atoms", default=1, type=int)
-    parser.add_argument("--max-atoms", default=6, type=int)
-    parser.add_argument("--max-num-bonds", default=40, type=int)
-    parser.add_argument("--max-num-actions", default=64, type=int)
-    parser.add_argument("--sa-score-threshold", default=3.5, type=float)
-    parser.add_argument("--stop-timesteps", default=int(1e6), type=int)
-    parser.add_argument("--stop-iters", default=1e3, type=int)
-    parser.add_argument("--stop-reward", default=1.0, type=float)
-    parser.add_argument("--run", default="PPO", type=str)
-    parser.add_argument("--num-gpus", default=0, type=int)
-    parser.add_argument("--num-cpus", default=8, type=int)
-    parser.add_argument("--num-samples", default=1, type=int)
-    parser.add_argument("--log-level", default="WARN", type=str)
-    parser.add_argument("--local-dir", default="../log", type=str)
-    parser.add_argument("--redis-password", default=None, type=str)
-    parser.add_argument("--node-ip-address", default="127.0.0.1", type=str)
+    from optimize_qed_argparser import parser
+
     args = parser.parse_args()
-
-    print("ARGS", vars(args))
+    print("ARGS", args)
 
     print ("ray initializing")
     if args.redis_password is None:
@@ -44,38 +64,7 @@ if __name__ == "__main__":
         ray.init(_redis_password=args.redis_password, address=os.environ["ip_head"])
     print ("ray initialized")
 
-
-    def make_env(_):
-
-        import tensorflow as tf
-
-        gpus = tf.config.list_physical_devices('GPU')
-        if gpus:
-            for gpu in gpus:
-                tf.config.experimental.set_memory_growth(gpu, True)
-
-        from examples.gym.molecule_gym.molecule_graph_problem import MoleculeGraphProblem
-        from rlmolecule.graph_gym.graph_gym_env import GraphGymEnv
-        from rlmolecule.molecule.builder.builder import MoleculeBuilder
-
-        result = GraphGymEnv(
-            MoleculeGraphProblem(
-                MoleculeBuilder(
-                    max_atoms=args.max_atoms,
-                    min_atoms=args.min_atoms,
-                    sa_score_threshold=args.sa_score_threshold,
-                    atom_additions=['C', 'N', 'O', 'S'],
-                    stereoisomers=False,
-                    try_embedding=True,
-                ),
-                max_num_bonds=args.max_num_bonds,
-                max_num_actions=args.max_num_actions
-            )
-        )
-
-        return result
-
-    example_env = make_env(None)
+    example_env = env_creator(args)
 
     from rlmolecule.graph_gym.graph_gym_model import GraphGymModel
     
@@ -106,7 +95,7 @@ if __name__ == "__main__":
             )
 
 
-    register_env("molecule_graph_problem", make_env)
+    register_env("molecule_graph_problem", env_creator)
 
     ModelCatalog.register_custom_model('molecule_graph_problem_model', ThisModel)
 
@@ -128,16 +117,19 @@ if __name__ == "__main__":
     config = dict(
         {
             'env': "molecule_graph_problem",
+            "env_config": vars(args),
             'model': {
                 'custom_model': 'molecule_graph_problem_model',
             },
             'num_gpus': args.num_gpus,
             'num_workers': num_workers,
-            "lr": tune.grid_search([1e-3, 1e-2]),
             'framework': 'tf2',
             'eager_tracing': False,   # does not work otherwise?
-            "num_sgd_iter": 10,
-            "entropy_coeff": tune.grid_search([0.0, 0.01]),
+            # "lr": tune.grid_search([1e-2]),
+            "lr_schedule": [[0, 1e-2], [250000, 5e-3], [500000, 1e-3], [750000, 4e-4]],
+            "gamma": 1.0,  # finite horizon problem, we want total reward-to-go?
+            "entropy_coeff": tune.grid_search([0.05]),
+            "num_sgd_iter": tune.grid_search([10]),
             'rollout_fragment_length': rollout_fragment_length,
             'train_batch_size': train_batch_size,
             # sgd_minibatch_size needs to be carefully tuned for the problem, 

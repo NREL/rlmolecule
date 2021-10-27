@@ -86,6 +86,7 @@ python -u optimize_qed.py \
      --min-atoms 6 \
      --max-num-bonds 100 \
      --max-num-actions 64 \
+     --stop-timesteps 10000000 \
      --redis-password $redis_password \
      --num-cpus $rollout_num_cpus \
      --num-gpus 1 \
