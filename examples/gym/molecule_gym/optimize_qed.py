@@ -49,6 +49,34 @@ def env_creator(args):
 
     return env
 
+from rlmolecule.graph_gym.graph_gym_model import GraphGymModel
+    
+class ThisModel(GraphGymModel):
+    def __init__(self,
+                    obs_space,
+                    action_space,
+                    num_outputs,
+                    model_config,
+                    name,
+                    **kwargs):
+
+        import tensorflow as tf
+        gpus = tf.config.list_physical_devices('GPU')
+        if gpus:
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+
+        from rlmolecule.molecule.policy.model import policy_model
+
+        super(ThisModel, self).__init__(
+            obs_space, action_space, num_outputs, model_config, name,
+            policy_model(
+                features=8,
+                num_heads=2,
+                num_messages=1
+            )
+        )
+
 
 if __name__ == "__main__":
 
@@ -65,34 +93,6 @@ if __name__ == "__main__":
     print ("ray initialized")
 
     example_env = env_creator(args)
-
-    from rlmolecule.graph_gym.graph_gym_model import GraphGymModel
-    
-    class ThisModel(GraphGymModel):
-        def __init__(self,
-                     obs_space,
-                     action_space,
-                     num_outputs,
-                     model_config,
-                     name,
-                     **kwargs):
-
-            import tensorflow as tf
-            gpus = tf.config.list_physical_devices('GPU')
-            if gpus:
-                for gpu in gpus:
-                    tf.config.experimental.set_memory_growth(gpu, True)
-
-            from rlmolecule.molecule.policy.model import policy_model
-
-            super(ThisModel, self).__init__(
-                obs_space, action_space, num_outputs, model_config, name,
-                policy_model(
-                    features=8,
-                    num_heads=2,
-                    num_messages=1
-                )
-            )
 
 
     register_env("molecule_graph_problem", env_creator)
@@ -126,7 +126,7 @@ if __name__ == "__main__":
             'framework': 'tf2',
             'eager_tracing': False,   # does not work otherwise?
             # "lr": tune.grid_search([1e-2]),
-            "lr_schedule": [[0, 1e-2], [250000, 5e-3], [500000, 1e-3], [750000, 4e-4]],
+            "lr_schedule": [[0, 1e-2], [400000, 1e-3], [800000, 1e-4]],
             "gamma": 1.0,  # finite horizon problem, we want total reward-to-go?
             "entropy_coeff": tune.grid_search([0.05]),
             "num_sgd_iter": tune.grid_search([10]),

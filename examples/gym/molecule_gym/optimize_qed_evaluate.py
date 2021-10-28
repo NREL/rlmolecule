@@ -1,4 +1,3 @@
-import argparse
 import os
 
 import pandas as pd
@@ -26,23 +25,24 @@ def main(args):
     config["num_gpus"] = 0
 
     print("CONFIG", config)
-
-    env_name = "molecule_graph_problem"
     
-    from optimize_qed import env_creator
+    from ray.rllib.models import ModelCatalog
+    from optimize_qed import env_creator, ThisModel
 
-    _ = register_env(env_name, env_creator)
-    config["env"] = env_name
-    config.update(args)  # TODO: use all env_config args at train time so they are saved
+    _ = register_env(config["env"], env_creator)
+    ModelCatalog.register_custom_model(config["model"]["custom_model"], ThisModel)
 
-    trainer = ppo.PPOTrainer(env=env_name, config=config)
+    # THIS LINE HERE IS BROKEN, something around importing the weights of the 
+    # custom model...
+    trainer = ppo.PPOTrainer(env=config["env"], config=config)
+
     checkpoint = os.path.join(
         restore_dir, 
         "checkpoint_{}/checkpoint-{}".format(
             chkpt, int(chkpt)))
     trainer.restore(checkpoint)
 
-    env = env_creator(config)
+    env = env_creator(config["env_config"])
 
     all_rewards = []
     for _ in tqdm(range(args["num_episodes"])):
