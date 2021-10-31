@@ -67,8 +67,8 @@ class MoleculeGraphProblem(GraphProblem):
     def make_observation(self, state: MoleculeState) -> {str: np.ndarray}:
         return self.preprocessor.construct_feature_matrices(
             state.molecule,
-            max_num_atoms=self.builder.max_atoms,
-            max_num_bonds=self.max_num_bonds,
+            max_num_nodes=self.builder.max_atoms,
+            max_num_edges=self.max_num_bonds,
         )
 
     def get_initial_state(self) -> MoleculeState:
