@@ -10,7 +10,7 @@
 ##ROLLOUT NODES
 #SBATCH hetjob 
 #SBATCH --tasks-per-node=1
-#SBATCH --nodes=4
+#SBATCH --nodes=2
 
 ##TRAINING NODE (GPU)
 #SBATCH hetjob
