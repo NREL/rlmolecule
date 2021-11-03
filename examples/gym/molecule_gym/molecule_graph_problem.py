@@ -1,9 +1,11 @@
-from typing import Optional
+from abc import abstractmethod
+from typing import Dict, Optional, Tuple
 
 import gym
 import numpy as np
 import rdkit
-from nfp.preprocessing.mol_preprocessor import MolPreprocessor
+# from nfp.preprocessing.mol_preprocessor import MolPreprocessor
+from nfp.preprocessing import MolPreprocessor
 from rdkit.Chem.QED import qed
 
 from rlmolecule.graph_gym.graph_problem import GraphProblem
@@ -63,25 +65,34 @@ class MoleculeGraphProblem(GraphProblem):
     def max_num_actions(self) -> int:
         return self._max_num_actions
 
-    def make_observation(self, state: MoleculeState) -> {str: np.ndarray}:
+    def make_observation(self, state: MoleculeState) -> Dict[str, np.ndarray]:
         return self.preprocessor.construct_feature_matrices(
             state.molecule,
-            max_num_atoms=self.builder.max_atoms,
-            max_num_bonds=self.max_num_bonds,
+            max_num_nodes=self.builder.max_atoms,
+            max_num_edges=self.max_num_bonds,
         )
 
     def get_initial_state(self) -> MoleculeState:
         return MoleculeState(rdkit.Chem.MolFromSmiles('C'), self.builder)
 
-    def step(self, state: MoleculeState) -> (float, bool, dict):
+    @abstractmethod
+    def reward(self, state: MoleculeState) -> float:
+        pass
+
+    def step(self, state: MoleculeState) -> Tuple[float, bool, dict]:
         is_terminal = len(state.get_next_actions()) == 0
         if state.forced_terminal:
-            r = qed(state.molecule)
+            r = self.reward(state)
             print(r)
             return r, is_terminal, {'forced_terminal': True, 'smiles': state.smiles}
             # return qed(state.molecule), is_terminal, {'forced_terminal': True, 'smiles': state.smiles}
         return 0.0, is_terminal, {'forced_terminal': False, 'smiles': state.smiles}
 
     @property
-    def invalid_action_result(self) -> (float, bool, {}):
-        return -1.0, False, {}
+    def invalid_action_result(self) -> Tuple[float, bool, Dict]:
+        return -1.0, True, {}
+
+
+class QEDGraphProblem(MoleculeGraphProblem):
+    def reward(self, state: MoleculeState) -> float:
+        return qed(state.molecule)

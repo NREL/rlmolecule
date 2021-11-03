@@ -3,8 +3,8 @@ from typing import Optional
 
 import rdkit
 from nfp.preprocessing.features import get_ring_size
-from nfp.preprocessing.mol_preprocessor import MolPreprocessor
-
+# from nfp.preprocessing.mol_preprocessor import MolPreprocessor
+from nfp.preprocessing import MolPreprocessor
 
 def atom_featurizer(atom: rdkit.Chem.Atom) -> str:
     """ Return an string representing the atom type
