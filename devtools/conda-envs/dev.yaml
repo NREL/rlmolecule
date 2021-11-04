@@ -25,7 +25,7 @@ dependencies:
   - scikit-learn
   - pip
   - pip:
-    - nfp
-    - tensorflow
-    - tensorflow-addons
-    - "ray[default]"
+      - nfp
+      - tensorflow
+      - tensorflow-addons
+      - "ray[default]"

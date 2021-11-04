@@ -1,9 +1,8 @@
-import psycopg2
-import time
-import logging
 import random
-import subprocess
 import socket
+import time
+
+import psycopg2
 
 dbparams = {
     'dbname': 'bde',
@@ -18,7 +17,6 @@ from bde.gaussian_redox import GaussianRedoxRunner
 
 
 def run_optimization():
-
     with psycopg2.connect(**dbparams) as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -38,7 +36,7 @@ def run_optimization():
             FROM cte
             WHERE redoxcompound.id = cte.id
             RETURNING redoxcompound.id, redoxcompound.smiles, redoxcompound.mol_initial, redoxcompound.estate;
-            """, (socket.gethostname(), ))
+            """, (socket.gethostname(),))
 
             cid, smiles, mol_initial, estate = cur.fetchone()
 
@@ -87,7 +85,7 @@ if __name__ == "__main__":
     # Add a random delay to avoid race conditions at the start of the job
     time.sleep(random.uniform(0, 1 * 10))
 
-    #while (time.time() - start_time) < (86400 * 1.75):  # Time in days
+    # while (time.time() - start_time) < (86400 * 1.75):  # Time in days
     while (time.time() - start_time) < (3600 * 3.5):  # Time in hours
 
         try:

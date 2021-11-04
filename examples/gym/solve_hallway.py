@@ -4,16 +4,16 @@ import time
 import numpy as np
 from sqlalchemy import create_engine
 
-from rlmolecule.alphazero.tensorflow.tfalphazero_problem import TFAlphaZeroProblem
-from rlmolecule.gym.gym_problem import GymProblem
-from rlmolecule.gym.gym_state import GymEnvState
-from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
-
 from examples.gym.hallway_env import HallwayEnv
 from examples.gym.tf_model import policy_model
+from rlmolecule.alphazero.tensorflow.tfalphazero_problem import TFAlphaZeroProblem
+from rlmolecule.gym.alphazero_gym import AlphaZeroGymEnv
+from rlmolecule.gym.gym_problem import GymProblem
+from rlmolecule.gym.gym_state import GymEnvState
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 # NOTE: These class definitions need to stay outside of construct_problem
 # or you will error out on not being able to pickle/serialize them.
@@ -22,17 +22,19 @@ logger = logging.getLogger(__name__)
 class HallwayAlphaZeroEnv(AlphaZeroGymEnv):
     """Lightweight wrapper around the gym env that makes the user implement
     the get_obs method."""
+
     def __init__(self, size=16, max_steps=16):
         env = HallwayEnv(size=size, max_steps=max_steps)
         super().__init__(env)
 
     def get_obs(self) -> np.ndarray:
-        return self.env.get_obs()
+        return self.env.make_observation()
 
 
 class HallwayProblem(GymProblem, TFAlphaZeroProblem):
     """Cartpole TF AZ problem.  For now we will ask the user to implement
     any obs preprocessing directly in the get_policy_inputs method."""
+
     def policy_model(self) -> "tf.keras.Model":
         return policy_model(obs_dim=self.env.observation_space.shape[0],
                             hidden_layers=3,
@@ -40,11 +42,10 @@ class HallwayProblem(GymProblem, TFAlphaZeroProblem):
                             input_dtype="int64")  # make sure your input dtypes match!
 
     def get_policy_inputs(self, state: GymEnvState) -> dict:
-        return {"obs": self.env.get_obs()}
+        return {"obs": self.env.make_observation()}
 
 
 def construct_problem():
-
     from rlmolecule.tree_search.reward import RankedRewardFactory
 
     engine = create_engine(f'sqlite:///hallway_data.db',
@@ -74,7 +75,6 @@ def construct_problem():
 
 
 def run_games(use_az=True, num_mcts_samples=50):
-
     if use_az:
         from rlmolecule.alphazero.alphazero import AlphaZero
         game = AlphaZero(construct_problem(), dirichlet_noise=False)
@@ -97,7 +97,6 @@ def train_model():
 
 
 def monitor():
-
     from rlmolecule.sql.tables import RewardStore
     problem = construct_problem()
 

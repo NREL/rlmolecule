@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import numpy as np
 
 import tensorflow as tf
@@ -37,47 +35,46 @@ def gridworld_index_fixed_embed_policy(
         hidden_layers: int = 2,
         hidden_dim: int = 128,
         activation: str = "relu") -> tf.keras.Model:
-
-    embed_array = np.zeros((size*size, size*size), dtype=float)
+    embed_array = np.zeros((size * size, size * size), dtype=float)
     for i in range(size):
         for j in range(size):
             arr = np.zeros((size, size), dtype=float)
             arr[i, j] = 1.
-            k = i*size + j
-            embed_array[:, k] = arr.reshape(-1, 1).squeeze() 
+            k = i * size + j
+            embed_array[:, k] = arr.reshape(-1, 1).squeeze()
 
     obs = layers.Input(shape=(1,), dtype=tf.int64, name="obs")
-    #steps = layers.Input(shape=(1,), dtype=tf.float64, name="steps")
+    # steps = layers.Input(shape=(1,), dtype=tf.float64, name="steps")
 
     x = layers.Embedding(
-            size*size,
-            size*size,
-            input_length=1,
-            trainable=False,
-            weights=[embed_array])(obs)
+        size * size,
+        size * size,
+        input_length=1,
+        trainable=False,
+        weights=[embed_array])(obs)
 
     x = layers.Reshape(target_shape=(size, size, 1))(x)
 
     # Convolutions on the frames on the screen
     x = layers.Conv2D(
-        filters[0], 
-        (kernel_size[0],kernel_size[0]),
+        filters[0],
+        (kernel_size[0], kernel_size[0]),
         strides[0],
         activation=activation)(x)
 
     for i in range(1, len(filters)):
         x = layers.Conv2D(
-                filters[i],
-                (kernel_size[i],kernel_size[i]),
-                strides[i],
-                activation=activation)(x)
+            filters[i],
+            (kernel_size[i], kernel_size[i]),
+            strides[i],
+            activation=activation)(x)
 
     x = layers.Flatten()(x)
-    #x = layers.Concatenate()((x, steps))
+    # x = layers.Concatenate()((x, steps))
 
     for _ in range(hidden_layers):
         x = layers.Dense(hidden_dim, activation=activation)(x)
-    
+
     value_logit = layers.Dense(1, name="value")(x)
     pi_logit = layers.Dense(1, name="prior")(x)
 
@@ -94,11 +91,11 @@ def gridworld_index_learned_embed_policy(
     """For gridworld env."""
 
     obs = layers.Input(shape=(1,), dtype=tf.int64, name="obs")
-    x = layers.Embedding(obs_dim+1, embed_dim, input_length=1)(obs)
+    x = layers.Embedding(obs_dim + 1, embed_dim, input_length=1)(obs)
     x = layers.Flatten()(x)
-    
+
     x = layers.Dense(hidden_dim, activation=activation)(x)
-    for _ in range(hidden_layers-1):
+    for _ in range(hidden_layers - 1):
         x = layers.Dense(hidden_dim, activation=activation)(x)
     x = layers.Flatten()(x)
 
@@ -117,9 +114,9 @@ def gridworld_scalar_policy(
 
     obs = layers.Input(shape=(2,), dtype=tf.int64, name="obs")
     x = layers.Lambda(lambda z: tf.cast(z, tf.float64) / float(size))(obs)
-    
+
     x = layers.Dense(hidden_dim, activation=activation)(x)
-    for _ in range(hidden_layers-1):
+    for _ in range(hidden_layers - 1):
         x = layers.Dense(hidden_dim, activation=activation)(x)
     x = layers.Flatten()(x)
 

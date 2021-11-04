@@ -6,30 +6,27 @@ import logging
 import math
 import os
 import time
+
 import pandas as pd
-# Apparently there's an issue with the latest version of pandas. 
+
+# Apparently there's an issue with the latest version of pandas.
 # Got this fix from here:
 # https://github.com/pandas-profiling/pandas-profiling/issues/662#issuecomment-803673639
 pd.set_option("display.max_columns", None)
-import networkx as nx
 import random
 import json
 import gzip
 import pathlib
-from collections import defaultdict
-import numpy as np
 import tensorflow as tf
-import tensorflow_addons as tfa
 import nfp
 from pymatgen.core import Structure
-from pymatgen.analysis import local_env
 
 from rlmolecule.crystal.builder import CrystalBuilder
 from rlmolecule.crystal.crystal_problem import CrystalTFAlphaZeroProblem
 from rlmolecule.crystal.crystal_state import CrystalState
 from rlmolecule.sql.run_config import RunConfig
 # from rlmolecule.tree_search.reward import RankedRewardFactory
-from rlmolecule.tree_search.reward import LinearBoundedRewardFactory, RankedRewardFactory
+from rlmolecule.tree_search.reward import RankedRewardFactory
 from rlmolecule.sql import Base, Session
 from rlmolecule.sql.tables import GameStore
 from scripts.nfp_extensions import RBFExpansion, CifPreprocessor
@@ -78,8 +75,8 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
     def __init__(self,
                  engine: 'sqlalchemy.engine.Engine',
                  energy_model: 'tf.keras.Model',
-                 df_competing_phases: 'pd.DataFrame', 
-                 #initial_state: str,
+                 df_competing_phases: 'pd.DataFrame',
+                 # initial_state: str,
                  **kwargs) -> None:
         """ A class to estimate the suitability of a crystal structure as a solid state battery
 
@@ -87,7 +84,7 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         :param builder: A CrystalBuilder class to handle crystal construction based on ICSD structures
         :param energy_model: A tensorflow model to estimate the total energy of a structure
         """
-        #self.initial_state = initial_state
+        # self.initial_state = initial_state
         self.engine = engine
         self.energy_model = energy_model
         self.df_competing_phases = df_competing_phases
@@ -104,8 +101,8 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
             icsd_prototype = structures[structure_key]
             if len(icsd_prototype.sites) > 150:
                 return self.default_reward, {'terminal': True,
-                             'num_sites': len(icsd_prototype.sites),
-                             'state_repr': repr(state)}
+                                             'num_sites': len(icsd_prototype.sites),
+                                             'state_repr': repr(state)}
 
             # generate the decoration for this state
             try:
@@ -114,7 +111,7 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
                 print(f"AssertionError: {e}")
                 return self.default_reward, {'terminal': True, 'state_repr': repr(state)}
             predicted_energy, hull_energy = self.calc_energy_stability(decorated_structure)
-            #print(str(state), predicted_energy)
+            # print(str(state), predicted_energy)
             # Predict the total energy and stability of this decorated structure
             info = {
                 'terminal': True,
@@ -123,7 +120,7 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
                 'num_sites': len(decorated_structure.sites),
                 'state_repr': repr(state),
             }
-            #return stability, info
+            # return stability, info
             # since any hull energy is better than nothing, add 10 to all the energies
             # (with the hull energy flipped since more negative is more stable)
             return - hull_energy.astype(float), info
@@ -132,21 +129,21 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
     def get_model_inputs(self, structure) -> {}:
         inputs = preprocessor.construct_feature_matrices(structure, train=False)
         print(inputs)
-        #return {key: tf.constant(np.expand_dims(val, 0)) for key, val in inputs.items()}
+        # return {key: tf.constant(np.expand_dims(val, 0)) for key, val in inputs.items()}
         return inputs
 
-    #@collect_metrics
+    # @collect_metrics
     def calc_energy_stability(self, structure: Structure, state=None):
         """ Predict the total energy of the structure using a GNN model (trained on unrelaxed structures)
         Then use that predicted energy to compute the decomposition (hull) energy
         """
-        #model_inputs = self.get_model_inputs(structure)
-        #predicted_energy = predict(self.energy_model, model_inputs)
+        # model_inputs = self.get_model_inputs(structure)
+        # predicted_energy = predict(self.energy_model, model_inputs)
         dataset = tf.data.Dataset.from_generator(
-            #lambda: preprocessor.construct_feature_matrices(structure, train=False),
+            # lambda: preprocessor.construct_feature_matrices(structure, train=False),
             lambda: (preprocessor.construct_feature_matrices(s, train=False) for s in [structure]),
             output_types=preprocessor.output_types,
-            output_shapes=preprocessor.output_shapes)\
+            output_shapes=preprocessor.output_shapes) \
             .padded_batch(batch_size=32,
                           padded_shapes=preprocessor.padded_shapes(max_sites=256, max_bonds=2048),
                           padding_values=preprocessor.padding_values)
@@ -159,15 +156,6 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
             hull_energy = -self.default_reward - 1
 
         return predicted_energy, hull_energy
-
-    ## TODO
-    #@collect_metrics
-    #def calc_reward(self, state: CrystalState) -> (float, {}):
-    #    """
-    #    """
-    #    reward = 0
-    #    stats = {}
-    #    return reward, stats
 
 
 def convex_hull_stability(df_competing_phases, structure: Structure, predicted_energy):
@@ -230,7 +218,7 @@ def create_problem():
                                                min_buffer_size=train_config.get('min_buffer_size', 15),
                                                batch_size=train_config.get('batch_size', 32),
                                                policy_checkpoint_dir=train_config.get('policy_checkpoint_dir',
-                                                                                  'policy_checkpoints'),
+                                                                                      'policy_checkpoints'),
                                                actions_to_ignore=prob_config.get('actions_to_ignore', None),
                                                )
 
@@ -254,10 +242,9 @@ def run_games():
         ucb_constant=config.get('ucb_constant', math.sqrt(2)),
         state_builder=builder,
     )
-    from rlmolecule.mcts.mcts import MCTS
-    #game = MCTS(
+    # game = MCTS(
     #    create_problem(),
-    #)
+    # )
     # i = 0
     while True:
         path, reward = game.run(
@@ -266,15 +253,15 @@ def run_games():
         )
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1]}')
 
-        #i += 1
-        #if i % 10 == 0:
+        # i += 1
+        # if i % 10 == 0:
         #    print(f"decoration_time: {decoration_time}, model_time: {model_time}")
         #     df = pd.DataFrame(volume_stats).T
         #     df.columns = ['conducting_ion_vol', 'total_vol', 'fraction', 'comp_type']
         #     df = df.sort_index()
         #     print(f"writing current stats to {out_file}")
         #     df.to_csv(out_file, sep='\t')
-            # write_structures_file(decorations_file, decorations)
+        # write_structures_file(decorations_file, decorations)
 
 
 def train_model():
@@ -328,7 +315,6 @@ def monitor():
 icsd_prototypes_file = "../../rlmolecule/crystal/inputs/icsd_prototypes.json.gz"
 structures = read_structures_file(icsd_prototypes_file)
 
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Run the battery structure stable energy optimization. ' +
@@ -354,8 +340,8 @@ if __name__ == "__main__":
     preprocessor.from_json('inputs/preprocessor.json')
 
     # keep track of how much time each part takes
-    #model_time = 0
-    #decoration_time = 0
+    # model_time = 0
+    # decoration_time = 0
 
     energy_model = tf.keras.models.load_model(args.energy_model,
                                               custom_objects={**nfp.custom_objects, **{'RBFExpansion': RBFExpansion}})

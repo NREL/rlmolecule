@@ -1,7 +1,6 @@
 import tempfile
-
 import pytest
-
+# noinspection PyUnresolvedReferences
 from .sql import engine
 
 

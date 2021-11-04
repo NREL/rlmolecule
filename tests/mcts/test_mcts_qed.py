@@ -150,7 +150,6 @@ class TestMCTSwithMoleculeState:
         game.sample(root, 100000, timeout=0.1)
         assert root.visit_count <= 100000
 
-
     def test_run_mcts(self, solver, problem):
 
         random.seed(42)

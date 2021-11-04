@@ -4,8 +4,6 @@ channels:
   - defaults
 dependencies:
   - python
-  - numpy=1.19
-  - tensorflow
   - rdkit
   - pandas
   - tqdm
@@ -18,4 +16,5 @@ dependencies:
   - diskcache
   - pip
   - pip:
-    - nfp
+      - tensorflow
+      - nfp

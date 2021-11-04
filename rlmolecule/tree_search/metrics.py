@@ -31,6 +31,7 @@ def collect_metrics(func: Callable):
     :param func: Function to be wrapped
     :return: Wrapped function that stores execution information to call_metrics.
     """
+
     @wraps(func)
     def store_metrics(*args, **kwargs):
         start_time = time()

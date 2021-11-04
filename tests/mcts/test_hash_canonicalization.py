@@ -1,5 +1,3 @@
-import random
-
 from rlmolecule.mcts.mcts import MCTS
 from rlmolecule.mcts.mcts_vertex import MCTSVertex
 from rlmolecule.molecule.builder.builder import MoleculeBuilder

@@ -2,9 +2,8 @@ import logging
 import time
 from typing import Tuple
 
-import tensorflow as tf
-
 import sqlalchemy
+import tensorflow as tf
 from sqlalchemy import create_engine
 
 from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
@@ -14,11 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 def construct_problem(ranked_reward=True):
-
     from rlmolecule.tree_search.reward import RankedRewardFactory
     from rlmolecule.alphazero.tensorflow.tfalphazero_problem import TFAlphaZeroProblem
 
-    from tf_model import policy_model  #todo: this looks broken? (psj)
+    from tf_model import policy_model  # todo: this looks broken? (psj)
     from hallway_config import HallwayConfig
     from hallway_state import HallwayState
 
@@ -69,7 +67,6 @@ def construct_problem(ranked_reward=True):
 
 
 def run_games(use_az=True, num_mcts_samples=50):
-
     if use_az:
         from rlmolecule.alphazero.alphazero import AlphaZero
         game = AlphaZero(construct_problem(), dirichlet_noise=False)
@@ -78,7 +75,7 @@ def run_games(use_az=True, num_mcts_samples=50):
         game = MCTS(construct_problem(ranked_reward=False))
 
     rewards_file = "_rewards.csv"
-    #with open(rewards_file, "w") as f:  pass
+    # with open(rewards_file, "w") as f:  pass
     while True:
         path, reward = game.run(num_mcts_samples=num_mcts_samples,
                                 action_selection_function=MCTS.visit_selection if not use_az else None)
@@ -89,7 +86,7 @@ def run_games(use_az=True, num_mcts_samples=50):
         if use_az:
             # Breaks if you use MCTS:
             logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1][0]}')
-        #with open(rewards_file, "a") as f:
+        # with open(rewards_file, "a") as f:
         #    f.write(str(reward.raw_reward) + "\n")
 
 
@@ -98,7 +95,6 @@ def train_model():
 
 
 def monitor():
-
     from rlmolecule.sql.tables import RewardStore
     problem = construct_problem()
 

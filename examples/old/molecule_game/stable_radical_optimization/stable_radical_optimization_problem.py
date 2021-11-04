@@ -11,11 +11,11 @@ from molecule_game.mol_preprocessor import (
     atom_featurizer,
     bond_featurizer,
 )
+from molecule_game.stable_radical_optimization.stable_radical_optimization_state import StableRadicalOptimizationState
 from rdkit.Chem.rdmolfiles import MolFromSmiles
 from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 
 from examples.old.stable_radical_optimization.run_mcts import predict
-from molecule_game.stable_radical_optimization.stable_radical_optimization_state import StableRadicalOptimizationState
 from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
 from rlmolecule.molecule.policy.model import build_policy_evaluator
@@ -33,13 +33,14 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
     """
     An AlphaZeroProblem that implements a stable radical optimization search.
     """
+
     def __init__(
-        self,
-        config: any,
-        start_smiles: str,
-        preprocessor: Optional[MolPreprocessor] = None,
-        preprocessor_data=None,
-        policy_checkpoint_dir=None,
+            self,
+            config: any,
+            start_smiles: str,
+            preprocessor: Optional[MolPreprocessor] = None,
+            preprocessor_data=None,
+            policy_checkpoint_dir=None,
     ) -> None:
         # super().__init__(
         #     config.min_reward,
@@ -91,7 +92,7 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
             with conn.cursor() as cur:
                 cur.execute(
                     "select real_reward from {table}_reward where smiles = %s".format(table=config.sql_basename),
-                    (state.smiles, ))
+                    (state.smiles,))
                 result = cur.fetchone()
             if result:
                 reward = result[0]
@@ -182,7 +183,7 @@ class StableRadicalOptimizationProblem(AlphaZeroProblem):
             with conn.cursor() as cur:
                 cur.execute(
                     "select count(*) from {table}_game where experiment_id = %s;".format(table=config.sql_basename),
-                    (config.experiment_id, ))
+                    (config.experiment_id,))
                 n_games = cur.fetchone()[0]
 
             if n_games < config.reward_buffer_min_size:

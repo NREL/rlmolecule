@@ -1,15 +1,12 @@
 import tensorflow as tf
-from tensorflow.keras import layers
-import numpy as np
-
 from examples.crystal_volume import optimize_crystal_volume as ocv
-from examples.crystal_volume.optimize_crystal_volume import CrystalVolOptimizationProblem
+from tensorflow.keras import layers
+
 from rlmolecule.crystal.builder import CrystalBuilder
 from rlmolecule.crystal.crystal_state import CrystalState
-from rlmolecule.crystal.crystal_problem import CrystalTFAlphaZeroProblem
 from rlmolecule.crystal.preprocessor import CrystalPreprocessor
-from rlmolecule.sql.run_config import RunConfig
 from rlmolecule.sql import Base, Session
+from rlmolecule.sql.run_config import RunConfig
 
 
 def policy_model_sequential(features: int = 64,
@@ -17,8 +14,8 @@ def policy_model_sequential(features: int = 64,
                             num_crystal_sys: int = 7,
                             num_proto_strc: int = 4170,
                             ) -> tf.keras.Model:
-    #crystal_sys_class = layers.Input(shape=[1], dtype=tf.int64, name='crystal_sys')
-    #proto_strc_class = layers.Input(shape=[1], dtype=tf.int64, name='proto_strc')
+    # crystal_sys_class = layers.Input(shape=[1], dtype=tf.int64, name='crystal_sys')
+    # proto_strc_class = layers.Input(shape=[1], dtype=tf.int64, name='proto_strc')
     crystal_sys_model = tf.keras.models.Sequential()
     crystal_sys_model.add(layers.Embedding(num_crystal_sys + 1), features, input_length=1)
     crystal_sys_model.add(layers.Dense(4, activation='relu'))
@@ -82,7 +79,8 @@ def policy_model(features: int = 64,
         input_dim=num_eles_and_stoich, output_dim=features,
         input_length=None, name='conducting_embedding')(element_class)
     print(element_embedding.shape)
-    element_embedding = layers.Lambda(lambda x: tf.keras.backend.sum(x, axis=-2, keepdims=True), output_shape=lambda s: (s[-1],))(element_embedding)
+    element_embedding = layers.Lambda(lambda x: tf.keras.backend.sum(x, axis=-2, keepdims=True),
+                                      output_shape=lambda s: (s[-1],))(element_embedding)
     print(element_embedding.shape)
     element_embedding = layers.Reshape((features,))(element_embedding)
     print(element_embedding.shape)
@@ -90,16 +88,16 @@ def policy_model(features: int = 64,
     # print(embedding_dense.shape)
 
     crystal_sys_embedding = layers.Embedding(
-        input_dim=num_crystal_sys+1, output_dim=features,
+        input_dim=num_crystal_sys + 1, output_dim=features,
         input_length=1, mask_zero=True, name='crystal_sys_embedding')(crystal_sys_class)
     print(crystal_sys_embedding.shape)
     proto_strc_embedding = layers.Embedding(
-        input_dim=num_proto_strc+1, output_dim=features,
+        input_dim=num_proto_strc + 1, output_dim=features,
         input_length=1, mask_zero=True, name='proto_strc_embedding')(proto_strc_class)
     print(proto_strc_embedding.shape)
 
     x = layers.concatenate([element_embedding, crystal_sys_embedding, proto_strc_embedding])
-    #x = np.sum()
+    # x = np.sum()
 
     # crystal_proto = layers.concatenate([crystal_sys_embedding, proto_strc_embedding])
     # crystal_proto_dense = layers.Dense(features, activation='relu')(crystal_proto)
@@ -111,7 +109,7 @@ def policy_model(features: int = 64,
     # proto_strc_output = layers.Dense(features, activation='relu')(proto_strc_embedding)
 
     # Merge all available features into a single large vector via concatenation
-    #x = layers.concatenate([elements_output, crystal_sys_output, proto_strc_output])
+    # x = layers.concatenate([elements_output, crystal_sys_output, proto_strc_output])
     # x = layers.concatenate([crystal_sys_model.output, proto_strc_model.output])
     global_state = layers.Dense(features, activation='relu')(x)
     output = layers.Dense(1)(global_state)
@@ -123,7 +121,7 @@ def test_policy_model(features: int = 64,
                       num_eles_and_stoich: int = 252,
                       num_crystal_sys: int = 7,
                       num_proto_strc: int = 4170,
-                 ) -> tf.keras.Model:
+                      ) -> tf.keras.Model:
     """ Constructs a policy model that predicts value, pi_logits from a batch of molecule inputs. Main model used in
     policy training and loading weights
 
@@ -150,7 +148,7 @@ def test_policy_model(features: int = 64,
     elements_output = layers.Dense(features // 3, activation='relu')(element_class)
 
     ## TODO don't need an embedding because the number of crystal systems is small(?). Just use a one-hot encoding
-    #crystal_sys_embedding = layers.Embedding(
+    # crystal_sys_embedding = layers.Embedding(
     #    num_crystal_sys, features, name='crystal_sys_embedding')(crystal_sys_class)
     # crystal_sys_output = layers.Dense(features, activation='relu')(crystal_sys_embedding)
     crystal_sys_output = layers.Dense(features // 3, activation='relu')(crystal_sys_class)
@@ -188,16 +186,16 @@ print(model.summary())
 preprocessor = CrystalPreprocessor()
 # this state will have elements, composition, crystal system, and structure
 
-#print(model.predict(policy_inputs))
+# print(model.predict(policy_inputs))
 
-#problem = ocv.create_problem()
-#builder = problem.builder
+# problem = ocv.create_problem()
+# builder = problem.builder
 builder = CrystalBuilder()
 
 root = 'root'
 state = CrystalState(root)
 
-#print(state.get_next_actions())
+# print(state.get_next_actions())
 
 state = CrystalState('Li')
 print(state)
@@ -213,4 +211,3 @@ while state.terminal is False:
     policy_inputs = preprocessor.construct_feature_matrices(state)
     print(policy_inputs)
     print(model(policy_inputs))
-
