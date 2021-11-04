@@ -113,10 +113,10 @@ def find_icsdphases(elementset):
         if any(x not in elementset for x in elements):
             continue
         else:
-            if len(elements) > 1 and trigger == 0:
-                # print '----------------'
-                print('COMPETING PHASES FOUND IN ICSD')
-                # print '----------------'
+            # if len(elements) > 1 and trigger == 0:
+                # # print '----------------'
+                # print('COMPETING PHASES FOUND IN ICSD')
+                # # print '----------------'
 
             if len(elements) > 1:
                 # print compound
@@ -150,10 +150,10 @@ def find_in_nrelmatdb(elementset):
         if any(x not in elementset for x in elements):
             continue
         else:
-            if len(elements) > 1 and trigger == 0:
-                # print '----------------'
-                print('COMPETING PHASES FOUND IN NRELMATDB')
-                # print '----------------'
+            # if len(elements) > 1 and trigger == 0:
+                # # print '----------------'
+                # print('COMPETING PHASES FOUND IN NRELMATDB')
+                # # print '----------------'
 
             if len(elements) > 1 and compound not in compounds_found:
                 # print compound
@@ -199,10 +199,10 @@ def find_energy_nrelmatdb(elementset, df):
         if any(x not in elementset for x in elements):
             continue
         else:
-            if len(elements) > 1 and trigger == 0:
-                # print '----------------'
-                print('COMPETING PHASES FOUND IN NRELMATDB')
-                # print '----------------'
+            # if len(elements) > 1 and trigger == 0:
+                # # print '----------------'
+                # print('COMPETING PHASES FOUND IN NRELMATDB')
+                # # print '----------------'
 
             if len(elements) > 1 and compound not in compounds_found:
                 # print compound
