@@ -50,6 +50,10 @@ def read_structures_file(structures_file):
 
 
 def write_structures_file(structures_file, structures_dict):
+    """ Write Pymatgen structures to a gzipped json file. 
+    *structures_dict*: dictionary of structure_id: dictionary representation of structure from `structure.as_dict()`
+        See https://pymatgen.org/pymatgen.core.structure.html#pymatgen.core.structure.IStructure.as_dict
+    """
     logger.info(f"writing {structures_file}")
     with gzip.open(structures_file, 'w') as out:
         out.write(json.dumps(structures_dict, indent=2).encode())
