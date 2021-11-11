@@ -1,9 +1,9 @@
 #!/bin/bash
 clear
-python optimize_rad.py \
+srun python optimize_rad.py \
     --min-atoms 4 \
     --max-atoms 12 \
     --max-num-bonds 30 \
     --num-gpus 1 \
     --num-cpus 34 \
-    --local-dir /scratch/$USER/ray_results/qed
+    --local-dir /scratch/$USER/ray_results/rad

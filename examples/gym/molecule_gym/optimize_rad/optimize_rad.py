@@ -19,7 +19,7 @@ def env_creator(args):
     if isinstance(args, argparse.Namespace):
         args = vars(args)
 
-    print("env_creator args", args)
+    # print("env_creator args", args)
 
     import tensorflow as tf
 
@@ -29,12 +29,13 @@ def env_creator(args):
             tf.config.experimental.set_memory_growth(gpu, True)
 
     from rlmolecule.graph_gym.graph_gym_env import GraphGymEnv
-    from rlmolecule.molecule.builder.builder import MoleculeBuilder
+    # from rlmolecule.molecule.builder.builder import MoleculeBuilder
     from examples.gym.molecule_gym.optimize_rad.rad_reward import RadGraphProblem
+    from examples.stable_radical_optimization.stable_radical_molecule_state import MoleculeBuilderWithFingerprint
 
     env = GraphGymEnv(
         RadGraphProblem(
-            MoleculeBuilder(
+            MoleculeBuilderWithFingerprint(
                 max_atoms=args["max_atoms"],
                 min_atoms=args["min_atoms"],
                 sa_score_threshold=args["sa_score_threshold"],
@@ -121,11 +122,12 @@ if __name__ == "__main__":
             "num_workers": num_workers,
             "framework": "tf2",
             "eager_tracing": False,  # does not work otherwise?
-            # "lr": tune.grid_search([1e-2]),
-            "lr_schedule": [[0, 1e-2], [400000, 1e-3], [800000, 1e-4]],
+            "lr": tune.grid_search([1e-3]),
+            "lr_schedule": [[0, 1e-2], [10_000, 1e-3], [50_000, 1e-4]],
             "gamma": 1.0,  # finite horizon problem, we want total reward-to-go?
-            "entropy_coeff": tune.grid_search([0.05]),
-            "num_sgd_iter": tune.grid_search([10]),
+            #"entropy_coeff": tune.grid_search([0.05]),
+            "entropy_coeff_schedule": [[0, 0.05], [50_000, 0.01], [75_000, 0.001]],
+            "num_sgd_iter": 10,
             "rollout_fragment_length": rollout_fragment_length,
             "train_batch_size": train_batch_size,
             # sgd_minibatch_size needs to be carefully tuned for the problem,
@@ -143,6 +145,7 @@ if __name__ == "__main__":
         "training_iteration": args.stop_iters,
         "timesteps_total": args.stop_timesteps,
         "episode_reward_mean": args.stop_reward,
+        "time_total_s": args.stop_time_total_s
     }
 
     experiment = tune.run(
