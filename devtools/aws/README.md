@@ -44,8 +44,17 @@ fails in multiple ways "as is".
     
     Failed to setup head node.
     ```
-    __Fix:__ Unknown!  The m5.large instances appear to have 100GiB EBS storage, 
-    so likely some other configuration problem?
+    __Fix:__ Increasing storage from 100 GiB to 500 GiB seems to have done the trick,
+    
+    ```
+    available_node_types:
+        ray.head.default:
+            node_config:
+                BlockDeviceMappings:
+                  - DeviceName: /dev/sda1
+                    Ebs:
+                         VolumeSize: 500
+    ```
 
 ## Multi-node training example using only CPU instances
 
@@ -74,6 +83,25 @@ available CPUs (there are 6 total).
     ```
     rllib train --run PPO --env CartPole-v0 --ray-num-cpus 6 --config '{"num_workers": 5}' 
     ```
+
+## Multi-node training example using GPU head and CPU worker instances
+
+Same as above, but set
+
+```
+docker:
+    head_image: "rayproject/ray-ml:latest-gpu"
+    worker_image: "rayproject/ray-ml:latest-cpu"
+```
+
+and use something like this command to train:
+
+```
+rllib train --env CartPole-v0 --run PPO --ray-num-gpu 1 --ray-num-cpu 6 --config '{"num_workers": 5}'
+```
+
+Here we are using 1 head GPU instance and 2 worker CPU instances, with a total of 1 GPU and 6 CPUs.
+
 
 ## Other notes
 
