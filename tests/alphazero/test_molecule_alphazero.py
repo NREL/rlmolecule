@@ -139,7 +139,7 @@ class TestPolicyTraining:
 
         weights_before = problem.batched_policy_model.get_weights()[1]
 
-        history = problem.train_policy_model(steps_per_epoch=10, epochs=1)
+        history = problem.train_policy_model(steps_per_epoch=10, epochs=1, verbose=2)
         assert np.isfinite(history.history['loss'][0])
         assert 'policy.01.index' in os.listdir(problem.policy_checkpoint_dir)
 
