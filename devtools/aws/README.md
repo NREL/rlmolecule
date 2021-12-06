@@ -129,17 +129,25 @@ in AWS (and we continue to be billed hourly for their use).
 1. If you're having trouble starting / connecting to a ray cluster, try the
 `--no-config-cache` option for your ray command.
 
-2. Check out the EC2 instance types that are compatible with the AMI: 
+1. Running `ray down ...` does not necessarily terminate your instance.  In some
+cases, they are only stopped (I couldn't reproduce this).  See:
+https://github.com/ray-project/ray/issues/6207.  There is probably a configuration
+option somewhere to override...
+
+
+1. Check out the EC2 instance types that are compatible with the AMI: 
 https://aws.amazon.com/marketplace/pp/prodview-x5nivojpquy6y .  You may need to 
 cross-reference this with the instance types that support GPU's:  
 https://aws.amazon.com/ec2/instance-types/
 
-3. Private ECR's will not work out of the box.  Use public if possible.
+1. Private ECR's will not work out of the box.  Use public if possible.
 
-4. If all else fails, check the AWS dashboard to see what's happening and to 
+1. If all else fails, check the AWS dashboard to see what's happening and to 
 manually stop/terminate instances and volumes.  __Make sure you are looking in the
-correct region, where your instances are actually running!__
+correct region, where your instances are actually running!__  
 
+1. It might end up being the case that a single, beefy GPU node will give better
+performance than the head/worker paradigm.
 
 
 ## Other notes
