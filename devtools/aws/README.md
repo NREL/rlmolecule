@@ -103,6 +103,27 @@ rllib train --env CartPole-v0 --run PPO --ray-num-gpu 1 --ray-num-cpu 6 --config
 Here we are using 1 head GPU instance and 2 worker CPU instances, with a total of 1 GPU and 6 CPUs.
 
 
+## Tearing down the cluster
+
+To destroy the cluster and attached volumes:
+
+```
+ray down example-full.yaml
+```
+
+This command releases all resources used by the job (and billing should stop, 
+as well).
+
+To _temporarily stop_ the ray cluster:
+
+```
+    ray stop example-full.yaml
+```
+
+Note that this does not destroy any volumes that are attached -- these persist 
+in AWS (and we continue to be billed hourly for their use).
+
+
 ## Other notes
 
 * Out of two attempts to create ray clusters, one had a failed worker node (1 

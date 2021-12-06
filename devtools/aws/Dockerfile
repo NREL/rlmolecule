@@ -1,4 +1,4 @@
-FROM rayproject/ray-ml:latest-cpu
+FROM rayproject/ray-ml:latest-gpu
 
 USER root
 COPY env.yaml .
