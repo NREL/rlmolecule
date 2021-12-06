@@ -124,6 +124,24 @@ Note that this does not destroy any volumes that are attached -- these persist
 in AWS (and we continue to be billed hourly for their use).
 
 
+## Hints / Pitfalls 
+
+1. If you're having trouble starting / connecting to a ray cluster, try the
+`--no-config-cache` option for your ray command.
+
+2. Check out the EC2 instance types that are compatible with the AMI: 
+https://aws.amazon.com/marketplace/pp/prodview-x5nivojpquy6y .  You may need to 
+cross-reference this with the instance types that support GPU's:  
+https://aws.amazon.com/ec2/instance-types/
+
+3. Private ECR's will not work out of the box.  Use public if possible.
+
+4. If all else fails, check the AWS dashboard to see what's happening and to 
+manually stop/terminate instances and volumes.  __Make sure you are looking in the
+correct region, where your instances are actually running!__
+
+
+
 ## Other notes
 
 * Out of two attempts to create ray clusters, one had a failed worker node (1 
