@@ -1,13 +1,12 @@
 import gzip
-
-import ujson
+import json
 from pymatgen.core import Structure
 
 
 def read_structures_file(structures_file):
     print(f"reading {structures_file}")
     with gzip.open(structures_file, 'r') as f:
-        structures_dict = ujson.loads(f.read().decode())
+        structures_dict = json.loads(f.read().decode())
     structures = {}
     for key, structure_dict in structures_dict.items():
         structures[key] = Structure.from_dict(structure_dict)
@@ -31,4 +30,5 @@ def write_structures_file(structures_file, structures_dict, round_float=None):
 
     print(f"writing {structures_file}")
     with gzip.open(structures_file, 'w') as out:
-        out.write(ujson.dumps(structures_dict).encode())
+        out.write(json.dumps(structures_dict).encode())
+

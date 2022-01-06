@@ -14,7 +14,7 @@ import pandas as pd
 # https://github.com/pandas-profiling/pandas-profiling/issues/662#issuecomment-803673639
 pd.set_option("display.max_columns", None)
 import random
-import ujson
+import json
 import gzip
 import pathlib
 import tensorflow as tf
@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 def read_structures_file(structures_file):
     logger.info(f"reading {structures_file}")
     with gzip.open(structures_file, 'r') as f:
-        structures_dict = ujson.loads(f.read().decode())
+        structures_dict = json.loads(f.read().decode())
     structures = {}
     for key, structure_dict in structures_dict.items():
         structures[key] = Structure.from_dict(structure_dict)
@@ -50,18 +50,20 @@ def read_structures_file(structures_file):
 
 
 def write_structures_file(structures_file, structures_dict):
+    """ Write Pymatgen structures to a gzipped json file. 
+    *structures_dict*: dictionary of structure_id: dictionary representation of structure from `structure.as_dict()`
+        See https://pymatgen.org/pymatgen.core.structure.html#pymatgen.core.structure.IStructure.as_dict
+    """
     logger.info(f"writing {structures_file}")
     with gzip.open(structures_file, 'w') as out:
-        out.write(ujson.dumps(structures_dict, indent=2).encode())
+        out.write(json.dumps(structures_dict, indent=2).encode())
 
 
-def generate_decoration(state: CrystalState) -> Structure:
+def generate_decoration(state: CrystalState, icsd_prototype) -> Structure:
     # Create the decoration of this composition onto this prototype structure
     # the 'action_node' string has the following format at this point:
     # comp_type|prototype_structure|decoration_idx
     # we just need 'comp_type|prototype_structure' to get the icsd structure
-    structure_key = '|'.join(state.action_node.split('|')[:-1])
-    icsd_prototype = structures[structure_key]
     decoration_idx = int(state.action_node.split('|')[-1]) - 1
     decorated_structure, stoich = CrystalState.decorate_prototype_structure(
         icsd_prototype, state.composition, decoration_idx=decoration_idx)
@@ -108,7 +110,7 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
 
             # generate the decoration for this state
             try:
-                decorated_structure = generate_decoration(state)
+                decorated_structure = generate_decoration(state, icsd_prototype)
             except AssertionError as e:
                 print(f"AssertionError: {e}")
                 return self.default_reward, {'terminal': True, 'state_repr': repr(state)}
@@ -137,6 +139,7 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
     # @collect_metrics
     def calc_energy_stability(self, structure: Structure, state=None):
         """ Predict the total energy of the structure using a GNN model (trained on unrelaxed structures)
+        Then use that predicted energy to compute the decomposition (hull) energy
         """
         # model_inputs = self.get_model_inputs(structure)
         # predicted_energy = predict(self.energy_model, model_inputs)
@@ -151,53 +154,45 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         predicted_energy = self.energy_model.predict(dataset)
         predicted_energy = predicted_energy[0][0]
 
-        hull_energy = self.convex_hull_stability(structure, predicted_energy)
+        hull_energy = convex_hull_stability(self.df_competing_phases, structure, predicted_energy)
         if hull_energy is None:
             # set the default hull energy as slightly bigger than the default energy
             hull_energy = -self.default_reward - 1
 
         return predicted_energy, hull_energy
 
-    def convex_hull_stability(self, structure: Structure, predicted_energy):
-        strc = structure
 
-        # Add the new composition and the predicted energy to "df" if DFT energy already not present
-        comp = strc.composition.reduced_composition.alphabetical_formula.replace(' ', '')
+def convex_hull_stability(df_competing_phases, structure: Structure, predicted_energy):
+    strc = structure
 
-        df = self.df_competing_phases
-        if comp not in df.reduced_composition.tolist():
-            df = self.df_competing_phases.append(
-                {'sortedformula': comp, 'energyperatom': predicted_energy, 'reduced_composition': comp},
-                ignore_index=True)
+    # Add the new composition and the predicted energy to "df" if DFT energy already not present
+    comp = strc.composition.reduced_composition.alphabetical_formula.replace(' ','')
 
-        # Create a list of elements in the composition
-        ele = strc.composition.chemical_system.split('-')
+    df = df_competing_phases
+    if comp not in df.reduced_composition.tolist():
+        df = df_competing_phases.append({'sortedformula': comp, 'energyperatom': predicted_energy, 'reduced_composition': comp}, ignore_index=True)
 
-        # Create input file for stability analysis 
-        inputs = nrelmatdbtaps.create_input_DFT(ele, df, chempot='ferev2')
+    # Create a list of elements in the composition
+    ele = strc.composition.chemical_system.split('-')
 
-        # Run stability function (args: input filename, composition)
-        stable_state = stability.run_stability(inputs, comp)
-        if stable_state == 'UNSTABLE':
-            stoic = ehull.frac_stoic(comp)
-            hull_nrg = ehull.unstable_nrg(stoic, comp, inputs)
-            # print("energy above hull of this UNSTABLE phase is", hull_nrg, "eV/atom")
-        elif stable_state == 'STABLE':
-            stoic = ehull.frac_stoic(comp)
-            hull_nrg = ehull.stable_nrg(stoic, comp, inputs)
-            # print("energy above hull of this STABLE phase is", hull_nrg, "eV/atom")
-        else:
-            print(f"ERR: unrecognized stable_state: '{stable_state}'")
-        return hull_nrg
+    # Create input file for stability analysis 
+    inputs = nrelmatdbtaps.create_input_DFT(ele, df, chempot='ferev2')
 
-    ## TODO
-    # @collect_metrics
-    # def calc_reward(self, state: CrystalState) -> (float, {}):
-    #    """
-    #    """
-    #    reward = 0
-    #    stats = {}
-    #    return reward, stats
+    # Run stability function (args: input filename, composition)
+    stable_state = stability.run_stability(inputs, comp)
+    if stable_state == 'UNSTABLE':
+        stoic = ehull.frac_stoic(comp)
+        hull_nrg = ehull.unstable_nrg(stoic, comp, inputs)
+        #print("energy above hull of this UNSTABLE phase is", hull_nrg, "eV/atom")
+    elif stable_state == 'STABLE':
+        stoic = ehull.frac_stoic(comp)
+        hull_nrg = ehull.stable_nrg(stoic, comp, inputs)
+        #print("energy above hull of this STABLE phase is", hull_nrg, "eV/atom")
+    else:
+        print(f"ERR: unrecognized stable_state: '{stable_state}'.")
+        print(f"\tcomp: {comp}")
+        return None
+    return hull_nrg
 
 
 def create_problem():
