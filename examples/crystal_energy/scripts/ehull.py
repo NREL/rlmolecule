@@ -1,7 +1,71 @@
 from copy import deepcopy
 
 import numpy as np
+import re
 from scripts import stability
+from scripts import nrelmatdbtaps
+
+
+# --------------------------------------------------------------------------------------------
+# function to alphabetically sort the composition e.g., Li1Sc1F4 would be F4Li1Sc1
+# and also get the individual elements in the composition
+def sort_comp(comp):
+    # split by the digits
+    # e.g., for "Li1Sc1F4": ['Li', '1', 'Sc', '1', 'F', '4', '']
+    split = np.asarray(re.split('(\d+)', comp))
+    ele_stoichs = [''.join(split[i:i+2]) for i in range(0, len(split), 2)]
+    sorted_comp = ''.join(sorted(ele_stoichs))
+    # also return the elements
+    elements = tuple(sorted(split[range(0, len(split) - 1, 2)]))
+    return sorted_comp, elements
+
+
+# --------------------------------------------------------------------------------------------
+# function to compute the decomposition energy for a given composition 
+def convex_hull_stability(comp, predicted_energy, df_competing_phases):
+    """
+    :param comp: composition such as Li1Sc1F4
+    :param predicted_energy: predicted eV/atom for the structure corresponding to this composition
+    :param df_competing_phases: pandas dataframe of competing phases used to 
+        construct the convex hull for the elements of the given composition
+    """
+    comp, eles = sort_comp(comp)
+
+    df_cp = df_competing_phases.copy()
+    # UPDATE: try including the composition if it is there
+    df_cp = df_cp[df_cp['reduced_composition'] != comp]
+    df_cp = df_competing_phases.append({'sortedformula': comp,
+                                        'energyperatom': predicted_energy,
+                                        'reduced_composition': comp},
+                                       ignore_index=True)
+
+    # Create input file for stability analysis
+    inputs = nrelmatdbtaps.create_input_DFT(eles, df_cp, chempot='ferev2')
+    # if this function failed to create the input, then skip this structure
+    if inputs is None:
+        return
+
+    # Run stability function (args: input filename, composition)
+    try:
+        stable_state = stability.run_stability(inputs, comp)
+        if stable_state == 'UNSTABLE':
+            stoic = frac_stoic(comp)
+            hull_nrg = unstable_nrg(stoic, comp, inputs)
+            #print("energy above hull of this UNSTABLE phase is", hull_nrg, "eV/atom")
+        elif stable_state == 'STABLE':
+            stoic = frac_stoic(comp)
+            hull_nrg = stable_nrg(stoic, comp, inputs)
+            #print("energy above hull of this STABLE phase is", hull_nrg, "eV/atom")
+        else:
+            print(f"ERR: unrecognized stable_state: '{stable_state}'.")
+            print(f"\tcomp: {comp}")
+            return
+    except SystemError as e:
+        print(e)
+        print(f"Failed at stability.run_stability for {comp} "
+              f"(pred_energy: {predicted_energy}). Skipping\n")
+        return
+    return hull_nrg
 
 
 # --------------------------------------------------------------------------------------------

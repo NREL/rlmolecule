@@ -6,18 +6,17 @@ import logging
 import math
 import os
 import time
-
 import pandas as pd
-
-# Apparently there's an issue with the latest version of pandas.
-# Got this fix from here:
-# https://github.com/pandas-profiling/pandas-profiling/issues/662#issuecomment-803673639
-pd.set_option("display.max_columns", None)
+## Apparently there's an issue with the latest version of pandas.
+## Got this fix from here:
+## https://github.com/pandas-profiling/pandas-profiling/issues/662#issuecomment-803673639
+#pd.set_option("display.max_columns", None)
 import random
 import json
 import gzip
 import pathlib
 import tensorflow as tf
+import tensorflow_addons as tfa
 import nfp
 from pymatgen.core import Structure
 
@@ -114,9 +113,17 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
             except AssertionError as e:
                 print(f"AssertionError: {e}")
                 return self.default_reward, {'terminal': True, 'state_repr': repr(state)}
-            predicted_energy, hull_energy = self.calc_energy_stability(decorated_structure)
-            # print(str(state), predicted_energy)
+
             # Predict the total energy and stability of this decorated structure
+            predicted_energy, hull_energy = self.calc_energy_stability(decorated_structure)
+            # subtract 1 to the default energy to distinguish between
+            # failed calculation here, and failing to decorate the structure 
+            hull_energy = - self.default_reward - 1 if hull_energy is None else hull_energy
+            # Since more negative is more stable, and higher is better for the reward values,
+            # flip the hull energy
+            reward = - hull_energy.astype(float)
+
+            # print(str(state), predicted_energy)
             info = {
                 'terminal': True,
                 'predicted_energy': predicted_energy.astype(float),
@@ -124,10 +131,7 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
                 'num_sites': len(decorated_structure.sites),
                 'state_repr': repr(state),
             }
-            # return stability, info
-            # since any hull energy is better than nothing, add 10 to all the energies
-            # (with the hull energy flipped since more negative is more stable)
-            return - hull_energy.astype(float), info
+            return reward, info
         return self.default_reward, {'terminal': False, 'state_repr': repr(state)}
 
     def get_model_inputs(self, structure) -> {}:
@@ -154,45 +158,12 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         predicted_energy = self.energy_model.predict(dataset)
         predicted_energy = predicted_energy[0][0]
 
-        hull_energy = convex_hull_stability(self.df_competing_phases, structure, predicted_energy)
-        if hull_energy is None:
-            # set the default hull energy as slightly bigger than the default energy
-            hull_energy = -self.default_reward - 1
+        comp = structure.composition.reduced_composition.alphabetical_formula.replace(' ','')
+        hull_energy = ehull.convex_hull_stability(comp,
+                                                  predicted_energy,
+                                                  self.df_competing_phases)
 
         return predicted_energy, hull_energy
-
-
-def convex_hull_stability(df_competing_phases, structure: Structure, predicted_energy):
-    strc = structure
-
-    # Add the new composition and the predicted energy to "df" if DFT energy already not present
-    comp = strc.composition.reduced_composition.alphabetical_formula.replace(' ','')
-
-    df = df_competing_phases
-    if comp not in df.reduced_composition.tolist():
-        df = df_competing_phases.append({'sortedformula': comp, 'energyperatom': predicted_energy, 'reduced_composition': comp}, ignore_index=True)
-
-    # Create a list of elements in the composition
-    ele = strc.composition.chemical_system.split('-')
-
-    # Create input file for stability analysis 
-    inputs = nrelmatdbtaps.create_input_DFT(ele, df, chempot='ferev2')
-
-    # Run stability function (args: input filename, composition)
-    stable_state = stability.run_stability(inputs, comp)
-    if stable_state == 'UNSTABLE':
-        stoic = ehull.frac_stoic(comp)
-        hull_nrg = ehull.unstable_nrg(stoic, comp, inputs)
-        #print("energy above hull of this UNSTABLE phase is", hull_nrg, "eV/atom")
-    elif stable_state == 'STABLE':
-        stoic = ehull.frac_stoic(comp)
-        hull_nrg = ehull.stable_nrg(stoic, comp, inputs)
-        #print("energy above hull of this STABLE phase is", hull_nrg, "eV/atom")
-    else:
-        print(f"ERR: unrecognized stable_state: '{stable_state}'.")
-        print(f"\tcomp: {comp}")
-        return None
-    return hull_nrg
 
 
 def create_problem():
