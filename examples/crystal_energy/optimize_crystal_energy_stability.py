@@ -15,10 +15,12 @@ import random
 import json
 import gzip
 import pathlib
+import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
-import nfp
 from pymatgen.core import Structure
+from nfp import custom_objects
+from nfp.preprocessing.crystal_preprocessor import PymatgenPreprocessor
 
 from rlmolecule.crystal.builder import CrystalBuilder
 from rlmolecule.crystal.crystal_problem import CrystalTFAlphaZeroProblem
@@ -28,7 +30,7 @@ from rlmolecule.sql.run_config import RunConfig
 from rlmolecule.tree_search.reward import RankedRewardFactory
 from rlmolecule.sql import Base, Session
 from rlmolecule.sql.tables import GameStore
-from scripts.nfp_extensions import RBFExpansion, CifPreprocessor
+from scripts.nfp_extensions import RBFExpansion #, CifPreprocessor
 from scripts import nrelmatdbtaps
 from scripts import stability
 from scripts import ehull
@@ -78,6 +80,7 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
     def __init__(self,
                  engine: 'sqlalchemy.engine.Engine',
                  energy_model: 'tf.keras.Model',
+                 dist_model: 'tf.keras.Model',
                  df_competing_phases: 'pd.DataFrame',
                  # initial_state: str,
                  **kwargs) -> None:
@@ -86,14 +89,20 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         :param engine: A sqlalchemy engine pointing to a suitable database backend
         :param builder: A CrystalBuilder class to handle crystal construction based on ICSD structures
         :param energy_model: A tensorflow model to estimate the total energy of a structure
+        :param dist_model: A tensorflow model to predict a binary value if the structure would 
+            relax close (1) or far (0) from the starting prototype. 
+            If close, the predicted energy should be more accurate.
         """
         # self.initial_state = initial_state
         self.engine = engine
         self.energy_model = energy_model
+        self.dist_model = dist_model
         self.df_competing_phases = df_competing_phases
         # since the reward values can take positive or negative values, centered around 0,
         # set the default reward lower so that failed runs have a smaller reward
-        self.default_reward = -5
+        self.default_reward = -10
+        # if a structure is not predicted to relax close to the original prototype, penalize the reward value
+        self.dist_penalty = -2
         super(CrystalEnergyStabilityOptProblem, self).__init__(engine, **kwargs)
 
     def get_reward(self, state: CrystalState) -> (float, {}):
@@ -116,6 +125,11 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
 
             # Predict the total energy and stability of this decorated structure
             predicted_energy, hull_energy = self.calc_energy_stability(decorated_structure)
+            if predicted_energy is None:
+                reward = self.default_reward - 2
+                return reward, {'terminal': True,
+                                'num_sites': len(icsd_prototype.sites),
+                                'state_repr': repr(state)}
             # subtract 1 to the default energy to distinguish between
             # failed calculation here, and failing to decorate the structure 
             hull_energy = - self.default_reward - 1 if hull_energy is None else hull_energy
@@ -123,21 +137,34 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
             # flip the hull energy
             reward = - hull_energy.astype(float)
 
+            dist_pred = self.calc_cos_dist(decorated_structure)
+            # TODO find the correct decision boundary to use. Should take the sigmoid, then apply the cutoff
+            if dist_pred < 0:
+                reward += self.dist_penalty
+
             # print(str(state), predicted_energy)
             info = {
                 'terminal': True,
                 'predicted_energy': predicted_energy.astype(float),
                 'hull_energy': hull_energy.astype(float),
                 'num_sites': len(decorated_structure.sites),
+                'dist_pred': dist_pred.astype(float),
                 'state_repr': repr(state),
             }
             return reward, info
         return self.default_reward, {'terminal': False, 'state_repr': repr(state)}
 
-    def get_model_inputs(self, structure) -> {}:
-        inputs = preprocessor.construct_feature_matrices(structure, train=False)
-        print(inputs)
-        # return {key: tf.constant(np.expand_dims(val, 0)) for key, val in inputs.items()}
+    def get_model_inputs(self, structure, preprocessor) -> {}:
+        inputs = preprocessor(structure, train=False)
+        # scale structures to a minimum of 1A interatomic distance
+        min_distance = inputs["distance"].min()
+        if np.isclose(min_distance, 0):
+            # if some atoms are on top of each other, then this normalization fails
+            # TODO remove those problematic prototype structures
+            return None
+            #raise RuntimeError(f"Error with {structure}")
+
+        inputs["distance"] /= inputs["distance"].min()
         return inputs
 
     # @collect_metrics
@@ -145,16 +172,20 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         """ Predict the total energy of the structure using a GNN model (trained on unrelaxed structures)
         Then use that predicted energy to compute the decomposition (hull) energy
         """
-        # model_inputs = self.get_model_inputs(structure)
+        model_inputs = self.get_model_inputs(structure, preprocessor)
+        if model_inputs is None:
+            return None, None
         # predicted_energy = predict(self.energy_model, model_inputs)
         dataset = tf.data.Dataset.from_generator(
-            # lambda: preprocessor.construct_feature_matrices(structure, train=False),
-            lambda: (preprocessor.construct_feature_matrices(s, train=False) for s in [structure]),
-            output_types=preprocessor.output_types,
-            output_shapes=preprocessor.output_shapes) \
-            .padded_batch(batch_size=32,
-                          padded_shapes=preprocessor.padded_shapes(max_sites=256, max_bonds=2048),
-                          padding_values=preprocessor.padding_values)
+            lambda: (s for s in [model_inputs]),
+            #lambda: (preprocessor.construct_feature_matrices(s, train=False) for s in [structure]),
+            output_signature=(preprocessor.output_signature),
+            )
+        dataset = dataset \
+            .padded_batch(
+                batch_size=1,
+                padding_values=(preprocessor.padding_values),
+            )
         predicted_energy = self.energy_model.predict(dataset)
         predicted_energy = predicted_energy[0][0]
 
@@ -165,10 +196,26 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
 
         return predicted_energy, hull_energy
 
+    def calc_cos_dist(self, structure: Structure, state=None):
+        model_inputs = self.get_model_inputs(structure, preprocessor_dist)
+        if model_inputs is None:
+            return None
+        dataset = tf.data.Dataset.from_generator(
+            lambda: (s for s in [model_inputs]),
+            #lambda: (preprocessor.construct_feature_matrices(s, train=False) for s in [structure]),
+            output_signature=(preprocessor.output_signature),
+            )
+        dataset = dataset \
+            .padded_batch(
+                batch_size=1,
+                padding_values=(preprocessor.padding_values),
+            )
+        predicted_dist = self.dist_model.predict(dataset)
+        predicted_dist = predicted_dist[0][0]
+        return predicted_dist
+
 
 def create_problem():
-    prob_config = run_config.problem_config
-
     run_id = run_config.run_id
     train_config = run_config.train_config
 
@@ -183,6 +230,7 @@ def create_problem():
 
     problem = CrystalEnergyStabilityOptProblem(engine,
                                                energy_model,
+                                               dist_model,
                                                df_competing_phases,
                                                run_id=run_id,
                                                reward_class=reward_factory,
@@ -194,7 +242,6 @@ def create_problem():
                                                batch_size=train_config.get('batch_size', 32),
                                                policy_checkpoint_dir=train_config.get('policy_checkpoint_dir',
                                                                                       'policy_checkpoints'),
-                                               actions_to_ignore=prob_config.get('actions_to_ignore', None),
                                                )
 
     return problem
@@ -203,7 +250,9 @@ def create_problem():
 def run_games():
     from rlmolecule.alphazero.alphazero import AlphaZero
 
-    builder = CrystalBuilder()
+    prob_config = run_config.problem_config
+    builder = CrystalBuilder(actions_to_ignore=prob_config.get('actions_to_ignore', None))
+
     config = run_config.mcts_config
     game = AlphaZero(
         create_problem(),
@@ -302,6 +351,11 @@ if __name__ == "__main__":
                         type=pathlib.Path,
                         required=True,
                         help='Model for predicting total energy of a battery system')
+    parser.add_argument('--dist-model',
+                        type=pathlib.Path,
+                        required=True,
+                        help='Model that predicts whether a given structure would relax '
+                             'close or far from the starting prototype')
 
     args = parser.parse_args()
 
@@ -311,19 +365,26 @@ if __name__ == "__main__":
     engine = run_config.start_engine()
 
     # Initialize the preprocessor class
-    preprocessor = CifPreprocessor(num_neighbors=12)
-    preprocessor.from_json('inputs/preprocessor.json')
+    preprocessor = PymatgenPreprocessor()
+    # TODO: shouldn't be hardcoded
+    preprocessor.from_json('inputs/models/icsd_battery_relaxed/20211227_icsd_and_battery/preprocessor.json')
+    preprocessor_dist = PymatgenPreprocessor()
+    preprocessor_dist.from_json('inputs/models/cos_dist/model_b64_dist_class_0_1/preprocessor.json')
 
     # keep track of how much time each part takes
     # model_time = 0
     # decoration_time = 0
 
     energy_model = tf.keras.models.load_model(args.energy_model,
-                                              custom_objects={**nfp.custom_objects, **{'RBFExpansion': RBFExpansion}})
+                                              custom_objects={**custom_objects,
+                                                              **{'RBFExpansion': RBFExpansion}})
+    dist_model = tf.keras.models.load_model(args.dist_model,
+                                              custom_objects={**custom_objects,
+                                                              **{'RBFExpansion': RBFExpansion}})
     # Dataframe containing competing phases from NRELMatDB
     print("Reading inputs/competing_phases.csv")
     df_competing_phases = pd.read_csv('inputs/competing_phases.csv')
-    print(df_competing_phases.head(3))
+    print(df_competing_phases.head(2))
 
     Base.metadata.create_all(engine, checkfirst=True)
     Session.configure(bind=engine)
