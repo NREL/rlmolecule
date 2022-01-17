@@ -77,11 +77,11 @@ class CrystalBuilder:
                 for neighbor in self.G.neighbors(n):
                     comp_type = self.comp_to_comp_type.get(neighbor)
                     composition = neighbor if comp_type is not None else None
-                    # if this is not a branch of the tree we want to follow, then stop here
-                    terminal = False if neighbor not in self.actions_to_ignore else True
+                    # if this is not a branch of the tree we want to follow, then skip it
+                    if neighbor in self.actions_to_ignore:
+                        continue
                     next_state = CrystalState(action_node=neighbor,
                                               composition=composition,
-                                              terminal=terminal,
                                               )
                     next_states.append(next_state)
                 return next_states
@@ -95,10 +95,11 @@ class CrystalBuilder:
                 return [crystal_state]
             else:
                 for neighbor in self.G2.neighbors(n):
+                    if neighbor in self.actions_to_ignore:
+                        continue
                     terminal = False
                     structure = None
-                    if self.G2.out_degree(neighbor) == 0 or \
-                            neighbor in self.actions_to_ignore:
+                    if self.G2.out_degree(neighbor) == 0:
                         terminal = True
                     next_state = CrystalState(action_node=neighbor,
                                               composition=crystal_state.composition,
