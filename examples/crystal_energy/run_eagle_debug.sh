@@ -58,7 +58,7 @@ conda activate crystals
 python -u optimize_crystal_energy_stability.py \
     --train-policy \
     --config $SCRIPT_CONFIG \
-    --energy-model inputs/models/icsd_battery_unrelaxed/hypo_randsub0_05_icsd_randsub0_05_seed1/best_model.hdf5
+    --energy-model inputs/models/icsd_battery_relaxed/hypo_randsub0_05_icsd_randsub0_05_seed1/best_model.hdf5
 EOF
 
 cat << EOF > "\$START_ROLLOUT_SCRIPT"
@@ -70,7 +70,7 @@ conda activate crystals
 python -u optimize_crystal_energy_stability.py \
     --rollout \
     --config $SCRIPT_CONFIG \
-    --energy-model inputs/models/icsd_battery_unrelaxed/hypo_randsub0_05_icsd_randsub0_05_seed1/best_model.hdf5
+    --energy-model inputs/models/icsd_battery_relaxed/hypo_randsub0_05_icsd_randsub0_05_seed1/best_model.hdf5
 EOF
 
 chmod +x "\$START_POLICY_SCRIPT" "\$START_ROLLOUT_SCRIPT"
