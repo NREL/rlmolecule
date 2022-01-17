@@ -36,7 +36,7 @@ train_config:
   # number of training examples to use when updating model parameters
   batch_size: 32
   # folder in which to store the trained models
-  policy_checkpoint_dir: '/projects/rlmolecule/$USER/crystal_energy/crystal_energy_example/policy_checkpoints'
+  policy_checkpoint_dir: '/projects/rlmolecule/$USER/logs/crystal_energy/crystal_energy_example/policy_checkpoints'
 
   # CrystalTFAlphaZeroProblem options:
   # size of network hidden layers
