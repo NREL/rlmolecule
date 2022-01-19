@@ -14,7 +14,7 @@ if [ "$2" == "" ]; then
     exit
 fi
 
-WORKING_DIR="/projects/rlmolecule/$USER/crystal_energy/${run_id}"
+WORKING_DIR="/projects/rlmolecule/$USER/logs/crystal_energy/${run_id}"
 mkdir -p $WORKING_DIR
 
 # copy the config file with the rest of the results
