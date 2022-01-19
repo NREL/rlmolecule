@@ -108,14 +108,15 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
     def get_reward(self, state: CrystalState) -> (float, {}):
         if not state.terminal:
             return self.default_reward, {'terminal': False, 'state_repr': repr(state)}
-        # skip this structure if it is too large for the model
-        # TODO truncate the structure?
+        # skip this structure if it is too large for the model.
+        # I removed these structures from the action space (see builder.py "action_graph2_file"),
+        # so shouldn't be a problem anymore
         structure_key = '|'.join(state.action_node.split('|')[:-1])
         icsd_prototype = structures[structure_key]
-        if len(icsd_prototype.sites) > 150:
-            return self.default_reward, {'terminal': True,
-                                            'num_sites': len(icsd_prototype.sites),
-                                            'state_repr': repr(state)}
+        #if len(icsd_prototype.sites) > 50:
+            #return self.default_reward, {'terminal': True,
+            #                                'num_sites': len(icsd_prototype.sites),
+            #                                'state_repr': repr(state)}
 
         # generate the decoration for this state
         try:
@@ -338,7 +339,7 @@ def monitor():
 
 # load the icsd prototype structures
 # https://pymatgen.org/usage.html#side-note-as-dict-from-dict
-icsd_prototypes_file = "../../rlmolecule/crystal/inputs/icsd_prototypes.json.gz"
+icsd_prototypes_file = "../../rlmolecule/crystal/inputs/icsd_prototypes_lt50atoms.json.gz"
 structures = read_structures_file(icsd_prototypes_file)
 
 if __name__ == "__main__":
