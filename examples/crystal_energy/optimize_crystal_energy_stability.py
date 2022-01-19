@@ -100,7 +100,7 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         self.df_competing_phases = df_competing_phases
         # since the reward values can take positive or negative values, centered around 0,
         # set the default reward lower so that failed runs have a smaller reward
-        self.default_reward = -10
+        self.default_reward = -10.0
         # if a structure is not predicted to relax close to the original prototype, penalize the reward value
         self.dist_penalty = -2
         super(CrystalEnergyStabilityOptProblem, self).__init__(engine, **kwargs)
@@ -135,7 +135,7 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
             hull_energy = - self.default_reward - 1 if hull_energy is None else hull_energy
             # Since more negative is more stable, and higher is better for the reward values,
             # flip the hull energy
-            reward = - hull_energy.astype(float)
+            reward = - hull_energy
 
             dist_pred = self.calc_cos_dist(decorated_structure)
             # TODO find the correct decision boundary to use. Should take the sigmoid, then apply the cutoff
@@ -146,7 +146,7 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
             info = {
                 'terminal': True,
                 'predicted_energy': predicted_energy.astype(float),
-                'hull_energy': hull_energy.astype(float),
+                'hull_energy': hull_energy,
                 'num_sites': len(decorated_structure.sites),
                 'dist_pred': dist_pred.astype(float),
                 'state_repr': repr(state),
