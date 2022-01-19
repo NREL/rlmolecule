@@ -100,59 +100,61 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         self.df_competing_phases = df_competing_phases
         # since the reward values can take positive or negative values, centered around 0,
         # set the default reward lower so that failed runs have a smaller reward
-        self.default_reward = -10.0
+        self.default_reward = np.float64(-10)
         # if a structure is not predicted to relax close to the original prototype, penalize the reward value
         self.dist_penalty = -2
         super(CrystalEnergyStabilityOptProblem, self).__init__(engine, **kwargs)
 
     def get_reward(self, state: CrystalState) -> (float, {}):
-        if state.terminal:
-            # skip this structure if it is too large for the model
-            # TODO truncate the structure?
-            structure_key = '|'.join(state.action_node.split('|')[:-1])
-            icsd_prototype = structures[structure_key]
-            if len(icsd_prototype.sites) > 150:
-                return self.default_reward, {'terminal': True,
-                                             'num_sites': len(icsd_prototype.sites),
-                                             'state_repr': repr(state)}
+        if not state.terminal:
+            return self.default_reward, {'terminal': False, 'state_repr': repr(state)}
+        # skip this structure if it is too large for the model
+        # TODO truncate the structure?
+        structure_key = '|'.join(state.action_node.split('|')[:-1])
+        icsd_prototype = structures[structure_key]
+        if len(icsd_prototype.sites) > 150:
+            return self.default_reward, {'terminal': True,
+                                            'num_sites': len(icsd_prototype.sites),
+                                            'state_repr': repr(state)}
 
-            # generate the decoration for this state
-            try:
-                decorated_structure = generate_decoration(state, icsd_prototype)
-            except AssertionError as e:
-                print(f"AssertionError: {e}")
-                return self.default_reward, {'terminal': True, 'state_repr': repr(state)}
+        # generate the decoration for this state
+        try:
+            decorated_structure = generate_decoration(state, icsd_prototype)
+        except AssertionError as e:
+            print(f"AssertionError: {e}")
+            return self.default_reward, {'terminal': True, 'state_repr': repr(state)}
 
-            # Predict the total energy and stability of this decorated structure
-            predicted_energy, hull_energy = self.calc_energy_stability(decorated_structure)
-            if predicted_energy is None:
-                reward = self.default_reward - 2
-                return reward, {'terminal': True,
-                                'num_sites': len(icsd_prototype.sites),
-                                'state_repr': repr(state)}
-            # subtract 1 to the default energy to distinguish between
-            # failed calculation here, and failing to decorate the structure 
-            hull_energy = - self.default_reward - 1 if hull_energy is None else hull_energy
+        # Predict the total energy and stability of this decorated structure
+        predicted_energy, hull_energy = self.calc_energy_stability(decorated_structure)
+        if predicted_energy is None:
+            reward = self.default_reward - 2
+            return reward, {'terminal': True,
+                            'num_sites': len(icsd_prototype.sites),
+                            'state_repr': repr(state)}
+        if hull_energy is not None:
             # Since more negative is more stable, and higher is better for the reward values,
             # flip the hull energy
-            reward = - hull_energy
+            reward = - hull_energy.astype(float)
+        else:
+            # subtract 1 to the default energy to distinguish between
+            # failed calculation here, and failing to decorate the structure 
+            reward = - self.default_reward - 1
 
-            dist_pred = self.calc_cos_dist(decorated_structure)
-            # TODO find the correct decision boundary to use. Should take the sigmoid, then apply the cutoff
-            if dist_pred < 0:
-                reward += self.dist_penalty
+        dist_pred = self.calc_cos_dist(decorated_structure)
+        # TODO find the correct decision boundary to use. Should take the sigmoid, then apply the cutoff
+        if dist_pred < 0:
+            reward += self.dist_penalty
 
-            # print(str(state), predicted_energy)
-            info = {
-                'terminal': True,
-                'predicted_energy': predicted_energy.astype(float),
-                'hull_energy': hull_energy,
-                'num_sites': len(decorated_structure.sites),
-                'dist_pred': dist_pred.astype(float),
-                'state_repr': repr(state),
-            }
-            return reward, info
-        return self.default_reward, {'terminal': False, 'state_repr': repr(state)}
+        # print(str(state), predicted_energy)
+        info = {
+            'terminal': True,
+            'predicted_energy': predicted_energy.astype(float),
+            'hull_energy': hull_energy.astype(float),
+            'num_sites': len(decorated_structure.sites),
+            'dist_pred': dist_pred.astype(float),
+            'state_repr': repr(state),
+        }
+        return reward, info
 
     def get_model_inputs(self, structure, preprocessor) -> {}:
         inputs = preprocessor(structure, train=False)
