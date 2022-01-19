@@ -65,7 +65,7 @@ class CrystalState(GraphSearchState):
     # so just pass the builder here
     def get_next_actions(self, builder) -> Sequence['CrystalState']:
         """
-        :param builder: A CrystalBuilder class
+        :param builder: A CrystalBuilder object
         """
         result = []
         if not self._terminal:

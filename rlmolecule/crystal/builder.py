@@ -8,7 +8,7 @@ from rlmolecule.crystal.crystal_state import CrystalState
 
 logger = logging.getLogger(__name__)
 dir_path = os.path.dirname(os.path.realpath(__file__))
-action_graph_file = os.path.join(dir_path, 'inputs', 'elements_to_compositions.edgelist.gz')
+action_graph_file = os.path.join(dir_path, 'inputs', 'elements_to_compositions_lt50atoms.edgelist.gz')
 action_graph2_file = os.path.join(dir_path, 'inputs', 'comp_type_to_decorations_lt50atoms.edgelist.gz')
 
 
@@ -65,9 +65,10 @@ class CrystalBuilder:
         """
         n = crystal_state.action_node
         next_states = []
-        node_found = False
+        node_found_G = False
+        node_found_G2 = False
         if self.G.has_node(n):
-            node_found = True
+            node_found_G = True
             # if we're at the end of the first graph, then pull actions from the second
             if self.G.out_degree(n) == 0:
                 n = self.comp_to_comp_type[crystal_state.composition]
@@ -87,7 +88,7 @@ class CrystalBuilder:
                 return next_states
 
         if self.G2.has_node(n):
-            node_found = True
+            node_found_G2 = True
             # if we're at the end of the second graph, then we have reached the end of the action space
             # and we're at a decorated crystal structure. Just return the original state
             if self.G2.out_degree(n) == 0:
@@ -109,5 +110,8 @@ class CrystalBuilder:
                     next_states.append(next_state)
                 return next_states
 
-        if node_found is False:
+        if node_found_G is False and node_found_G2 is False:
             raise (f"StateNotFound: Action node '{n}' was not in either action graph.")
+        elif node_found_G2 is False:
+            raise (f"StateNotFound: Action node '{crystal_state.action_node}' "
+                   f"comp_type '{n}' not found in G2")
