@@ -28,6 +28,19 @@ class RunConfig:
 
         # Settings specific to the problem at hand
         self.problem_config = self.config_map.get('problem_config', {})
+        # Since the action graph has sorted element tuples (e.g., ('Li', 'O'), ('Br', 'K', 'Sc')),
+        # make sure any lists specified in 'actions_to_ignore' are converted
+        if 'actions_to_ignore' in self.problem_config:
+            ati = []
+            for action in self.problem_config['actions_to_ignore']:
+                if isinstance(action, list):
+                    ati.append(tuple(sorted(action)))
+                else:
+                    ati.append(action)
+            self.problem_config['actions_to_ignore'] = set(ati)
+            print(f"{len(self.problem_config['actions_to_ignore'])} "
+                  "actions_to_ignore")
+
         # Settings for training the policy model
         self.train_config = self.config_map.get('train_config', {})
         self.mcts_config = self.config_map.get('mcts_config', {})
