@@ -139,7 +139,7 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         else:
             # subtract 1 to the default energy to distinguish between
             # failed calculation here, and failing to decorate the structure 
-            reward = - self.default_reward - 1
+            reward = self.default_reward + 1
 
         dist_pred = self.calc_cos_dist(decorated_structure)
         # TODO find the correct decision boundary to use. Should take the sigmoid, then apply the cutoff
@@ -150,7 +150,7 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         info = {
             'terminal': True,
             'predicted_energy': predicted_energy.astype(float),
-            'hull_energy': hull_energy.astype(float),
+            'hull_energy': hull_energy,
             'num_sites': len(decorated_structure.sites),
             'dist_pred': dist_pred.astype(float),
             'state_repr': repr(state),
