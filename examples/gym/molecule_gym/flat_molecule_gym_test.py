@@ -3,7 +3,7 @@
 """
 import tensorflow as tf
 
-gpus = tf.config.list_physical_devices('GPU')
+gpus = tf.config.list_physical_devices("GPU")
 if gpus:
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
@@ -23,43 +23,35 @@ if __name__ == "__main__":
     ray.init()
 
     args = {
-        'run': 'PPO',
-        'as_test': True,
-        'stop_iters': int(1e3),
-        'stop_timesteps': int(1e6),
-        'stop_reward': 100.0,
+        "run": "PPO",
+        "as_test": True,
+        "stop_iters": int(1e3),
+        "stop_timesteps": int(1e6),
+        "stop_reward": 100.0,
     }
-
 
     def make_env(_):
         import tensorflow as tf
 
-        gpus = tf.config.list_physical_devices('GPU')
+        gpus = tf.config.list_physical_devices("GPU")
         if gpus:
             for gpu in gpus:
                 tf.config.experimental.set_memory_growth(gpu, True)
 
-        from examples.gym.molecule_gym.molecule_graph_problem import MoleculeGraphProblem
+        from examples.gym.molecule_gym.molecule_graph_problem import QEDGraphProblem
         from rlmolecule.graph_gym.flat_graph_gym_env import FlatGraphGymEnv
         from rlmolecule.molecule.builder.builder import MoleculeBuilder
 
-        result = FlatGraphGymEnv(MoleculeGraphProblem(MoleculeBuilder()))
+        result = FlatGraphGymEnv(QEDGraphProblem(MoleculeBuilder()))
         return result
-
 
     from rlmolecule.graph_gym.flat_graph_gym_model import FlatGraphGymModel
 
-
     class ThisModel(FlatGraphGymModel):
-        def __init__(self,
-                     obs_space,
-                     action_space,
-                     num_outputs,
-                     model_config,
-                     name,
-                     **kwargs):
+        def __init__(self, obs_space, action_space, num_outputs, model_config, name, **kwargs):
             import tensorflow as tf
-            gpus = tf.config.list_physical_devices('GPU')
+
+            gpus = tf.config.list_physical_devices("GPU")
             if gpus:
                 for gpu in gpus:
                     tf.config.experimental.set_memory_growth(gpu, True)
@@ -67,23 +59,21 @@ if __name__ == "__main__":
             from rlmolecule.molecule.policy.model import policy_model
 
             super(ThisModel, self).__init__(
-                obs_space, action_space, num_outputs, model_config, name,
-                policy_model,
-                **kwargs)
+                obs_space, action_space, num_outputs, model_config, name, policy_model, **kwargs
+            )
 
+    register_env("molecule_graph_problem", make_env)
 
-    register_env('molecule_graph_problem', make_env)
+    ModelCatalog.register_custom_model("molecule_graph_problem_model", ThisModel)
 
-    ModelCatalog.register_custom_model('molecule_graph_problem_model', ThisModel)
-
-    if args['run'] == 'DQN':
+    if args["run"] == "DQN":
         cfg = {
             # TODO(ekl) we need to set these to prevent the masked values
             # from being further processed in DistributionalQModel, which
             # would mess up the masking. It is possible to support these if we
             # defined a custom DistributionalQModel that is aware of masking.
-            'hiddens': [],
-            'dueling': False,
+            "hiddens": [],
+            "dueling": False,
         }
     else:
         cfg = {}
@@ -91,32 +81,33 @@ if __name__ == "__main__":
     num_workers = 3
     config = dict(
         {
-            'local_dir': '../log',
-            'env': 'molecule_graph_problem',
-            'model': {
-                'custom_model': 'molecule_graph_problem_model',
+            "local_dir": "../log",
+            "env": "molecule_graph_problem",
+            "model": {
+                "custom_model": "molecule_graph_problem_model",
             },
-            'num_gpus': 0,
-            'num_gpus_per_worker': 0,
-            'num_workers': 0,
+            "num_gpus": 0,
+            "num_gpus_per_worker": 0,
+            "num_workers": 0,
             # 'num_gpus': 0,
             # 'num_gpus_per_worker': 0,
             # 'num_workers': 0,
             # 'num_gpus': 0,
             # 'num_gpus_per_worker': 0,
             # 'num_workers': num_workers,
-            'framework': 'tf2',
-            'eager_tracing': True,
+            "framework": "tf2",
+            "eager_tracing": True,
             # 'framework': 'tf1',
             # 'rollout_fragment_length': int(8),
             # 'train_batch_size': int(16),
             # 'sgd_minibatch_size': 8,
-            'rollout_fragment_length': 16,
-            'train_batch_size': 128,
-            'sgd_minibatch_size': 32,
-            "batch_mode": 'truncate_episodes',  # '"truncate_episodes",
+            "rollout_fragment_length": 16,
+            "train_batch_size": 128,
+            "sgd_minibatch_size": 32,
+            "batch_mode": "truncate_episodes",  # '"truncate_episodes",
         },
-        **cfg)
+        **cfg
+    )
 
     config = command_line_tools.parse_config_from_args(sys.argv[1:], config)
 
@@ -126,12 +117,12 @@ if __name__ == "__main__":
     #     'episode_reward_mean': args['stop_reward'],
     # }
 
-    local_dir = config['local_dir']
-    del config['local_dir']
+    local_dir = config["local_dir"]
+    del config["local_dir"]
 
-    results = tune.run(args['run'], config=config, verbose=3, local_dir=local_dir)
+    results = tune.run(args["run"], config=config, verbose=3, local_dir=local_dir)
 
-    if args['as_test']:
-        check_learning_achieved(results, args['stop_reward'])
+    if args["as_test"]:
+        check_learning_achieved(results, args["stop_reward"])
 
     ray.shutdown()

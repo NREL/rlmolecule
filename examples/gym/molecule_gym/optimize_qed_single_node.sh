@@ -6,4 +6,4 @@ python optimize_qed.py \
     --max-num-bonds 100 \
     --num-gpus 1 \
     --num-cpus 34 \
-    --local-dir /scratch/dbiagion/ray_results/qed
+    --local-dir /scratch/$USER/ray_results/qed

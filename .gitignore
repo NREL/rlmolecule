@@ -147,3 +147,5 @@ rlops_pass
 .vscode
 *.sw[op]
 *.out
+
+log/
