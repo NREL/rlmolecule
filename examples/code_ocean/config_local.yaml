@@ -6,7 +6,7 @@ run_id: 'local_run'
 problem_config:
   initial_state: 'C'
   # maximum number of heavy atoms
-  max_atoms: 10
+  max_atoms: 12
   # minimum number of heavy atoms
   min_atoms: 4
   # atoms to use when building the molecule
