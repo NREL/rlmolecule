@@ -6,6 +6,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 
+source ~/.bashrc
 conda activate rlmol
 
+./start_postgres.sh
 python stable_radical_opt.py --config=config_local.yaml
