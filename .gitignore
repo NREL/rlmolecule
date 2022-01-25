@@ -147,3 +147,7 @@ rlops_pass
 .vscode
 *.sw[op]
 *.out
+examples/code_ocean/redox-models
+examples/code_ocean/*.db
+examples/code_ocean/policy_checkpoints
+examples/code_ocean/builder_cache

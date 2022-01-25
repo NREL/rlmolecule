@@ -4,19 +4,21 @@ import sys
 from abc import ABC, abstractmethod
 from functools import partial
 from multiprocessing import Pool
-from typing import Iterable, List, Optional, Dict
+from typing import Dict, Iterable, List, Optional
 
 import numpy as np
 import rdkit
-from diskcache import FanoutCache, Cache
+from diskcache import Cache, FanoutCache
 from rdkit import Chem, RDConfig
-from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
+from rdkit.Chem.EnumerateStereoisomers import (
+    EnumerateStereoisomers,
+    StereoEnumerationOptions,
+)
 from rdkit.Chem.MolStandardize import rdMolStandardize
 from rdkit.Chem.rdDistGeom import EmbedMolecule
-
 from rlmolecule.molecule.builder.gdb_filters import check_all_filters
 
-sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
+sys.path.append(os.path.join(RDConfig.RDContribDir, "SA_Score"))
 # noinspection PyUnresolvedReferences
 import sascorer
 
@@ -30,21 +32,23 @@ logger = logging.getLogger(__name__)
 
 from rdkit import RDLogger
 
-RDLogger.DisableLog('rdApp.warning')
+RDLogger.DisableLog("rdApp.warning")
 
 
 class MoleculeBuilder:
-    def __init__(self,
-                 max_atoms: int = 10,
-                 min_atoms: int = 4,
-                 atom_additions: Optional[List] = None,
-                 stereoisomers: bool = False,
-                 canonicalize_tautomers: bool = False,
-                 sa_score_threshold: Optional[float] = None,
-                 try_embedding: bool = False,
-                 cache_dir: Optional[str] = None,
-                 num_shards: int = 1,
-                 parallel: bool = False) -> None:
+    def __init__(
+        self,
+        max_atoms: int = 10,
+        min_atoms: int = 4,
+        atom_additions: Optional[List] = None,
+        stereoisomers: bool = False,
+        canonicalize_tautomers: bool = False,
+        sa_score_threshold: Optional[float] = None,
+        try_embedding: bool = False,
+        cache_dir: Optional[str] = None,
+        num_shards: int = 1,
+        parallel: bool = False,
+    ) -> None:
         """A class to build molecules according to a number of different options
 
         :param max_atoms: Maximum number of heavy atoms
@@ -81,7 +85,9 @@ class MoleculeBuilder:
             AddNewAtomsAndBonds(atom_additions),
         ]
 
-        parallel_stack = [GdbFilter(), ]
+        parallel_stack = [
+            GdbFilter(),
+        ]
 
         if sa_score_threshold is not None:
             parallel_stack += [SAScoreFilter(sa_score_threshold, min_atoms)]
@@ -102,7 +108,8 @@ class MoleculeBuilder:
         if parallel:
             self.transformation_stack += [
                 ParallelTransformer(parallel_stack),
-                UniqueMoleculeFilter()]
+                UniqueMoleculeFilter(),
+            ]
 
         else:
             self.transformation_stack += parallel_stack
@@ -122,7 +129,7 @@ class MoleculeBuilder:
 
     def __getstate__(self):
         attributes = self.__dict__
-        attributes['cached_call'] = None
+        attributes["cached_call"] = None
         return attributes
 
 
@@ -142,7 +149,9 @@ class MoleculeTransformer(BaseTransformer, ABC):
             yield from self.call(molecule)
 
 
-def process_call(molecule: rdkit.Chem.Mol, transformation_stack: List[MoleculeTransformer]) -> List[rdkit.Chem.Mol]:
+def process_call(
+    molecule: rdkit.Chem.Mol, transformation_stack: List[MoleculeTransformer]
+) -> List[rdkit.Chem.Mol]:
     inputs = (molecule,)
     for transformer in transformation_stack:
         inputs = transformer(inputs)
@@ -150,9 +159,9 @@ def process_call(molecule: rdkit.Chem.Mol, transformation_stack: List[MoleculeTr
 
 
 class ParallelTransformer(BaseTransformer):
-    def __init__(self,
-                 transformation_stack: List[MoleculeTransformer],
-                 chunk_size: int = 10):
+    def __init__(
+        self, transformation_stack: List[MoleculeTransformer], chunk_size: int = 10
+    ):
         self.chunk_size = chunk_size
         self.transformation_stack = transformation_stack
         self.pool = Pool()
@@ -189,7 +198,7 @@ class AddNewAtomsAndBonds(MoleculeTransformer):
         if atom_additions is not None:
             self.atom_additions = atom_additions
         else:
-            self.atom_additions = ('C', 'N', 'O')
+            self.atom_additions = ("C", "N", "O")
 
     @staticmethod
     def sanitize(molecule: rdkit.Chem.Mol) -> Optional[rdkit.Chem.Mol]:
@@ -218,24 +227,41 @@ class AddNewAtomsAndBonds(MoleculeTransformer):
         """ For a given atom, calculate the free valence remaining """
         return pt.GetDefaultValence(atom.GetSymbol()) - atom.GetExplicitValence()
 
-    def _get_valid_partners(self, starting_mol: rdkit.Chem.Mol, atom: rdkit.Chem.Atom) -> List[int]:
+    def _get_valid_partners(
+        self, starting_mol: rdkit.Chem.Mol, atom: rdkit.Chem.Atom
+    ) -> List[int]:
         """ For a given atom, return other atoms it can be connected to """
         return list(
-            set(range(starting_mol.GetNumAtoms())) - set((neighbor.GetIdx() for neighbor in atom.GetNeighbors())) -
-            set(range(atom.GetIdx())) -  # Prevent duplicates by only bonding forward
-            {atom.GetIdx()} | set(np.arange(len(self.atom_additions)) + starting_mol.GetNumAtoms()))
+            set(range(starting_mol.GetNumAtoms()))
+            - set((neighbor.GetIdx() for neighbor in atom.GetNeighbors()))
+            - set(range(atom.GetIdx()))
+            - {atom.GetIdx()}  # Prevent duplicates by only bonding forward
+            | set(np.arange(len(self.atom_additions)) + starting_mol.GetNumAtoms())
+        )
 
-    def _get_valid_bonds(self, starting_mol: rdkit.Chem.Mol, atom1_idx: int, atom2_idx: int) -> range:
+    def _get_valid_bonds(
+        self, starting_mol: rdkit.Chem.Mol, atom1_idx: int, atom2_idx: int
+    ) -> range:
         """ Compare free valences of two atoms to calculate valid bonds """
         free_valence_1 = self._get_free_valence(starting_mol.GetAtomWithIdx(atom1_idx))
         if atom2_idx < starting_mol.GetNumAtoms():
-            free_valence_2 = self._get_free_valence(starting_mol.GetAtomWithIdx(int(atom2_idx)))
+            free_valence_2 = self._get_free_valence(
+                starting_mol.GetAtomWithIdx(int(atom2_idx))
+            )
         else:
-            free_valence_2 = pt.GetDefaultValence(self.atom_additions[atom2_idx - starting_mol.GetNumAtoms()])
+            free_valence_2 = pt.GetDefaultValence(
+                self.atom_additions[atom2_idx - starting_mol.GetNumAtoms()]
+            )
 
         return range(min(min(free_valence_1, free_valence_2), 3))
 
-    def _add_bond(self, starting_mol: rdkit.Chem.Mol, atom1_idx: int, atom2_idx: int, bond_type: int) -> Chem.RWMol:
+    def _add_bond(
+        self,
+        starting_mol: rdkit.Chem.Mol,
+        atom1_idx: int,
+        atom2_idx: int,
+        bond_type: int,
+    ) -> Chem.RWMol:
         """ Given two atoms and a bond type, execute the addition using rdkit """
         num_atom = starting_mol.GetNumAtoms()
         rw_mol = Chem.RWMol(starting_mol)
@@ -279,9 +305,8 @@ class StereoEnumerator(MoleculeTransformer):
 
             smiles_out = rdkit.Chem.MolToSmiles(out)
             stereo_count = count_stereocenters(smiles_out)
-            if stereo_count['atom_unassigned'] != 0:
-                print(f'{smiles_in}: {smiles_out}')
-            # if stereo_count['bond_unassigned'] == 0, f'{smiles_in}: {smiles_out}'
+            if stereo_count["atom_unassigned"] != 0:
+                logger.debug(f"unassigned stereo in output {smiles_in}: {smiles_out}")
 
             yield out
 
@@ -315,7 +340,9 @@ class GdbFilter(MoleculeFilter):
         try:
             return check_all_filters(molecule)
         except Exception as ex:
-            logger.warning(f"Issue with GDBFilter and molecule {Chem.MolToSmiles(molecule)}: {ex}")
+            logger.warning(
+                f"Issue with GDBFilter and molecule {Chem.MolToSmiles(molecule)}: {ex}"
+            )
             return False
 
 
@@ -327,18 +354,34 @@ def count_stereocenters(smiles: str) -> Dict:
     rdkit.Chem.FindPotentialStereoBonds(mol)
 
     stereocenters = rdkit.Chem.FindMolChiralCenters(mol, includeUnassigned=True)
-    stereobonds = [bond for bond in mol.GetBonds() if bond.GetStereo() is not
-                   rdkit.Chem.rdchem.BondStereo.STEREONONE]
+    stereobonds = [
+        bond
+        for bond in mol.GetBonds()
+        if bond.GetStereo() is not rdkit.Chem.rdchem.BondStereo.STEREONONE
+    ]
 
-    atom_assigned = len([center for center in stereocenters if center[1] != '?'])
-    atom_unassigned = len([center for center in stereocenters if center[1] == '?'])
+    atom_assigned = len([center for center in stereocenters if center[1] != "?"])
+    atom_unassigned = len([center for center in stereocenters if center[1] == "?"])
 
-    bond_assigned = len([bond for bond in stereobonds if bond.GetStereo() is not
-                         rdkit.Chem.rdchem.BondStereo.STEREOANY])
-    bond_unassigned = len([bond for bond in stereobonds if bond.GetStereo() is
-                           rdkit.Chem.rdchem.BondStereo.STEREOANY])
+    bond_assigned = len(
+        [
+            bond
+            for bond in stereobonds
+            if bond.GetStereo() is not rdkit.Chem.rdchem.BondStereo.STEREOANY
+        ]
+    )
+    bond_unassigned = len(
+        [
+            bond
+            for bond in stereobonds
+            if bond.GetStereo() is rdkit.Chem.rdchem.BondStereo.STEREOANY
+        ]
+    )
 
-    return {'atom_assigned': atom_assigned,
-            'atom_unassigned': atom_unassigned,
-            'bond_assigned': bond_assigned,
-            'bond_unassigned': bond_unassigned}
+    return {
+        "atom_assigned": atom_assigned,
+        "atom_unassigned": atom_unassigned,
+        "bond_assigned": bond_assigned,
+        "bond_unassigned": bond_unassigned,
+    }
+
