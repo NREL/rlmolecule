@@ -59,20 +59,22 @@ def read_input(inputs):
 
 ######################################
 
-def run_stability(inputs, phase):
+def run_stability(inputs, phase, out_file=None):
     """
     Run stability analysis
 
     Arguments:
     inputs -- list of strings containing chemical potentials and total energies
     phase -- the structure of interest for phase stability     
+    out_file -- write the results of the stability analysis
 
     """
     trigger_phase_found = 0
 
     A, b, els, stoich = read_input(inputs)
 
-    # f = open(filewrite,'w')
+    f = open(out_file,'w')
+    return_val = None
 
     h = Hrep(A, b)
 
@@ -104,21 +106,23 @@ def run_stability(inputs, phase):
         cmpd_dummy = [el2[i] + str(stoic2[i]) for i in range(len(el2))]
         cmpdnew = ''.join(cmpd_dummy)
 
-        # if cmpdnew == phasenew:
-        # print cmpd+'\n'
-        # f.write(cmpd+'\n')
+        if cmpdnew == phasenew:
+            # print cmpd+'\n'
+            f.write(cmpd+'\n')
 
         if len(borders) == 0:
             if cmpdnew == phasenew:
                 # print 'UNSTABLE\n'
-                # f.write('UNSTABLE\n')
-                return 'UNSTABLE'
+                f.write('UNSTABLE\n')
+                return_val = 'UNSTABLE' if return_val is None else return_val
+                #return 'UNSTABLE'
                 trigger_phase_found = 1
         else:
             if cmpdnew == phasenew:
-                return 'STABLE'
                 # print 'STABLE\n'
-                # f.write('STABLE\n')
+                f.write('STABLE\n')
+                return_val = 'STABLE' if return_val is None else return_val
+                #return 'STABLE'
                 trigger_phase_found = 1
 
             for border in borders:
@@ -134,9 +138,9 @@ def run_stability(inputs, phase):
                 header = header + 'dmu_%s ' % els[i]
             header = header + 'competing_phases\n'
 
-            # if cmpdnew == phasenew:
-            # print header
-            # f.write(header)
+            if cmpdnew == phasenew:
+                # print header
+                f.write(header)
 
             for i in range(len(borders)):
 
@@ -176,14 +180,15 @@ def run_stability(inputs, phase):
                 if cmpdnew == phasenew:
                     write_str = write_str[:-1] + '\n'
                     # print write_str
-                    # f.write(write_str)
+                    f.write(write_str)
 
-    # f.close()
+    f.close()
 
     if trigger_phase_found == 0:
         print('DID NOT FIND PHASE: Please include all elements in the specifying the formula e.g. Te1Zn1Cd0')
 
-    return
+    #return
+    return return_val
 
 
 ######################################
