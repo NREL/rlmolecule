@@ -47,11 +47,6 @@ def main(relaxed_energies_file,
 
     print(f"reading {comp_phases_file}")
     df_phases = pd.read_csv(comp_phases_file)
-    # TODO For some reason, Li1Sc1F4 is always getting the same decomposition energy
-    # try removing a couple compositions
-    #df_phases = df_phases[df_phases.reduced_composition != "F6Li3Sc1"]
-    #df_phases = df_phases[df_phases.reduced_composition != "F4Li1Y1"]
-    #df_phases = df_phases[df_phases.reduced_composition != "F1Li1"]
     print(df_phases.head(2))
 
     print(f"Computing decomposition energy for {len(strc_energies)} structures.")
@@ -60,8 +55,6 @@ def main(relaxed_energies_file,
         out.write(','.join(["decoration", "energy_per_atom", "decomp_energy"]) + '\n')
         strc_hull_nrgy = {}
         for strc_id, energy in tqdm(strc_energies.items()):
-            if 'Li1Sc1F4' not in strc_id:
-                continue
             #try:
             comp = strc_id.split('_')[0]
             cvex_hull_file = f"{cvex_hull_dir}/{strc_id}.txt" if write_stab_calcs else None
