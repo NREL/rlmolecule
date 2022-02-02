@@ -1,9 +1,20 @@
+""" Compute the decomposition energy of any structure based on its composition and (predicted) total energy
+"""
+# example call:
+# python scripts/compute_decomp_energy.py \
+#    --relaxed-energies-file /projects/rlmolecule/pgorai/mcts_validation/mctsvalidation_Mg80decor_1.csv \
+#    --out-file /projects/rlmolecule/jlaw/crystals/2022-01-25/mctsvalidation_Mg80decor_1.csv \
+#    --write-stab-calcs
+
+import argparse
+from pathlib import Path
 import os
 import sys
 from collections import defaultdict
 from tqdm import tqdm
 import gzip
 import json
+import re
 import numpy as np
 import sqlalchemy
 import pandas as pd
@@ -17,91 +28,79 @@ from scripts import nrelmatdbtaps
 from scripts import stability
 from scripts import ehull
 
-import matplotlib.pyplot as plt
-import seaborn as sns
-sns.set(
-    context='paper',
-    font_scale=8/8.8,
-#     context="talk",
-    style='ticks',
-    color_codes=True,
-    rc={'legend.frameon': False})
 
-plt.rcParams['svg.fonttype'] = 'none'
+def main(relaxed_energies_file,
+         out_file,
+         comp_phases_file,
+         write_stab_calcs=False,
+         ):
+    os.makedirs(os.path.dirname(out_file), exist_ok=True)
+    if write_stab_calcs:
+        cvex_hull_dir = str(out_file).replace('.csv', '-stab-analysis')
+        os.makedirs(cvex_hull_dir, exist_ok=True)
 
+    print(f"reading {relaxed_energies_file}")
+    df_rel = pd.read_csv(relaxed_energies_file)
+    print(df_rel.head(2))
+    strc_energies = dict(zip(df_rel['decoration'], df_rel['energy_per_atom']))
 
-def read_structures_file(structures_file):
-    print(f"reading {structures_file}")
-    with gzip.open(structures_file, 'r') as f:
-        structures_dict = json.loads(f.read().decode())
-    structures = {}
-    for key, structure_dict in structures_dict.items():
-        structures[key] = Structure.from_dict(structure_dict)
-    print(f"\t{len(structures)} structures read")
-    return structures
+    print(f"reading {comp_phases_file}")
+    df_phases = pd.read_csv(comp_phases_file)
+    # TODO For some reason, Li1Sc1F4 is always getting the same decomposition energy
+    # try removing a couple compositions
+    #df_phases = df_phases[df_phases.reduced_composition != "F6Li3Sc1"]
+    #df_phases = df_phases[df_phases.reduced_composition != "F4Li1Y1"]
+    #df_phases = df_phases[df_phases.reduced_composition != "F1Li1"]
+    print(df_phases.head(2))
 
-
-def convex_hull_stability(df_competing_phases, structure: Structure, predicted_energy):
-    strc = structure
-
-    # Add the new composition and the predicted energy to "df" if DFT energy already not present
-    comp = strc.composition.reduced_composition.alphabetical_formula.replace(' ','')
-
-    df = df_competing_phases
-    if comp not in df.reduced_composition.tolist():
-        df = df_competing_phases.append({'sortedformula': comp, 'energyperatom': predicted_energy, 'reduced_composition': comp}, ignore_index=True)
-
-    # Create a list of elements in the composition
-    ele = strc.composition.chemical_system.split('-')
-
-    # Create input file for stability analysis 
-    inputs = nrelmatdbtaps.create_input_DFT(ele, df, chempot='ferev2')
-
-    # Run stability function (args: input filename, composition)
-    stable_state = stability.run_stability(inputs, comp)
-    if stable_state == 'UNSTABLE':
-        stoic = ehull.frac_stoic(comp)
-        hull_nrg = ehull.unstable_nrg(stoic, comp, inputs)
-        #print("energy above hull of this UNSTABLE phase is", hull_nrg, "eV/atom")
-    elif stable_state == 'STABLE':
-        stoic = ehull.frac_stoic(comp)
-        hull_nrg = ehull.stable_nrg(stoic, comp, inputs)
-        #print("energy above hull of this STABLE phase is", hull_nrg, "eV/atom")
-    else:
-        print(f"ERR: unrecognized stable_state: '{stable_state}'.")
-        print(f"\tcomp: {comp}")
-        return None
-    return hull_nrg
+    print(f"Computing decomposition energy for {len(strc_energies)} structures.")
+    print(f"Writing to {out_file}")
+    with open(out_file, 'w') as out:
+        out.write(','.join(["decoration", "energy_per_atom", "decomp_energy"]))
+        strc_hull_nrgy = {}
+        for strc_id, energy in tqdm(strc_energies.items()):
+            #try:
+            comp = strc_id.split('_')[0]
+            #in_cvex_hull_file = f"{cvex_hull_dir}/{comp}.txt"
+            cvex_hull_file = None
+            if write_stab_calcs:
+                cvex_hull_file = f"{cvex_hull_dir}/{strc_id}.txt"
+            decomp_energy = ehull.convex_hull_stability(comp,
+                                                        energy,
+                                                        df_phases,
+                                                        out_file=cvex_hull_file)
+            print(strc_id, energy, decomp_energy)
+            #except:
+            #    print(f"Failed for {strc_id}. Skipping")
+            #    continue
+            strc_hull_nrgy[strc_id] = decomp_energy
+            out.write(f"{strc_id},{energy},{decomp_energy}\n")
 
 
-
-
-# load the relaxed structures and run the hull energy code
-relaxed_energies_file = "/projects/rlmolecule/jlaw/crystal-gnn-fork/inputs/structures/battery_relaxed_energies.csv"
-print(f"reading {relaxed_energies_file}")
-df_rel = pd.read_csv(relaxed_energies_file)
-print(df_rel.head(2))
-strc_energies = dict(zip(df_rel['id'], df_rel['energyperatom']))
-
-comp_phases_file = "/home/jlaw/projects/arpa-e/crystals/rlmolecule/examples/crystal_energy/inputs/competing_phases.csv"
-print(f"reading {comp_phases_file}")
-df_phases = pd.read_csv(comp_phases_file)
-print(df_phases.head(2))
-
-strcs_file = "/projects/rlmolecule/jlaw/crystal-gnn-fork/inputs/structures/battery_relaxed_structures.json.gz"
-rel_structures = utils.read_structures_file(strcs_file)
-
-out_file = "outputs/relaxed-hull-energies.tsv"
-print(f"Computing decomposition energy for {len(rel_structures)} structures.")
-print(f"Writing to {out_file}")
-with open(out_file, 'w') as out:
-    strc_hull_nrgy = {}
-    for strc_id, strc in tqdm(rel_structures.items()):
-        try:
-            hull_energy = convex_hull_stability(df_phases, strc, strc_energies[strc_id])
-        except:
-            print(f"Failed for {strc_id}. Skipping")
-            continue
-        strc_hull_nrgy[strc_id] = hull_energy
-        out.write(f"{strc_id}\t{strc_energies[strc_id]}\t{hull_energy}\n")
-
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description='Compute the decomposition energy of any structure based on '
+                    'its composition and (predicted) total energy')
+    parser.add_argument('--relaxed-energies-file', '-r',
+                        type=Path,
+                        required=True,
+                        help="CSV with at least two columns titled 'decoration' and 'energy_per_atom'")
+    parser.add_argument('--out-file', '-o',
+                        type=Path,
+                        required=True,
+                        help="Output CSV containing computed decomposition energy")
+    parser.add_argument('--comp-phases-file',
+                        type=Path,
+                        default='/projects/rlmolecule/jlaw/rlmolecule/examples/crystal_energy/inputs/competing_phases.csv',
+                        help="Competing phases file necessary for constructing the convex hull")
+    parser.add_argument('--write-stab-calcs',
+                        action='store_true',
+                        help="Write the stability analysis of each decoration "
+                        "to a dir with the same name as <out-file>, "
+                        " with '-stab-analysis' appended to it")
+    
+    args = parser.parse_args()
+    main(args.relaxed_energies_file,
+         args.out_file,
+         args.comp_phases_file,
+         args.write_stab_calcs)
