@@ -32,6 +32,7 @@ from scripts import ehull
 def main(relaxed_energies_file,
          out_file,
          comp_phases_file,
+         write_cvex_inputs=False,
          write_stab_calcs=False,
          ):
     os.makedirs(os.path.dirname(out_file), exist_ok=True)
@@ -56,18 +57,19 @@ def main(relaxed_energies_file,
     print(f"Computing decomposition energy for {len(strc_energies)} structures.")
     print(f"Writing to {out_file}")
     with open(out_file, 'w') as out:
-        out.write(','.join(["decoration", "energy_per_atom", "decomp_energy"]))
+        out.write(','.join(["decoration", "energy_per_atom", "decomp_energy"]) + '\n')
         strc_hull_nrgy = {}
         for strc_id, energy in tqdm(strc_energies.items()):
+            if 'Li1Sc1F4' not in strc_id:
+                continue
             #try:
             comp = strc_id.split('_')[0]
-            #in_cvex_hull_file = f"{cvex_hull_dir}/{comp}.txt"
-            cvex_hull_file = None
-            if write_stab_calcs:
-                cvex_hull_file = f"{cvex_hull_dir}/{strc_id}.txt"
+            cvex_hull_file = f"{cvex_hull_dir}/{strc_id}.txt" if write_stab_calcs else None
+            inputs_file = f"{cvex_hull_dir}/{strc_id}_inputs.txt" if write_cvex_inputs else None
             decomp_energy = ehull.convex_hull_stability(comp,
                                                         energy,
                                                         df_phases,
+                                                        inputs_file=inputs_file,
                                                         out_file=cvex_hull_file)
             print(strc_id, energy, decomp_energy)
             #except:
@@ -93,6 +95,11 @@ if __name__ == "__main__":
                         type=Path,
                         default='/projects/rlmolecule/jlaw/rlmolecule/examples/crystal_energy/inputs/competing_phases.csv',
                         help="Competing phases file necessary for constructing the convex hull")
+    parser.add_argument('--write-cvex-inputs',
+                        action='store_true',
+                        help="Write the inputs to the convex hull analysis of each composition "
+                        "to a dir with the same name as <out-file>, "
+                        " with '-stab-analysis' appended to it")
     parser.add_argument('--write-stab-calcs',
                         action='store_true',
                         help="Write the stability analysis of each decoration "
@@ -103,4 +110,5 @@ if __name__ == "__main__":
     main(args.relaxed_energies_file,
          args.out_file,
          args.comp_phases_file,
+         args.write_cvex_inputs,
          args.write_stab_calcs)

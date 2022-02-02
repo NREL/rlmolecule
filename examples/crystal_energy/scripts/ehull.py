@@ -62,14 +62,11 @@ def convex_hull_stability(comp,
     # Run stability function (args: input filename, composition)
     try:
         stable_state = stability.run_stability(inputs, comp, out_file=out_file)
+        stoic = frac_stoic(comp)
         if stable_state == 'UNSTABLE':
-            stoic = frac_stoic(comp)
-            hull_nrg = unstable_nrg(stoic, comp, inputs)
-            #print("energy above hull of this UNSTABLE phase is", hull_nrg, "eV/atom")
+            hull_nrg = stability_nrg(stoic, comp, inputs, stable=False)
         elif stable_state == 'STABLE':
-            stoic = frac_stoic(comp)
-            hull_nrg = stable_nrg(stoic, comp, inputs)
-            #print("energy above hull of this STABLE phase is", hull_nrg, "eV/atom")
+            hull_nrg = stability_nrg(stoic, comp, inputs, stable=True)
         else:
             print(f"ERR: unrecognized stable_state: '{stable_state}'.")
             print(f"\tcomp: {comp}")
@@ -94,39 +91,12 @@ def frac_stoic(sortedformula):
     return frac
 
 
-# ---------------------------------------------------------------------------------------------------
-# function to compute predcited energy above the hull for an UNSTABLE phase (args: fractional stoichiometry and phase)
-def unstable_nrg(stoich, phase, inputs):
-    stoich_dummy = deepcopy(stoich)
-
-    # A_,B,els_,stoich_ = stability.read_input('input_'+phase)  # read input file for stoichiometry list
-    A_, B, els_, stoich_ = stability.read_input(inputs)  # read input file for stoichiometry list
-
-    for j in range(len(A_)):  # loop over all stoichiometries in A_ to find the phase of interest
-        if list(A_[j]) == stoich:
-            index = j
-            # print('phase found')
-
-    original_nrg = B[index]  # save the original formation energy corresponding index found in the above loop
-
-    discrete_nrgs = np.arange(0.001, 6.002, 0.002)  # discretize formation energies
-    for jj in range(len(discrete_nrgs)):
-        discrete_nrgs[jj] = B[index] - discrete_nrgs[jj]
-
-    ehull = None
-    for ii in range(len(discrete_nrgs)):  # for each discretized formation energy, check if STABILITY is achieved
-        B[index] = discrete_nrgs[ii]
-        if stability.run_stability_hull(inputs, phase, B) == 'STABLE':
-            # print("STABILITY CRITERIA ACHIEVED")
-            ehull = original_nrg - discrete_nrgs[ii]
-            break
-
-    return ehull
-
-
 # ------------------------------------------------------------------------------------------------------------------
-# function to compute decomposition energy for a STABLE phase (args: fractional stoichiometry and phase)
-def stable_nrg(stoich, phase, inputs):
+# function to compute decomposition energy for a STABLE or UNSTABLE phase
+# (args: fractional stoichiometry and phase)
+# stable: if unstable, slowly decrease the discrete energies from above until stability is reached
+# if stable, slowly increase until unstability is reached
+def stability_nrg(stoich, phase, inputs, stable=False):
     stoich_dummy = deepcopy(stoich)
 
     A_, B, els_, stoich_ = stability.read_input(inputs)  # read input file for stoichiometry list
@@ -134,19 +104,25 @@ def stable_nrg(stoich, phase, inputs):
     for j in range(len(A_)):  # loop over all stoichiometries in A_ to find the phase of interest
         if list(A_[j]) == stoich:
             index = j
-            # print('phase found')
 
     original_nrg = B[index]  # save the original formation energy corresponding index found in the above loop
 
     discrete_nrgs = np.arange(0.001, 6.002, 0.002)  # discretize formation energies
     for jj in range(len(discrete_nrgs)):
-        discrete_nrgs[jj] = B[index] + discrete_nrgs[jj]
+        if stable:
+            discrete_nrgs[jj] = B[index] + discrete_nrgs[jj]
+        else:
+            discrete_nrgs[jj] = B[index] - discrete_nrgs[jj]
 
     Hd = None
-    for ii in range(len(discrete_nrgs)):  # for each discretized formation energy, check if UNSTABILITY is achieved
+    # for each discretized formation energy, check if the opposite stability is achieved
+    for ii in range(len(discrete_nrgs)):
         B[index] = discrete_nrgs[ii]
-        if stability.run_stability_hull(inputs, phase, B) == 'UNSTABLE':
-            # print("UNSTABILITY CRITERIA ACHIEVED")
+        new_stability = stability.run_stability_hull(inputs, phase, B) 
+        if stable and new_stability == 'UNSTABLE':
+            Hd = original_nrg - discrete_nrgs[ii]
+            break
+        elif not stable and new_stability == 'STABLE':
             Hd = original_nrg - discrete_nrgs[ii]
             break
 
