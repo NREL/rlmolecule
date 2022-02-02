@@ -22,17 +22,24 @@ def sort_comp(comp):
 
 # --------------------------------------------------------------------------------------------
 # function to compute the decomposition energy for a given composition 
-def convex_hull_stability(comp, predicted_energy, df_competing_phases):
+def convex_hull_stability(comp,
+                          predicted_energy,
+                          df_competing_phases,
+                          inputs_file=None,
+                          out_file=None):
     """
     :param comp: composition such as Li1Sc1F4
     :param predicted_energy: predicted eV/atom for the structure corresponding to this composition
     :param df_competing_phases: pandas dataframe of competing phases used to 
         construct the convex hull for the elements of the given composition
+    :param inputs_file: write the statistics necessary for the convex hull analysis to a file. 
+        Only contains composition-level information
+    :param out_file: write the results of the stability analysis.
     """
     comp, eles = sort_comp(comp)
 
     df_cp = df_competing_phases.copy()
-    # UPDATE: try including the composition if it is there
+    # UPDATE: remove the composition if it is there
     df_cp = df_cp[df_cp['reduced_composition'] != comp]
     df_cp = df_competing_phases.append({'sortedformula': comp,
                                         'energyperatom': predicted_energy,
@@ -45,9 +52,16 @@ def convex_hull_stability(comp, predicted_energy, df_competing_phases):
     if inputs is None:
         return
 
+    # The inputs used to be written to a file, and then read back in.
+    # I updated the functions to store the inputs in a list, and then parse that list 
+    if inputs_file is not None:
+        print(f"writing {inputs_file}")
+        with open(inputs_file, 'w') as out:
+            out.write('\n'.join(inputs) + '\n')
+
     # Run stability function (args: input filename, composition)
     try:
-        stable_state = stability.run_stability(inputs, comp)
+        stable_state = stability.run_stability(inputs, comp, out_file=out_file)
         if stable_state == 'UNSTABLE':
             stoic = frac_stoic(comp)
             hull_nrg = unstable_nrg(stoic, comp, inputs)

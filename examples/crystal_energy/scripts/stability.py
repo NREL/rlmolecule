@@ -66,14 +66,15 @@ def run_stability(inputs, phase, out_file=None):
     Arguments:
     inputs -- list of strings containing chemical potentials and total energies
     phase -- the structure of interest for phase stability     
-    out_file -- write the results of the stability analysis
+    out_file -- write the results of the stability analysis.
+        If structure is unstable, the output file will instead just have "UNSTABLE" in it
 
     """
     trigger_phase_found = 0
 
     A, b, els, stoich = read_input(inputs)
 
-    f = open(out_file,'w')
+    out_strs = []
     return_val = None
 
     h = Hrep(A, b)
@@ -107,20 +108,17 @@ def run_stability(inputs, phase, out_file=None):
         cmpdnew = ''.join(cmpd_dummy)
 
         if cmpdnew == phasenew:
-            # print cmpd+'\n'
-            f.write(cmpd+'\n')
+            out_strs.append(cmpd)
 
         if len(borders) == 0:
             if cmpdnew == phasenew:
-                # print 'UNSTABLE\n'
-                f.write('UNSTABLE\n')
+                out_strs.append('UNSTABLE')
                 return_val = 'UNSTABLE' if return_val is None else return_val
                 #return 'UNSTABLE'
                 trigger_phase_found = 1
         else:
             if cmpdnew == phasenew:
-                # print 'STABLE\n'
-                f.write('STABLE\n')
+                out_strs.append('STABLE')
                 return_val = 'STABLE' if return_val is None else return_val
                 #return 'STABLE'
                 trigger_phase_found = 1
@@ -136,11 +134,10 @@ def run_stability(inputs, phase, out_file=None):
 
             for i in range(len(els)):
                 header = header + 'dmu_%s ' % els[i]
-            header = header + 'competing_phases\n'
+            header = header + 'competing_phases'
 
             if cmpdnew == phasenew:
-                # print header
-                f.write(header)
+                out_strs.append(header)
 
             for i in range(len(borders)):
 
@@ -178,11 +175,13 @@ def run_stability(inputs, phase, out_file=None):
                             write_str = write_str + out_string + ','
 
                 if cmpdnew == phasenew:
-                    write_str = write_str[:-1] + '\n'
-                    # print write_str
-                    f.write(write_str)
+                    write_str = write_str[:-1]
+                    out_strs.append(write_str)
 
-    f.close()
+    if out_file is not None:
+        print(f"writing {out_file}")
+        with open(out_file, 'w') as out:
+            out.write('\n'.join(out_strs) + '\n')
 
     if trigger_phase_found == 0:
         print('DID NOT FIND PHASE: Please include all elements in the specifying the formula e.g. Te1Zn1Cd0')
