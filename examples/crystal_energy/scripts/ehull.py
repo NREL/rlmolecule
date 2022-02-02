@@ -41,10 +41,10 @@ def convex_hull_stability(comp,
     df_cp = df_competing_phases.copy()
     # UPDATE: remove the composition if it is there
     df_cp = df_cp[df_cp['reduced_composition'] != comp]
-    df_cp = df_competing_phases.append({'sortedformula': comp,
-                                        'energyperatom': predicted_energy,
-                                        'reduced_composition': comp},
-                                       ignore_index=True)
+    df_cp = df_cp.append({'sortedformula': comp,
+                          'energyperatom': predicted_energy,
+                          'reduced_composition': comp},
+                         ignore_index=True)
 
     # Create input file for stability analysis
     inputs = nrelmatdbtaps.create_input_DFT(eles, df_cp, chempot='ferev2')
