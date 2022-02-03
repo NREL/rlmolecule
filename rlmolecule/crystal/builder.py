@@ -8,8 +8,14 @@ from rlmolecule.crystal.crystal_state import CrystalState
 
 logger = logging.getLogger(__name__)
 dir_path = os.path.dirname(os.path.realpath(__file__))
-action_graph_file = os.path.join(dir_path, 'inputs', 'elements_to_compositions_lt50atoms.edgelist.gz')
-action_graph2_file = os.path.join(dir_path, 'inputs', 'comp_type_to_decorations_lt50atoms.edgelist.gz')
+# elements to compositions
+action_graph_file = os.path.join(dir_path,
+                                 'inputs',
+                                 'eles_to_comps_lt50atoms_lt100dist.edgelist.gz')
+# comp_type to decorations
+action_graph2_file = os.path.join(dir_path,
+                                  'inputs',
+                                  'comp_type_to_decors_lt50atoms_lt100dist.edgelist.gz')
 
 
 class CrystalBuilder:
