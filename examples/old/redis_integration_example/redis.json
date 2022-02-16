@@ -1,6 +1,0 @@
-{
-  "__info__": "Details needed to connect a Redis instance",
-  "host": "app-test",
-  "port": 6378,
-  "namespace": "rlmol"
-}

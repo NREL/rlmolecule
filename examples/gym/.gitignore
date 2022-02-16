@@ -1,5 +1,0 @@
-*.db
-*policy_checkpoints
-test*.py
-scratch
-
