@@ -1,5 +1,6 @@
 from tempfile import TemporaryDirectory
 
+import pytest
 import rdkit
 from rdkit.Chem.rdmolfiles import MolFromSmiles, MolToSmiles
 from rlmolecule.builder import MoleculeBuilder, count_stereocenters
@@ -104,6 +105,16 @@ def test_tautomers():
     assert "C=C(C)OC" in products
 
 
+def test_max_atoms():
+    builder = MoleculeBuilder(max_atoms=5)
+    start = rdkit.Chem.MolFromSmiles("CCCC")
+    assert len(builder(start)) >= 1
+
+    builder = MoleculeBuilder(max_atoms=4)
+    start = rdkit.Chem.MolFromSmiles("CCCC")
+    assert builder(start) == []
+
+
 def test_parallel_build():
     builder = MoleculeBuilder(
         max_atoms=15,
@@ -122,6 +133,7 @@ def test_parallel_build():
 
 
 # Just make sure this runs in finite time...
+@pytest.mark.skip
 def test_eagle_error2():
     builder = MoleculeBuilder(
         max_atoms=15,

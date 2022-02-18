@@ -119,6 +119,10 @@ class MoleculeBuilder:
             self.transformation_stack += parallel_stack
 
     def call(self, parent_molecule: rdkit.Chem.Mol) -> List[rdkit.Chem.Mol]:
+
+        if parent_molecule.GetNumAtoms() >= self.max_atoms:
+            return []
+
         inputs = [parent_molecule]
         for transformer in self.transformation_stack:
             inputs = transformer(inputs)
