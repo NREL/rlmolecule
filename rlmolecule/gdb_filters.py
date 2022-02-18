@@ -2,18 +2,19 @@ from collections import Counter
 
 import rdkit
 
-
 # These filters should return 'False' if it passes the criteria
 
 
 def h2(mol):
     """no atom shared by two small rings"""
-    return mol.HasSubstructMatch(rdkit.Chem.MolFromSmarts('[R2r3,r4]([R1r3,r4])([R1r3,r4])[R1r3,r4]'))
+    return mol.HasSubstructMatch(
+        rdkit.Chem.MolFromSmarts("[R2r3,r4]([R1r3,r4])([R1r3,r4])[R1r3,r4]")
+    )
 
 
 def h3(mol):
     """no bridgehead in 3 rings"""
-    return mol.HasSubstructMatch(rdkit.Chem.MolFromSmarts('[R3]'))
+    return mol.HasSubstructMatch(rdkit.Chem.MolFromSmarts("[R3]"))
 
 
 def h4(mol):
@@ -24,7 +25,7 @@ def h4(mol):
 
 def s1(mol):
     """no allenes"""
-    return mol.HasSubstructMatch(rdkit.Chem.MolFromSmarts('C=C=C'))
+    return mol.HasSubstructMatch(rdkit.Chem.MolFromSmarts("C=C=C"))
 
 
 def s2(mol):
@@ -40,8 +41,10 @@ def s2(mol):
 def s3(mol):
     """at most one sp2-center in 4-membered rings"""
     for atoms in filter(lambda x: len(x) == 4, mol.GetRingInfo().AtomRings()):
-        c_atoms = filter(lambda x: mol.GetAtomWithIdx(x).GetSymbol() == 'C', atoms)
-        atom_centers = Counter((mol.GetAtomWithIdx(atom).GetHybridization() for atom in c_atoms))
+        c_atoms = filter(lambda x: mol.GetAtomWithIdx(x).GetSymbol() == "C", atoms)
+        atom_centers = Counter(
+            (mol.GetAtomWithIdx(atom).GetHybridization() for atom in c_atoms)
+        )
         if atom_centers[rdkit.Chem.rdchem.HybridizationType.SP2] > 1:
             return True
 
@@ -50,14 +53,14 @@ def s3(mol):
 
 def s4(mol):
     """No triple bonds in ring"""
-    return mol.HasSubstructMatch(rdkit.Chem.MolFromSmarts('[R]#[R]'))
+    return mol.HasSubstructMatch(rdkit.Chem.MolFromSmarts("[R]#[R]"))
 
 
 def f2(mol):
     """at most one sp2-center in 4-membered rings"""
     for atoms in filter(lambda x: len(x) <= 4, mol.GetRingInfo().AtomRings()):
         atom_types = Counter((mol.GetAtomWithIdx(atom).GetSymbol() for atom in atoms))
-        if atom_types['O'] + atom_types['S'] + atom_types['N'] > 1:
+        if atom_types["O"] + atom_types["S"] + atom_types["N"] > 1:
             return True
 
     return False

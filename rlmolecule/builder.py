@@ -9,18 +9,18 @@ from typing import Dict, Iterable, List, Optional
 import numpy as np
 import rdkit
 from diskcache import Cache, FanoutCache
-from rdkit import Chem, RDConfig
+from rdkit import Chem, RDConfig, RDLogger
 from rdkit.Chem.EnumerateStereoisomers import (
     EnumerateStereoisomers,
     StereoEnumerationOptions,
 )
 from rdkit.Chem.MolStandardize import rdMolStandardize
 from rdkit.Chem.rdDistGeom import EmbedMolecule
-from rlmolecule.molecule.builder.gdb_filters import check_all_filters
+
+from rlmolecule.gdb_filters import check_all_filters
 
 sys.path.append(os.path.join(RDConfig.RDContribDir, "SA_Score"))
-# noinspection PyUnresolvedReferences
-import sascorer
+import sascorer  # type: ignore # pylint disable=unresolved-import # noqa=E402
 
 pt = Chem.GetPeriodicTable()
 tautomer_enumerator = rdMolStandardize.TautomerEnumerator()
@@ -30,7 +30,6 @@ tautomer_enumerator.SetMaxTransforms(50)
 bond_orders = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE, Chem.BondType.TRIPLE]
 logger = logging.getLogger(__name__)
 
-from rdkit import RDLogger
 
 RDLogger.DisableLog("rdApp.warning")
 
@@ -53,13 +52,17 @@ class MoleculeBuilder:
 
         :param max_atoms: Maximum number of heavy atoms
         :param min_atoms: minimum number of heavy atoms
-        :param atom_additions: potential atom types to consider. Defaults to ('C', 'H', 'O')
+        :param atom_additions: potential atom types to consider. Defaults to
+         ('C', 'H', 'O')
         :param stereoisomers: whether to consider stereoisomers different molecules
-        :param sa_score_threshold: If set, don't construct molecules greater than a given sa_score.
-        :param try_embedding: Try to get a 3D embedding of the molecule, and if this fails, remote it.
+        :param sa_score_threshold: If set, don't construct molecules greater than a
+        given sa_score.
+        :param try_embedding: Try to get a 3D embedding of the molecule, and if this
+         fails, remote it.
         """
 
-        # Not the most elegant solution, these are carried and referenced by MoleculeState, but are not used internally
+        # Not the most elegant solution, these are carried and referenced by
+        # MoleculeState, but are not used internally
         self.parallel = parallel
         self.max_atoms = max_atoms
         self.min_atoms = min_atoms
@@ -99,7 +102,8 @@ class MoleculeBuilder:
             parallel_stack += [StereoEnumerator()]
 
         if not parallel:
-            # If we're not running in parallel, reduce to unique molecules before embedding
+            # If we're not running in parallel, reduce to unique molecules before
+            # embedding
             parallel_stack += [UniqueMoleculeFilter()]
 
         if try_embedding:
@@ -202,8 +206,9 @@ class AddNewAtomsAndBonds(MoleculeTransformer):
 
     @staticmethod
     def sanitize(molecule: rdkit.Chem.Mol) -> Optional[rdkit.Chem.Mol]:
-        """Sanitize the output molecules, as the RWmols don't have the correct initialization of rings and valence.
-        Would be good to debug faster versions of this.
+        """Sanitize the output molecules, as the RWmols don't have the correct
+        initialization of rings and valence. Would be good to debug faster versions of
+        this.
 
         :param molecule: rdkit RWmol or variant
         :return: sanitized molecule, or None if failed
@@ -224,13 +229,13 @@ class AddNewAtomsAndBonds(MoleculeTransformer):
 
     @staticmethod
     def _get_free_valence(atom) -> int:
-        """ For a given atom, calculate the free valence remaining """
+        """For a given atom, calculate the free valence remaining"""
         return pt.GetDefaultValence(atom.GetSymbol()) - atom.GetExplicitValence()
 
     def _get_valid_partners(
         self, starting_mol: rdkit.Chem.Mol, atom: rdkit.Chem.Atom
     ) -> List[int]:
-        """ For a given atom, return other atoms it can be connected to """
+        """For a given atom, return other atoms it can be connected to"""
         return list(
             set(range(starting_mol.GetNumAtoms()))
             - set((neighbor.GetIdx() for neighbor in atom.GetNeighbors()))
@@ -242,7 +247,7 @@ class AddNewAtomsAndBonds(MoleculeTransformer):
     def _get_valid_bonds(
         self, starting_mol: rdkit.Chem.Mol, atom1_idx: int, atom2_idx: int
     ) -> range:
-        """ Compare free valences of two atoms to calculate valid bonds """
+        """Compare free valences of two atoms to calculate valid bonds"""
         free_valence_1 = self._get_free_valence(starting_mol.GetAtomWithIdx(atom1_idx))
         if atom2_idx < starting_mol.GetNumAtoms():
             free_valence_2 = self._get_free_valence(
@@ -262,7 +267,7 @@ class AddNewAtomsAndBonds(MoleculeTransformer):
         atom2_idx: int,
         bond_type: int,
     ) -> Chem.RWMol:
-        """ Given two atoms and a bond type, execute the addition using rdkit """
+        """Given two atoms and a bond type, execute the addition using rdkit"""
         num_atom = starting_mol.GetNumAtoms()
         rw_mol = Chem.RWMol(starting_mol)
 
@@ -347,8 +352,8 @@ class GdbFilter(MoleculeFilter):
 
 
 def count_stereocenters(smiles: str) -> Dict:
-    """ Returns a count of both assigned and unassigned stereocenters in the
-    given molecule. Mainly used for testing """
+    """Returns a count of both assigned and unassigned stereocenters in the
+    given molecule. Mainly used for testing"""
 
     mol = rdkit.Chem.MolFromSmiles(smiles)
     rdkit.Chem.FindPotentialStereoBonds(mol)
@@ -384,4 +389,3 @@ def count_stereocenters(smiles: str) -> Dict:
         "bond_assigned": bond_assigned,
         "bond_unassigned": bond_unassigned,
     }
-

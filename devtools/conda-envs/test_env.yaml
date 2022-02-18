@@ -3,16 +3,12 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python
+  - python=3.9
   - rdkit
   - pandas
   - tqdm
-  - gym
-  - sqlalchemy
   - pytest
   - pytest-cov
-  - lazy_import
-  - networkx
   - diskcache
   - pip
   - pip:
