@@ -56,6 +56,42 @@ fails in multiple ways "as is".
                          VolumeSize: 500
     ```
 
+4. Subnets problem (causes an intermittent problem with ssh connections timing out)
+    
+    For every sandbox account, NREL adds several public subnets (despite them not being allowed to have any public access) to enable Internet Gateway service, which allows  EC2 instances to access the broader internet (e.g. reach github.com, etc). The EC2 instances need to be given public IPs briefly from those subnet IP pools in order to make public internet requests. 
+    
+    To see public and private subnets, navigate to VPC within AWS console -> Subnets. Currently there are 2 public and 4 private subnets for this project. It was confirned that the subnet IDs will not change for the lifetime of the sandbox account for a given project.
+    
+    The problem with Ray clusters (with the default config) comes from the fact that if subnets aren't specified for head and worker nodes, those nodes will be assigned to subnets randomly, which causes this intermittent problem with ssh connectons (intermittent here means that different but identically launched instances will act diffently rather than the same instance acting differently over time).  
+    
+    The solution here is to pick *one of the private* subnet IDs and use it in the configuration file, as described below. This subnet ID should look like: `subnet-XY...Z`.
+    
+    This solution also requires specifying a particular security group to be used with the head and worker nodes. You can see available security groups under EC2 console -> Security Groups. After you have tried `ray up...`, you should have a security group with the name: `ray-autoscaler-default`. You should use the corresponding group ID, which looks like: `sg-XY..Z`.
+    
+    To specify both the subnet and the security group, edit the .yml file and add the entire `NetworkInterfaces:` block as demonstrated below. **Repeat** this under both `ray.head.default:` and `ray.worker.default:` (make sure that exactly the same subnet ID and security group ID are used in both cases).
+    
+    Note that subnet ID is spelled `SubnetId` here (exact capitalization is important).
+    
+    ```
+    available_node_types:
+      ray.head.default:
+        resources: {}
+            node_config:
+            InstanceType: g3.4xlarge
+            ImageId: ami-0a2363a9cff180a64 # Deep Learning AMI (Ubuntu) Version 30
+            # You can provision additional disk space with a conf as follows
+            BlockDeviceMappings:
+                - DeviceName: /dev/sda1
+                  Ebs:
+                      VolumeSize: 600
+            # Additional options in the boto docs.
+            NetworkInterfaces:
+                - DeviceIndex: 0 # Primary network interface.
+                  SubnetId: subnet-XY...Z # replace with appropriate subnet (i.e. one of _private_ subnets for the sandbox account being used)
+                  Groups:
+                    - sg-XY...Z # Replace with appropriate Security Group ID.
+    ```
+
 ## Multi-node training example using only CPU instances
 
 Here are the steps that demonstrated multi-node training of a PPO policy on 
