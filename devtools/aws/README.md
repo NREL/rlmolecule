@@ -91,6 +91,9 @@ fails in multiple ways "as is".
                   Groups:
                     - sg-XY...Z # Replace with appropriate Security Group ID.
     ```
+    
+    Example of such configuration was found at: 
+    https://github.com/ray-project/ray/blob/fcb044d47c9673ddcf97908097f4b38c02d54826/python/ray/autoscaler/aws/example-network-interfaces.yaml
 
 ## Multi-node training example using only CPU instances
 
@@ -153,12 +156,39 @@ as well).
 To _temporarily stop_ the ray cluster:
 
 ```
-    ray stop example-full.yaml
+ray stop example-full.yaml
 ```
 
 Note that this does not destroy any volumes that are attached -- these persist 
 in AWS (and we continue to be billed hourly for their use).
 
+## Enabling Tensorboard and connecting to it
+
+Similar to the examples above, you can run rllib example but this time you can specify the destination of the produced training results using `--local-dir LOCAL_DIR`, for instance:
+      
+```
+rllib train --run PPO --env CartPole-v0 --ray-num-cpus 6 --config '{"num_workers": 5}' --local-dir /app/rlmolecule/output
+```
+
+While this comamnd is running, run this command in a separate terminal window (from the directory with the `example-full.yml` file that was used to launch the cluster):
+
+```
+ray exec example-full.yaml 'tensorboard --logdir=/app/rlmolecule/output --port 6006 --bind_all' -p 6006 --no-config-cache
+```
+This will run Tensorboard on the head node at port 6006 and will also set up the necessary ssh port forwarding for that port, which will allow seeing the dashboard locally. Good ouput from this command should end with the line: `TensorBoard 2.7.0 at http://<hostname>:6006/ (Press CTRL+C to quit)`.
+
+Then, navigate to: `http://localhost:6006` in your browser. **Important:** it seems to work fine in Chrome, but in Safari, this will just show an empy page (it is possible that the browser settings do not allow JavaScript, and they need to be udapted).
+
+## Ray dashboard
+
+Ray comes with its own dashboard showing the available workers, used/available memory, CPUs and GPUs, etc. This dashboard runs at port 8265.
+
+To connect to it, run this command (from the directory with the `example-full.yml` file that was used to launch the cluster):
+```
+ray dashboard example-full.yaml --no-config-cache
+```
+
+Then, keep that command running in a terminal and open the dashboard at: `http://localhost:8265`. You can use Chrome or Safari (or, possibly, other browsers) to see this dashboard.
 
 ## Hints / Pitfalls 
 
