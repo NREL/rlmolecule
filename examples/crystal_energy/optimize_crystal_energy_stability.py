@@ -1,4 +1,4 @@
-""" Optimize the volume for the conducting ions
+""" Optimize crystals for thermodynamic stability
 """
 
 import argparse
@@ -29,7 +29,7 @@ from rlmolecule.sql.run_config import RunConfig
 # from rlmolecule.tree_search.reward import RankedRewardFactory
 from rlmolecule.tree_search.reward import RankedRewardFactory
 from rlmolecule.sql import Base, Session
-from rlmolecule.sql.tables import GameStore
+from rlmolecule.sql.tables import GameStore, RewardStore
 from scripts.nfp_extensions import RBFExpansion #, CifPreprocessor
 from scripts import nrelmatdbtaps
 from scripts import stability
@@ -100,7 +100,7 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         self.df_competing_phases = df_competing_phases
         # since the reward values can take positive or negative values, centered around 0,
         # set the default reward lower so that failed runs have a smaller reward
-        self.default_reward = np.float64(-10)
+        self.default_reward = np.float64(-5)
         # if a structure is not predicted to relax close to the original prototype, penalize the reward value
         self.dist_penalty = -2
         super(CrystalEnergyStabilityOptProblem, self).__init__(engine, **kwargs)
@@ -272,7 +272,8 @@ def run_games():
     # game = MCTS(
     #    create_problem(),
     # )
-    # i = 0
+    i = 0
+    states_seen = set()
     while True:
         path, reward = game.run(
             num_mcts_samples=config.get('num_mcts_samples', 5),
@@ -280,15 +281,43 @@ def run_games():
         )
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1]}')
 
-        # i += 1
-        # if i % 10 == 0:
-        #    print(f"decoration_time: {decoration_time}, model_time: {model_time}")
-        #     df = pd.DataFrame(volume_stats).T
-        #     df.columns = ['conducting_ion_vol', 'total_vol', 'fraction', 'comp_type']
-        #     df = df.sort_index()
-        #     print(f"writing current stats to {out_file}")
-        #     df.to_csv(out_file, sep='\t')
-        # write_structures_file(decorations_file, decorations)
+        if i % 2 == 0:
+            set_states_seen(game, states_seen)
+        i += 1
+
+
+def set_states_seen(game, states_seen):
+    start = time.process_time()
+    # UPDATE 2022-03-01:
+    # load the crystal states with a computed reward,
+    # and add them to the states_to_ignore so they will not be
+    # available as part of the search space anymore
+    df = pd.read_sql(session.query(RewardStore) \
+                        .filter_by(run_id=run_config.run_id) \
+                        .statement, session.bind)
+    # only keep the terminal states, and those with a reward value above a cutoff
+    # Since states with low reward values won't be repeatedly selected,
+    # the reward cutoff should be able to be relatively high e.g., > 0
+    reward_cutoff = -1
+    df['state'] = df['data'].apply(lambda x: x['state_repr'])
+    df['terminal'] = df['data'].apply(lambda x: x['terminal'])
+    states = set(df[(df['terminal'] is True) & (df['reward'] > reward_cutoff)]['state'].values)
+    for state in states - states_seen:
+        comp = state.split('|')[0]
+        decoration_node = '|'.join(state.split('|')[1:])
+        game.state_builder.states_to_ignore[comp].add(decoration_node)
+
+    states_seen |= states
+    print(f"{len(states - states_seen)} new states since last checked. "
+          f"len(states_seen): {len(states_seen)}")
+    # check to make sure there are no dead-ends e.g., compositions with no prototypes available
+    game.state_builder.remove_dead_ends()
+    print(f"{len(game.state_builder.actions_to_ignore)}, "
+          f"{len(game.state_builder.actions_to_ignore_G2)}, "
+          f"{len(game.state_builder.states_to_ignore)} "
+          "actions to ignore in G, G2, and states, respectively")
+    print(f"\t took {time.process_time() - start:0.2f} sec")
+    return states_seen
 
 
 def train_model():
@@ -317,7 +346,6 @@ def iter_recent_games():
 
 
 def monitor():
-    from rlmolecule.sql.tables import RewardStore
     problem = create_problem()
 
     while True:
@@ -332,14 +360,14 @@ def monitor():
 
         if best_reward:
             print(f"Best Reward: {best_reward.reward:.3f} for molecule "
-                  f"{best_reward.data['smiles']} with {num_games} games played")
+                  f"{best_reward.data['state']} with {num_games} games played")
 
         time.sleep(5)
 
 
 # load the icsd prototype structures
 # https://pymatgen.org/usage.html#side-note-as-dict-from-dict
-icsd_prototypes_file = "../../rlmolecule/crystal/inputs/icsd_prototypes_lt50atoms.json.gz"
+icsd_prototypes_file = "../../rlmolecule/crystal/inputs/icsd_prototypes_lt50atoms_lt100dist.json.gz"
 structures = read_structures_file(icsd_prototypes_file)
 
 if __name__ == "__main__":
@@ -374,10 +402,6 @@ if __name__ == "__main__":
     preprocessor_dist = PymatgenPreprocessor()
     preprocessor_dist.from_json('inputs/models/cos_dist/model_b64_dist_class_0_1/preprocessor.json')
 
-    # keep track of how much time each part takes
-    # model_time = 0
-    # decoration_time = 0
-
     energy_model = tf.keras.models.load_model(args.energy_model,
                                               custom_objects={**custom_objects,
                                                               **{'RBFExpansion': RBFExpansion}})
@@ -401,22 +425,3 @@ if __name__ == "__main__":
         run_games()
     else:
         monitor()
-        # jobs = [multiprocessing.Process(target=monitor)]
-        # jobs[0].start()
-        # time.sleep(1)
-        #
-        # for i in range(5):
-        #     jobs += [multiprocessing.Process(target=run_games)]
-        #
-        # jobs += [multiprocessing.Process(target=train_model)]
-        #
-        # for job in jobs[1:]:
-        #     job.start()
-        #
-        # start = time.time()
-        # while time.time() - start <= run_config.problem_config.get('timeout', 300):
-        #     time.sleep(1)
-        #
-        # for j in jobs:
-        #     j.terminate()
-        #     j.join()
