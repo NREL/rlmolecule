@@ -94,6 +94,8 @@ fails in multiple ways "as is".
     
     Example of such configuration was found at: 
     https://github.com/ray-project/ray/blob/fcb044d47c9673ddcf97908097f4b38c02d54826/python/ray/autoscaler/aws/example-network-interfaces.yaml
+    
+    Note that the example configuration available at the link above includes the line `InterfaceType: efa # Use EFA for higher throughput and lower latency` (under under `NetworkInterfaces:` under `ray.worker.efa:`). It does **not** work with the current configuration (under `ray.worker.default:`); maybe it is not available for the selected instance type in the selected region (for more info, see a comment about EFA in the linked example).
 
 ## Multi-node training example using only CPU instances
 
