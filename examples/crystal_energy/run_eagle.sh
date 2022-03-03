@@ -27,8 +27,8 @@ echo """#!/bin/bash
 #SBATCH --account=rlmolecule
 #SBATCH --time=4:00:00  
 #SBATCH --job-name=$run_id
-##SBATCH --mail-type=END
-##SBATCH --mail-user=$USER@nrel.gov
+#SBATCH --mail-type=END
+#SBATCH --mail-user=$USER@nrel.gov
 #SBATCH --output=$WORKING_DIR/%j-sbatch.out
 # --- Policy Trainer ---
 #SBATCH --nodes=1
@@ -86,8 +86,8 @@ srun --pack-group=0 \
 
 # there are 36 cores on each eagle node.
 srun --pack-group=1 \
-     --ntasks-per-node=18 \
-     --cpus-per-task=2 \
+     --ntasks-per-node=36 \
+     --cpus-per-task=1 \
      --job-name="az-rollout" \
      --output=$WORKING_DIR/%j-mcts.out \
      "\$START_ROLLOUT_SCRIPT"
