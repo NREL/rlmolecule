@@ -5,11 +5,6 @@ from rlmolecule.molecule_state import MoleculeState
 
 
 @pytest.fixture
-def builder() -> MoleculeBuilder:
-    return MoleculeBuilder(max_atoms=5)
-
-
-@pytest.fixture
 def propane(builder: MoleculeBuilder) -> MoleculeState:
     return MoleculeState(
         rdkit.Chem.MolFromSmiles("CCC"), builder=builder, force_terminal=False
@@ -17,7 +12,7 @@ def propane(builder: MoleculeBuilder) -> MoleculeState:
 
 
 def test_root(propane: MoleculeState):
-    root = propane.get_root()
+    root = propane.root
     assert root.smiles == "C"
 
 
@@ -27,3 +22,7 @@ def test_next_actions(propane: MoleculeState):
     assert len(butanes) == 1
     assert butanes[0].forced_terminal is False
     assert next_actions[-1].forced_terminal is True
+
+
+def test_observation_space(propane: MoleculeState):
+    assert propane.observation_space.contains(propane.observation)

@@ -10,7 +10,9 @@ dependencies:
   - pytest
   - pytest-cov
   - diskcache
+  - gym
   - pip
   - pip:
+      - ray[rllib]
       - tensorflow
       - nfp

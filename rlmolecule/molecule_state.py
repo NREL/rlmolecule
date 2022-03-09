@@ -1,18 +1,20 @@
 import logging
 import random
-from typing import Dict, Optional, Sequence, Type
+from typing import Dict, Optional, Sequence, Type, Union
 
 import gym
+import nfp
 import numpy as np
-from graphenv.node import N, Node
+from graphenv.vertex import N, Vertex
 from rdkit.Chem import Mol, MolFromSmiles, MolToSmiles
 
 from rlmolecule.builder import MoleculeBuilder
+from rlmolecule.policy.preprocessor import load_preprocessor
 
 logger = logging.getLogger(__name__)
 
 
-class MoleculeState(Node):
+class MoleculeState(Vertex):
     """
     A state implementation which uses simple transformations (such as adding a bond) to
     define a graph of molecules that can be navigated.
@@ -28,6 +30,8 @@ class MoleculeState(Node):
         force_terminal: bool = False,
         smiles: Optional[str] = None,
         max_num_actions: int = 20,
+        max_num_bonds: Optional[int] = None,
+        preprocessor: Union[Type[nfp.preprocessing.MolPreprocessor], str, None] = None,
     ) -> None:
         """
         :param molecule: an RDKit molecule specifying the current state
@@ -39,15 +43,76 @@ class MoleculeState(Node):
         """
         super().__init__(max_num_actions)
         self._builder: any = builder
+        self.max_num_bonds = (
+            builder.max_atoms * 4 if max_num_bonds is None else max_num_bonds
+        )
         self._molecule: Mol = molecule
         self._smiles: str = MolToSmiles(self._molecule) if smiles is None else smiles
         self._forced_terminal: bool = force_terminal
 
-    def __repr__(self) -> str:
-        """
-        delegates to the SMILES string
-        """
-        return f"{self.smiles}{' (t)' if self._forced_terminal else ''}"
+        if preprocessor is None or isinstance(preprocessor, str):
+            self.preprocessor = load_preprocessor(preprocessor)
+        else:
+            self.preprocessor = preprocessor
+
+    @property
+    def root(self) -> N:
+        return self.new(MolFromSmiles("C"))
+
+    def _get_next_actions(self) -> Sequence[N]:
+        if self.forced_terminal:
+            return []
+
+        next_molecules = list(self.builder(self.molecule))
+        if len(next_molecules) > self.max_num_actions - 1:
+            logger.warning(
+                f"{self} has {len(next_molecules) + 1} next actions when the "
+                f"maximum is {self.max_num_actions}"
+            )
+            next_molecules = random.sample(next_molecules, self.max_num_actions)
+
+        next_actions = [self.new(molecule) for molecule in next_molecules]
+        next_actions.append(
+            self.new(self.molecule, force_terminal=True, smiles=self.smiles)
+        )
+        return next_actions
+
+    def _make_observation(self) -> Dict[str, np.ndarray]:
+        return self.preprocessor(
+            self.molecule,
+            max_num_nodes=self.builder.max_atoms,
+            max_num_edges=self.max_num_bonds,
+        )
+
+    @property
+    def observation_space(self) -> gym.spaces.Dict:
+        return gym.spaces.Dict(
+            {
+                "atom": gym.spaces.Box(
+                    low=0,
+                    high=self.preprocessor.atom_classes,
+                    shape=(self.builder.max_atoms,),
+                    dtype=int,
+                ),
+                "bond": gym.spaces.Box(
+                    low=0,
+                    high=self.preprocessor.bond_classes,
+                    shape=(self.max_num_bonds,),
+                    dtype=int,
+                ),
+                "connectivity": gym.spaces.Box(
+                    low=0,
+                    high=self.builder.max_atoms,
+                    shape=(self.max_num_bonds, 2),
+                    dtype=int,
+                ),
+            }
+        )
+
+    def new(
+        self, molecule: Mol, force_terminal: bool = False, smiles: Optional[str] = None
+    ) -> N:
+        return self.__class__(molecule, self.builder, force_terminal, smiles)
 
     @property
     def forced_terminal(self) -> bool:
@@ -69,39 +134,8 @@ class MoleculeState(Node):
     def num_atoms(self) -> int:
         return self.molecule.GetNumAtoms()
 
-    def get_next_actions(self) -> Sequence[N]:
-        if self.forced_terminal:
-            return []
-
-        next_molecules = list(self.builder(self.molecule))
-        if len(next_molecules) > self.max_num_actions - 1:
-            logger.warning(
-                f"{self} has {len(next_molecules) + 1} next actions when the "
-                f"maximum is {self.max_num_actions}"
-            )
-            next_molecules = random.sample(next_molecules, self.max_num_actions)
-
-        next_actions = [self.new(molecule) for molecule in next_molecules]
-        next_actions.append(
-            self.new(self.molecule, force_terminal=True, smiles=self.smiles)
-        )
-        return next_actions
-
-    def make_observation(self) -> Dict[str, np.ndarray]:
-        pass
-
-    @property
-    def observation_space(self) -> gym.spaces.Dict:
-        pass
-
-    def get_root(self) -> N:
-        return self.new(MolFromSmiles("C"))
-
-    def new(
-        self, molecule: Mol, force_terminal: bool = False, smiles: Optional[str] = None
-    ) -> N:
-        return MoleculeState(molecule, self.builder, force_terminal, smiles)
-
-    # @abstractmethod
-    # def reward(self) -> float:
-    #     pass
+    def __repr__(self) -> str:
+        """
+        delegates to the SMILES string
+        """
+        return f"{self.smiles}{' (t)' if self._forced_terminal else ''}"
