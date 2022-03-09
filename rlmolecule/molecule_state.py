@@ -41,7 +41,7 @@ class MoleculeState(Vertex):
         `molecule`.
         :param max_num_actions: The maximum number of next states to consider.
         """
-        super().__init__(max_num_actions)
+        super().__init__()
         self._builder: any = builder
         self.max_num_bonds = (
             builder.max_atoms * 4 if max_num_bonds is None else max_num_bonds
@@ -49,6 +49,7 @@ class MoleculeState(Vertex):
         self._molecule: Mol = molecule
         self._smiles: str = MolToSmiles(self._molecule) if smiles is None else smiles
         self._forced_terminal: bool = force_terminal
+        self.max_num_actions = max_num_actions
 
         if preprocessor is None or isinstance(preprocessor, str):
             self.preprocessor = load_preprocessor(preprocessor)
@@ -64,9 +65,9 @@ class MoleculeState(Vertex):
             return []
 
         next_molecules = list(self.builder(self.molecule))
-        if len(next_molecules) > self.max_num_actions - 1:
+        if len(next_molecules) > self.max_num_actions:
             logger.warning(
-                f"{self} has {len(next_molecules) + 1} next actions when the "
+                f"{self} has {len(next_molecules)} next actions when the "
                 f"maximum is {self.max_num_actions}"
             )
             next_molecules = random.sample(next_molecules, self.max_num_actions)

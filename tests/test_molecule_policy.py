@@ -12,7 +12,7 @@ def single_layer_model(qed_root: MoleculeState):
 
 @pytest.fixture
 def molecule_env(qed_root: MoleculeState):
-    return GraphEnv(qed_root)
+    return GraphEnv(qed_root, max_num_actions=qed_root.max_num_actions)
 
 
 def test_policy_model(molecule_env, single_layer_model):
