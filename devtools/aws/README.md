@@ -97,6 +97,15 @@ fails in multiple ways "as is".
     
     Note that the example configuration available at the link above includes the line `InterfaceType: efa # Use EFA for higher throughput and lower latency` (under under `NetworkInterfaces:` under `ray.worker.efa:`). It does **not** work with the current configuration (under `ray.worker.default:`); maybe it is not available for the selected instance type in the selected region (for more info, see a comment about EFA in the linked example).
 
+5. Docker image
+
+    As of 03/19/22, this is a recent working option (specified under `docker:`)
+    
+    ```
+    image: "rayproject/ray-ml:1.11.0-py36-gpu" 
+    ```
+    More about Ray version 1.11.0: [https://github.com/ray-project/ray/releases/tag/ray-1.11.0](https://github.com/ray-project/ray/releases/tag/ray-1.11.0). An older version of this image used to cause consistent issues with the head node not being able to ssh into the worker nodes in AWS. 
+
 ## Multi-node training example using only CPU instances
 
 Here are the steps that demonstrated multi-node training of a PPO policy on 
