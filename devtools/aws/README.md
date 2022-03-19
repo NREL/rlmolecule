@@ -152,27 +152,6 @@ rllib train --env CartPole-v0 --run PPO --ray-num-gpu 1 --ray-num-cpu 6 --config
 
 Here we are using 1 head GPU instance and 2 worker CPU instances, with a total of 1 GPU and 6 CPUs.
 
-
-## Tearing down the cluster
-
-To destroy the cluster and attached volumes:
-
-```
-ray down example-full.yaml
-```
-
-This command releases all resources used by the job (and billing should stop, 
-as well).
-
-To _temporarily stop_ the ray cluster:
-
-```
-ray stop example-full.yaml
-```
-
-Note that this does not destroy any volumes that are attached -- these persist 
-in AWS (and we continue to be billed hourly for their use).
-
 ## Enabling Tensorboard and connecting to it
 
 Similar to the examples above, you can run rllib example but this time you can specify the destination of the produced training results using `--local-dir LOCAL_DIR`, for instance:
@@ -200,6 +179,40 @@ ray dashboard example-full.yaml --no-config-cache
 ```
 
 Then, keep that command running in a terminal and open the dashboard at: `http://localhost:8265`. You can use Chrome or Safari (or, possibly, other browsers) to see this dashboard.
+
+
+## Monitoring the logs
+
+After the cluster is launched:
+
+```
+ray attach example-full.yaml --no-config-cache       # on local machine
+tail -f /tmp/ray/session_latest/logs/monitor.out     # on head node
+```
+
+This helped troubleshoot issues with the worker nodes not being accessible via ssh. Directory `/tmp/ray/session_latest/logs/` has other log files with more info about Ray operation.
+
+
+## Tearing down the cluster
+
+To destroy the cluster and attached volumes:
+
+```
+ray down example-full.yaml
+```
+
+This command releases all resources used by the job (and billing should stop, 
+as well).
+
+To _temporarily stop_ the ray cluster:
+
+```
+ray stop example-full.yaml
+```
+
+**Note that this does not destroy any volumes that are attached -- these persist 
+in AWS (and we continue to be billed hourly for their use).**
+
 
 ## Hints / Pitfalls 
 
