@@ -15,7 +15,8 @@ upscaling_speed: 1.0
 # and opens all the necessary ports to support the Ray cluster.
 # Empty string means disabled.
 docker:
-    image: "public.ecr.aws/c9w8g6o2/rlmolecule:latest-gpu"
+    # image: "public.ecr.aws/c9w8g6o2/rlmolecule:latest-gpu" # This is an older image in ECR, going back to Dec 5, 2021
+    image: "rayproject/ray-ml:1.11.0-py36-gpu" # Use recent fixed version
     container_name: "rlmol_container"
     #image: "rayproject/ray-ml:latest-gpu" # You can change this to latest-cpu if you don't need GPU support and want a faster startup
     # image: rayproject/ray:latest-gpu   # use this one if you don't need ML dependencies, it's faster to pull
