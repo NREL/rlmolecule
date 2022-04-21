@@ -17,7 +17,7 @@ def test_root(propane: MoleculeState):
 
 
 def test_next_actions(propane: MoleculeState):
-    next_actions = propane.next_actions
+    next_actions = propane.children
     butanes = list(filter(lambda x: x.smiles == "CCCC", next_actions))
     assert len(butanes) == 1
     assert butanes[0].forced_terminal is False

@@ -3,11 +3,13 @@ from typing import Dict, Optional, Tuple
 from graphenv import tf
 from graphenv.graph_model import GraphModel
 from nfp.preprocessing import MolPreprocessor
+from ray.rllib.agents.dqn.distributional_q_tf_model import DistributionalQTFModel
+from ray.rllib.models.tf.tf_modelv2 import TFModelV2
 
 from rlmolecule.policy.model import policy_model
 
 
-class MoleculeModel(GraphModel):
+class BaseMoleculeModel(GraphModel):
     def __init__(
         self,
         *args,
@@ -27,3 +29,11 @@ class MoleculeModel(GraphModel):
         self, input_dict: Dict[str, tf.Tensor]
     ) -> Tuple[tf.Tensor, tf.Tensor]:
         return self.base_model(input_dict)
+
+
+class MoleculeQModel(BaseMoleculeModel, DistributionalQTFModel):
+    pass
+
+
+class MoleculeModel(BaseMoleculeModel, TFModelV2):
+    pass

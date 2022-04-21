@@ -1,18 +1,13 @@
-name: test
+name: rlmolecule
 channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.9
+  - python<=3.9
   - rdkit
-  - pandas
-  - tqdm
   - pytest
-  - pytest-cov
   - diskcache
-  - gym
   - pip
   - pip:
-      - ray[rllib]
-      - tensorflow
       - nfp
+      - graphenv

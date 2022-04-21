@@ -5,7 +5,7 @@ from typing import Dict, Optional, Sequence, Type, Union
 import gym
 import nfp
 import numpy as np
-from graphenv.vertex import N, Vertex
+from graphenv.vertex import V, Vertex
 from rdkit.Chem import Mol, MolFromSmiles, MolToSmiles
 
 from rlmolecule.builder import MoleculeBuilder
@@ -57,10 +57,10 @@ class MoleculeState(Vertex):
             self.preprocessor = preprocessor
 
     @property
-    def root(self) -> N:
+    def root(self) -> V:
         return self.new(MolFromSmiles("C"))
 
-    def _get_next_actions(self) -> Sequence[N]:
+    def _get_children(self) -> Sequence[V]:
         if self.forced_terminal:
             return []
 
@@ -111,8 +111,11 @@ class MoleculeState(Vertex):
         )
 
     def new(
-        self, molecule: Mol, force_terminal: bool = False, smiles: Optional[str] = None
-    ) -> N:
+        self,
+        molecule: Mol,
+        force_terminal: bool = False,
+        smiles: Optional[str] = None,
+    ) -> V:
         return self.__class__(molecule, self.builder, force_terminal, smiles)
 
     @property

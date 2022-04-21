@@ -24,14 +24,15 @@ class QEDState(MoleculeState):
 class MoleculeEnv(GraphEnv):
     def __init__(self, config: EnvContext, *args, **kwargs) -> None:
         mol = rdkit.Chem.MolFromSmiles(config["initial_smiles"])
-        builder = MoleculeBuilder(**config["builder"])
-        state = config["molecule_state"](
+        builder = MoleculeBuilder(**config.pop("builder", {}))
+        state = config.pop("molecule_state")(
             mol,
             builder=builder,
             smiles=config["initial_smiles"],
-            max_num_actions=config["max_num_actions"],
+            max_num_actions=config["max_num_children"],
         )
-        super().__init__(state, config["max_num_actions"], *args, **kwargs)
+        config["state"] = state
+        super().__init__(config, *args, **kwargs)
 
 
 @pytest.fixture
@@ -68,7 +69,7 @@ def test_ppo(ray_init, ppo_config):
             "molecule_state": QEDState,
             "initial_smiles": "C",
             "builder": {"max_atoms": 5},
-            "max_num_actions": 20,
+            "max_num_children": 20,
         },
         "model": {
             "custom_model": "MoleculeModel",
