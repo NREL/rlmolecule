@@ -19,7 +19,10 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
 from pymatgen.core import Structure
+from pymatgen.analysis.structure_prediction.volume_predictor import DLSVolumePredictor
+from collections import Counter
 from nfp import custom_objects
+from nfp.layers import RBFExpansion
 from nfp.preprocessing.crystal_preprocessor import PymatgenPreprocessor
 
 from rlmolecule.crystal.builder import CrystalBuilder
@@ -30,7 +33,6 @@ from rlmolecule.sql.run_config import RunConfig
 from rlmolecule.tree_search.reward import RankedRewardFactory
 from rlmolecule.sql import Base, Session
 from rlmolecule.sql.tables import GameStore, RewardStore
-from scripts.nfp_extensions import RBFExpansion #, CifPreprocessor
 from scripts import nrelmatdbtaps
 from scripts import stability
 from scripts import ehull
@@ -80,8 +82,8 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
     def __init__(self,
                  engine: 'sqlalchemy.engine.Engine',
                  energy_model: 'tf.keras.Model',
-                 dist_model: 'tf.keras.Model',
                  df_competing_phases: 'pd.DataFrame',
+                 vol_pred_site_bias: 'pd.Series' = None,
                  # initial_state: str,
                  **kwargs) -> None:
         """ A class to estimate the suitability of a crystal structure as a solid state battery
@@ -89,20 +91,16 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         :param engine: A sqlalchemy engine pointing to a suitable database backend
         :param builder: A CrystalBuilder class to handle crystal construction based on ICSD structures
         :param energy_model: A tensorflow model to estimate the total energy of a structure
-        :param dist_model: A tensorflow model to predict a binary value if the structure would 
-            relax close (1) or far (0) from the starting prototype. 
-            If close, the predicted energy should be more accurate.
         """
         # self.initial_state = initial_state
         self.engine = engine
         self.energy_model = energy_model
-        self.dist_model = dist_model
         self.df_competing_phases = df_competing_phases
+        self.dls_vol_predictor = DLSVolumePredictor()
+        self.vol_pred_site_bias = vol_pred_site_bias
         # since the reward values can take positive or negative values, centered around 0,
         # set the default reward lower so that failed runs have a smaller reward
         self.default_reward = np.float64(-5)
-        # if a structure is not predicted to relax close to the original prototype, penalize the reward value
-        self.dist_penalty = -2
         super(CrystalEnergyStabilityOptProblem, self).__init__(engine, **kwargs)
 
     def get_reward(self, state: CrystalState) -> (float, {}):
@@ -125,6 +123,11 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
             print(f"AssertionError: {e}")
             return self.default_reward, {'terminal': True, 'state_repr': repr(state)}
 
+        if self.vol_pred_site_bias is not None:
+            # predict the volume of the decorated structure before
+            # passing it to the GNN. Use a linear model + pymatgen's DLS predictor
+            decorated_structure = self.scale_by_pred_vol(decorated_structure)
+
         # Predict the total energy and stability of this decorated structure
         predicted_energy, hull_energy = self.calc_energy_stability(decorated_structure)
         if predicted_energy is None:
@@ -141,21 +144,29 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
             # failed calculation here, and failing to decorate the structure 
             reward = self.default_reward + 1
 
-        dist_pred = self.calc_cos_dist(decorated_structure)
-        # TODO find the correct decision boundary to use. Should take the sigmoid, then apply the cutoff
-        if dist_pred < 0:
-            reward += self.dist_penalty
-
         # print(str(state), predicted_energy)
         info = {
             'terminal': True,
             'predicted_energy': predicted_energy.astype(float),
             'hull_energy': hull_energy,
             'num_sites': len(decorated_structure.sites),
-            'dist_pred': dist_pred.astype(float),
             'state_repr': repr(state),
         }
         return reward, info
+
+    def scale_by_pred_vol(self, structure):
+        # first predict the volume using the average volume per element (from ICSD)
+        site_counts = pd.Series(Counter(
+            str(site.specie) for site in structure.sites)).fillna(0)
+        curr_site_bias = self.vol_pred_site_bias[
+            self.vol_pred_site_bias.index.isin(site_counts.index)]
+        linear_pred = site_counts @ curr_site_bias
+        structure.scale_lattice(linear_pred)
+
+        # then apply Pymatgen's DLS predictor
+        pred_volume = self.dls_vol_predictor.predict(structure)
+        structure.scale_lattice(pred_volume)
+        return structure
 
     def get_model_inputs(self, structure, preprocessor) -> {}:
         inputs = preprocessor(structure, train=False)
@@ -163,11 +174,12 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         min_distance = inputs["distance"].min()
         if np.isclose(min_distance, 0):
             # if some atoms are on top of each other, then this normalization fails
-            # TODO remove those problematic prototype structures
             return None
             #raise RuntimeError(f"Error with {structure}")
 
-        inputs["distance"] /= inputs["distance"].min()
+        # only normalize if the volume is not being predicted
+        if self.vol_pred_site_bias is None:
+            inputs["distance"] /= inputs["distance"].min()
         return inputs
 
     # @collect_metrics
@@ -192,30 +204,19 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         predicted_energy = self.energy_model.predict(dataset)
         predicted_energy = predicted_energy[0][0]
 
-        comp = structure.composition.reduced_composition.alphabetical_formula.replace(' ','')
-        hull_energy = ehull.convex_hull_stability(comp,
-                                                  predicted_energy,
-                                                  self.df_competing_phases)
+        comp = structure.composition.reduced_composition.alphabetical_formula.replace(' ', '')
+        # update: if the composition is in the competing phases,
+        # then just compare the predicted energy to the energy of the competing phase
+        if comp in self.df_competing_phases['reduced_composition']:
+            competing_energy = self.df_competing_phases.set_index(
+                'reduced_composition').loc[comp].energyperatom
+            hull_energy = predicted_energy - competing_energy
+        else:
+            hull_energy = ehull.convex_hull_stability(comp,
+                                                      predicted_energy,
+                                                      self.df_competing_phases)
 
         return predicted_energy, hull_energy
-
-    def calc_cos_dist(self, structure: Structure, state=None):
-        model_inputs = self.get_model_inputs(structure, preprocessor_dist)
-        if model_inputs is None:
-            return None
-        dataset = tf.data.Dataset.from_generator(
-            lambda: (s for s in [model_inputs]),
-            #lambda: (preprocessor.construct_feature_matrices(s, train=False) for s in [structure]),
-            output_signature=(preprocessor.output_signature),
-            )
-        dataset = dataset \
-            .padded_batch(
-                batch_size=1,
-                padding_values=(preprocessor.padding_values),
-            )
-        predicted_dist = self.dist_model.predict(dataset)
-        predicted_dist = predicted_dist[0][0]
-        return predicted_dist
 
 
 def create_problem():
@@ -233,8 +234,8 @@ def create_problem():
 
     problem = CrystalEnergyStabilityOptProblem(engine,
                                                energy_model,
-                                               dist_model,
                                                df_competing_phases,
+                                               vol_pred_site_bias=site_bias,
                                                run_id=run_id,
                                                reward_class=reward_factory,
                                                features=train_config.get('features', 64),
@@ -292,24 +293,24 @@ def set_states_seen(game, states_seen):
     # load the crystal states with a computed reward,
     # and add them to the states_to_ignore so they will not be
     # available as part of the search space anymore
-    df = pd.read_sql(session.query(RewardStore) \
-                        .filter_by(run_id=run_config.run_id) \
-                        .statement, session.bind)
+    df = pd.read_sql(session.query(RewardStore)
+                            .filter_by(run_id=run_config.run_id)
+                            .statement, session.bind)
     # only keep the terminal states, and those with a reward value above a cutoff
     # Since states with low reward values won't be repeatedly selected,
     # the reward cutoff should be able to be relatively high e.g., > 0
-    reward_cutoff = -1
+    reward_cutoff = -.5
     df['state'] = df['data'].apply(lambda x: x['state_repr'])
-    df['terminal'] = df['data'].apply(lambda x: x['terminal'])
-    states = set(df[(df['terminal'] is True) & (df['reward'] > reward_cutoff)]['state'].values)
+    df['terminal'] = df['data'].apply(lambda x: str(x['terminal']).lower() == "true")
+    states = set(df[(df['terminal']) & (df['reward'] > reward_cutoff)]['state'].values)
     for state in states - states_seen:
         comp = state.split('|')[0]
         decoration_node = '|'.join(state.split('|')[1:])
         game.state_builder.states_to_ignore[comp].add(decoration_node)
 
     states_seen |= states
-    print(f"{len(states - states_seen)} new states since last checked. "
-          f"len(states_seen): {len(states_seen)}")
+    #print(f"{len(states - states_seen)} new states since last checked. "
+    #      f"len(states_seen): {len(states_seen)}")
     # check to make sure there are no dead-ends e.g., compositions with no prototypes available
     game.state_builder.remove_dead_ends()
     print(f"{len(game.state_builder.actions_to_ignore)}, "
@@ -382,11 +383,10 @@ if __name__ == "__main__":
                         type=pathlib.Path,
                         required=True,
                         help='Model for predicting total energy of a battery system')
-    parser.add_argument('--dist-model',
-                        type=pathlib.Path,
-                        required=True,
-                        help='Model that predicts whether a given structure would relax '
-                             'close or far from the starting prototype')
+    parser.add_argument('--vol-pred-site-bias', type=pathlib.Path,
+                        help='Apply a volume prediction to the decorated structure '
+                        'before passing it to the GNN. '
+                        'Give the path to a file with the average volume per element')
 
     args = parser.parse_args()
 
@@ -398,20 +398,24 @@ if __name__ == "__main__":
     # Initialize the preprocessor class
     preprocessor = PymatgenPreprocessor()
     # TODO: shouldn't be hardcoded
-    preprocessor.from_json('inputs/models/icsd_battery_relaxed/20211227_icsd_and_battery/preprocessor.json')
-    preprocessor_dist = PymatgenPreprocessor()
-    preprocessor_dist.from_json('inputs/models/cos_dist/model_b64_dist_class_0_1/preprocessor.json')
+    #preprocessor.from_json('inputs/models/icsd_battery_relaxed/20211227_icsd_and_battery/preprocessor.json')
+    preprocessor_file = os.path.dirname(args.energy_model) + '/preprocessor.json'
 
     energy_model = tf.keras.models.load_model(args.energy_model,
-                                              custom_objects={**custom_objects,
-                                                              **{'RBFExpansion': RBFExpansion}})
-    dist_model = tf.keras.models.load_model(args.dist_model,
                                               custom_objects={**custom_objects,
                                                               **{'RBFExpansion': RBFExpansion}})
     # Dataframe containing competing phases from NRELMatDB
     print("Reading inputs/competing_phases.csv")
     df_competing_phases = pd.read_csv('inputs/competing_phases.csv')
+    print(f"\t{len(df_competing_phases)} lines")
     print(df_competing_phases.head(2))
+
+    site_bias = None
+    if args.vol_pred_site_bias is not None:
+        print(f"Reading {args.vol_pred_site_bias}")
+        site_bias = pd.read_csv(args.vol_pred_site_bias,
+                                index_col=0, squeeze=True)
+        print(f"\t{len(site_bias)} elements")
 
     Base.metadata.create_all(engine, checkfirst=True)
     Session.configure(bind=engine)

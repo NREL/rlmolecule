@@ -35,7 +35,7 @@ echo """#!/bin/bash
 #SBATCH --gres=gpu:2
 # --- MCTS Rollouts ---
 #SBATCH hetjob
-#SBATCH -N 5
+#SBATCH -N 10
 
 
 # Track which version of the code generated this output
@@ -60,8 +60,8 @@ conda activate /projects/rlmolecule/jlaw/envs/crystals_nfp0_3
 python -u optimize_crystal_energy_stability.py \
     --train-policy \
     --config $SCRIPT_CONFIG \
-    --energy-model inputs/models/icsd_battery_relaxed/20211227_icsd_and_battery/best_model.hdf5 \
-    --dist-model inputs/models/cos_dist/model_b64_dist_class_0_1/best_model.hdf5
+    --energy-model inputs/models/icsd_battery_vol/20220421_volunrelax_linear_dls1.5/best_model.hdf5 \
+    --vol-pred-site-bias /projects/rlmolecule/pstjohn/crystal_inputs/site_volumes_from_icsd.csv
 EOF
 
 cat << EOF > "\$START_ROLLOUT_SCRIPT"
@@ -73,9 +73,10 @@ conda activate /projects/rlmolecule/jlaw/envs/crystals_nfp0_3
 python -u optimize_crystal_energy_stability.py \
     --rollout \
     --config $SCRIPT_CONFIG \
-    --energy-model inputs/models/icsd_battery_relaxed/20211227_icsd_and_battery/best_model.hdf5 \
-    --dist-model inputs/models/cos_dist/model_b64_dist_class_0_1/best_model.hdf5
+    --energy-model inputs/models/icsd_battery_vol/20220421_volunrelax_linear_dls1.5/best_model.hdf5 \
+    --vol-pred-site-bias /projects/rlmolecule/pstjohn/crystal_inputs/site_volumes_from_icsd.csv
 EOF
+
 
 chmod +x "\$START_POLICY_SCRIPT" "\$START_ROLLOUT_SCRIPT"
 
