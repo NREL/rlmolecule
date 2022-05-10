@@ -397,9 +397,8 @@ if __name__ == "__main__":
 
     # Initialize the preprocessor class
     preprocessor = PymatgenPreprocessor()
-    # TODO: shouldn't be hardcoded
-    #preprocessor.from_json('inputs/models/icsd_battery_relaxed/20211227_icsd_and_battery/preprocessor.json')
     preprocessor_file = os.path.dirname(args.energy_model) + '/preprocessor.json'
+    preprocessor.from_json(preprocessor_file)
 
     energy_model = tf.keras.models.load_model(args.energy_model,
                                               custom_objects={**custom_objects,
