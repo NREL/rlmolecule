@@ -39,12 +39,18 @@ def convex_hull_stability(comp,
     comp, eles = sort_comp(comp)
 
     df_cp = df_competing_phases.copy()
-    # UPDATE: remove the composition if it is there
-    df_cp = df_cp[df_cp['reduced_composition'] != comp]
-    df_cp = df_cp.append({'sortedformula': comp,
-                          'energyperatom': predicted_energy,
-                          'reduced_composition': comp},
-                         ignore_index=True)
+    # UPDATE: if the composition is already in ICSD,
+    # then just compare the total energy directly
+    if comp in df_cp.reduced_composition.values:
+        competing_energy = df_cp.set_index(
+            'reduced_composition').loc[comp].energyperatom
+        decomp_energy = predicted_energy - competing_energy
+        return decomp_energy
+    else:
+        df_cp = df_cp.append({'sortedformula': comp,
+                              'energyperatom': predicted_energy,
+                              'reduced_composition': comp},
+                             ignore_index=True)
 
     # Create input file for stability analysis
     inputs = nrelmatdbtaps.create_input_DFT(eles, df_cp, chempot='ferev2')
@@ -110,21 +116,26 @@ def stability_nrg(stoich, phase, inputs, stable=False):
     discrete_nrgs = np.arange(0.001, 6.002, 0.002)  # discretize formation energies
     for jj in range(len(discrete_nrgs)):
         if stable:
+            # if the structure is already stable, 
+            # then increase the energy untill its unstable
             discrete_nrgs[jj] = B[index] + discrete_nrgs[jj]
         else:
+            # if its unstable, then decrease the energy until its stable
             discrete_nrgs[jj] = B[index] - discrete_nrgs[jj]
 
     Hd = None
     # for each discretized formation energy, check if the opposite stability is achieved
     for ii in range(len(discrete_nrgs)):
         B[index] = discrete_nrgs[ii]
-        new_stability = stability.run_stability_hull(inputs, phase, B) 
+        new_stability = stability.run_stability(inputs, phase, B=B) 
         if stable and new_stability == 'UNSTABLE':
             Hd = original_nrg - discrete_nrgs[ii]
             break
         elif not stable and new_stability == 'STABLE':
             Hd = original_nrg - discrete_nrgs[ii]
             break
+    #print(f"{stable = } switched: {original_nrg =} to {B[index] =}.")
+    #print(f"{ii = }, {discrete_nrgs[ii] = }, {Hd =}")
 
     return Hd
 

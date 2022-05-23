@@ -201,19 +201,12 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         predicted_energy = predicted_energy[0][0]
 
         comp = structure.composition.reduced_composition.alphabetical_formula.replace(' ', '')
-        # update: if the composition is in the competing phases,
-        # then just compare the predicted energy to the energy of the competing phase
-        if comp in self.df_competing_phases['reduced_composition']:
-            competing_energy = self.df_competing_phases.set_index(
-                'reduced_composition').loc[comp].energyperatom
-            decomp_energy = predicted_energy - competing_energy
         # TODO: this is a bit of a bottleneck.
         # if the decomposition energy has already been computed
         # for a structure of this composition, then figure out how to use that
-        else:
-            decomp_energy = ehull.convex_hull_stability(comp,
-                                                        predicted_energy,
-                                                        self.df_competing_phases)
+        decomp_energy = ehull.convex_hull_stability(comp,
+                                                    predicted_energy,
+                                                    self.df_competing_phases)
 
         return predicted_energy, decomp_energy
 
