@@ -13,7 +13,7 @@ default_elements = conducting_ions | anions | framework_cations
 default_crystal_systems = {'triclinic', 'monoclinic', 'orthorhombic', 'tetragonal', 'trigonal', 'hexagonal', 'cubic'}
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-default_proto_strc_names_file = os.path.join(dir_path, 'inputs', 'icsd_prototype_filenames.txt')
+default_proto_strc_names_file = os.path.join(dir_path, 'inputs', 'icsd_prototype_ids_lt50atoms_lt100dist.txt')
 default_proto_strc_names = set()
 with open(default_proto_strc_names_file, 'r') as f:
     for line in f:

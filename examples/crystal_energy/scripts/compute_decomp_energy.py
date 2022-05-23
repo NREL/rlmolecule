@@ -43,7 +43,7 @@ def main(relaxed_energies_file,
     print(f"reading {relaxed_energies_file}")
     df_rel = pd.read_csv(relaxed_energies_file)
     print(df_rel.head(2))
-    strc_energies = dict(zip(df_rel['decoration'], df_rel['energy_per_atom']))
+    strc_energies = dict(zip(df_rel['id'], df_rel['energyperatom']))
 
     print(f"reading {comp_phases_file}")
     df_phases = pd.read_csv(comp_phases_file)
@@ -52,7 +52,7 @@ def main(relaxed_energies_file,
     print(f"Computing decomposition energy for {len(strc_energies)} structures.")
     print(f"Writing to {out_file}")
     with open(out_file, 'w') as out:
-        out.write(','.join(["decoration", "energy_per_atom", "decomp_energy"]) + '\n')
+        out.write(','.join(["id", "energyperatom", "decomp_energy"]) + '\n')
         strc_hull_nrgy = {}
         for strc_id, energy in tqdm(strc_energies.items()):
             #try:
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     parser.add_argument('--relaxed-energies-file', '-r',
                         type=Path,
                         required=True,
-                        help="CSV with at least two columns titled 'decoration' and 'energy_per_atom'")
+                        help="CSV with at least two columns titled 'id' and 'energyperatom'")
     parser.add_argument('--out-file', '-o',
                         type=Path,
                         required=True,

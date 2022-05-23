@@ -111,10 +111,6 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         # so shouldn't be a problem anymore
         structure_key = '|'.join(state.action_node.split('|')[:-1])
         icsd_prototype = structures[structure_key]
-        #if len(icsd_prototype.sites) > 50:
-            #return self.default_reward, {'terminal': True,
-            #                                'num_sites': len(icsd_prototype.sites),
-            #                                'state_repr': repr(state)}
 
         # generate the decoration for this state
         try:
@@ -129,16 +125,16 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
             decorated_structure = self.scale_by_pred_vol(decorated_structure)
 
         # Predict the total energy and stability of this decorated structure
-        predicted_energy, hull_energy = self.calc_energy_stability(decorated_structure)
+        predicted_energy, decomp_energy = self.calc_energy_stability(decorated_structure)
         if predicted_energy is None:
             reward = self.default_reward - 2
             return reward, {'terminal': True,
                             'num_sites': len(icsd_prototype.sites),
                             'state_repr': repr(state)}
-        if hull_energy is not None:
+        if decomp_energy is not None:
             # Since more negative is more stable, and higher is better for the reward values,
             # flip the hull energy
-            reward = - hull_energy.astype(float)
+            reward = - decomp_energy.astype(float)
         else:
             # subtract 1 to the default energy to distinguish between
             # failed calculation here, and failing to decorate the structure 
@@ -148,7 +144,7 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         info = {
             'terminal': True,
             'predicted_energy': predicted_energy.astype(float),
-            'hull_energy': hull_energy,
+            'decomp_energy': decomp_energy,
             'num_sites': len(decorated_structure.sites),
             'state_repr': repr(state),
         }
@@ -210,13 +206,16 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         if comp in self.df_competing_phases['reduced_composition']:
             competing_energy = self.df_competing_phases.set_index(
                 'reduced_composition').loc[comp].energyperatom
-            hull_energy = predicted_energy - competing_energy
+            decomp_energy = predicted_energy - competing_energy
+        # TODO: this is a bit of a bottleneck.
+        # if the decomposition energy has already been computed
+        # for a structure of this composition, then figure out how to use that
         else:
-            hull_energy = ehull.convex_hull_stability(comp,
-                                                      predicted_energy,
-                                                      self.df_competing_phases)
+            decomp_energy = ehull.convex_hull_stability(comp,
+                                                        predicted_energy,
+                                                        self.df_competing_phases)
 
-        return predicted_energy, hull_energy
+        return predicted_energy, decomp_energy
 
 
 def create_problem():
@@ -255,7 +254,9 @@ def run_games():
     from rlmolecule.alphazero.alphazero import AlphaZero
 
     prob_config = run_config.problem_config
-    builder = CrystalBuilder(actions_to_ignore=prob_config.get('actions_to_ignore', None))
+    builder = CrystalBuilder(G=prob_config.get('action_graph1'),
+                             G2=prob_config.get('action_graph2'),
+                             actions_to_ignore=prob_config.get('actions_to_ignore'))
 
     config = run_config.mcts_config
     game = AlphaZero(
@@ -275,6 +276,8 @@ def run_games():
     # )
     i = 0
     states_seen = set()
+    # remove deadends before starting the rollouts
+    set_states_seen(game, states_seen)
     while True:
         path, reward = game.run(
             num_mcts_samples=config.get('num_mcts_samples', 5),
@@ -415,6 +418,22 @@ if __name__ == "__main__":
         site_bias = pd.read_csv(args.vol_pred_site_bias,
                                 index_col=0, squeeze=True)
         print(f"\t{len(site_bias)} elements")
+
+    # map the elements in elements_to_skip to the corresponding action nodes (tuples) 
+    # that have those elements
+    prob_config = run_config.problem_config
+    if 'elements_to_ignore' in prob_config:
+        eles_to_ignore = prob_config['elements_to_ignore']
+        actions_to_ignore = set(prob_config.get('actions_to_ignore', []))
+        num_acts = len(actions_to_ignore)
+        builder = CrystalBuilder()
+        for ele in eles_to_ignore:
+            for n in builder.G.nodes():
+                if isinstance(n, tuple) and ele in n:
+                    actions_to_ignore.add(n)
+        print(f"{len(eles_to_ignore)} elements to ignore mapped to "
+              f"{len(actions_to_ignore) - num_acts} new actions to ignore")
+        prob_config['actions_to_ignore'] = actions_to_ignore
 
     Base.metadata.create_all(engine, checkfirst=True)
     Session.configure(bind=engine)

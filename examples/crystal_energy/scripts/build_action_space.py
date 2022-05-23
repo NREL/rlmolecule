@@ -21,6 +21,7 @@ import json
 import gzip
 import itertools
 from pathlib import Path
+from tqdm import tqdm
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -56,10 +57,16 @@ from pymatgen.core import Composition, Structure
 #def get_element_sets():
 # want to maximize the volume around only the conducting ions
 conducting_ions = set(['Li', 'Na', 'K', 'Mg', 'Zn'])
+# UPDATE 2022-05-19: focus on only these conducting ions
+#conducting_ions = set(['Li', 'Na', 'K'])
 # P is in the anion and framework_cation sets
 anions = set(['F', 'Cl', 'Br', 'I', 'O', 'S', 'N', 'P'])
+# TEMP 2022-05-19: remove halides 
+#anions = set(['O', 'S', 'N', 'P'])
 # Zn is in the conducting_ion and framework_cation sets
 framework_cations = set(['Sc', 'Y', 'La', 'Ti', 'Zr', 'Hf', 'W', 'Zn', 'Cd', 'Hg', 'B', 'Al', 'Si', 'Ge', 'Sn', 'P', 'Sb'])
+# TEMP 2022-05-19: remove halides 
+#framework_cations = set(['La', 'Ti', 'Zr', 'Hf', 'W', 'Zn', 'Cd', 'Hg', 'B', 'Al', 'Si', 'Ge', 'Sn', 'P', 'Sb'])
 elements = conducting_ions | anions | framework_cations
 # sort by the length of the string, so that multiple letter elements come first
 elements = sorted(elements, key=len, reverse=True)
@@ -123,9 +130,50 @@ def build_element_combination_actions(G):
                     G.add_edge(c_f1_a1, c_f1_f2_a1)
 
 
+def split_comp_to_eles_and_type(comp: str):
+    """
+    Extract the elements and composition type from a given composition
+    e.g., _1_1_4 from Li1Sc1F4
+    """
+    # this splits by the digits
+    # e.g., for "Li1Sc1F4": ['Li', '1', 'Sc', '1', 'F', '4', '']
+    comp = comp.replace(' ','')
+    split = np.asarray(re.split('(\d+)', comp))
+    elements = tuple(sorted(split[range(0, len(split) - 1, 2)]))
+    stoich = split[range(1, len(split), 2)]
+    # sort the stoichiometry to get the correct order of the comp type
+    comp_type = '_' + '_'.join(map(str, sorted(map(int, stoich))))
+    return elements, comp_type
+
+
+def build_eles_to_comp(df_comp, G):
+    """ Build the mapping from the element combinations in G 
+    to the compositions in df_comp
+    """
+    compositions = df_comp['composition'].to_list()
+
+    # build dictionary of sorted element tuple to the set of compositions with those elements 
+    # e.g., {('F', 'Li', 'Sc'): set(Li1Sc1F4, ...), ...}
+    eles_to_comp = defaultdict(set)
+    for c in compositions:
+        eles, _ = split_comp_to_eles_and_type(c)
+        eles_to_comp[tuple(sorted(eles))].add(c)
+    print(f"{len(compositions)} compositions map to {len(eles_to_comp)} element tuples")
+
+    # limit to the element combinations present in G
+    # the nodes that are element combinations are tuples
+    graph_ele_combos = set([n for n in G.nodes() if isinstance(n, tuple)])
+    G_eles_to_comp = defaultdict(set)
+    for eles in set(eles_to_comp.keys()) & graph_ele_combos:
+        G_eles_to_comp[eles] = eles_to_comp[eles]
+    print(f"{len(G_eles_to_comp)} / {len(eles_to_comp)} element tuples are combinations in G")
+
+    return G_eles_to_comp
+
+
 def build_graph_from_eles_to_comps(df_comp, limit_to_comp_types=None):
     """ Build graph from elements to compositions
-    :param df_comp: 
+    :param df_comp: dataframe of valence-balanced compositions to consider
     :param limit_to_comp_types: set of composition types to which the compositions will be limited
         e.g., _1_1_2_4
     """
@@ -138,24 +186,10 @@ def build_graph_from_eles_to_comps(df_comp, limit_to_comp_types=None):
     build_element_combination_actions(G)
     print(f'{G.number_of_nodes()} nodes, {G.number_of_edges()} edges')
 
-    compositions = df_comp['composition'].to_list()
+    eles_to_comp = build_eles_to_comp(df_comp, G)
+
     #comp_types = set(df_comp['comp_type'].to_list())
     comp_to_comp_type = dict(zip(df_comp['composition'], df_comp['comp_type']))
-
-    # build dictionary of sorted element tuple to the set of compositions with those elements 
-    # e.g., {('F', 'Li', 'Sc'): set(Li1Sc1F4, ...), ...}
-    comp_elements = defaultdict(set)
-    for c in compositions:
-        orig_c = c
-        ele_in_comp = []
-        # these elements are sorted such that the double letter elements come after single letter ones
-        for e in elements:
-            if e in c:
-                ele_in_comp.append(e)
-                # make sure a single letter element doesn't also match (e.g., Si vs S)
-                c = c.replace(e,'')
-        comp_elements[tuple(sorted(ele_in_comp))].add(orig_c)
-    print(f"{len(comp_elements)} element tuples")
 
     # not all of the generated element sets have a valence-balanced composition,
     # i.e., stoichiometric sum of oxidation states of ions equals 0.
@@ -165,49 +199,51 @@ def build_graph_from_eles_to_comps(df_comp, limit_to_comp_types=None):
     # the nodes that are element combinations are tuples
     graph_ele_combos = [n for n in G.nodes() if isinstance(n, tuple)]
     for ele_combo in graph_ele_combos:
-        if ele_combo in comp_elements:
+        if ele_combo in eles_to_comp:
             ele_combo_with_comp.add(ele_combo)
         else:
             ele_combo_without_comp.add(ele_combo)
 
-    print(f"{len(ele_combo_with_comp)} out of {len(graph_ele_combos)} element combinations have a corresponding valence-balanced composition")
+    print(f"{len(ele_combo_with_comp)} out of {len(graph_ele_combos)} "
+          f"element combinations have a corresponding valence-balanced composition")
     # delete the non-valid element combinations from the graph
     G.remove_nodes_from(ele_combo_without_comp)
-    print(f"{len(G.nodes())} nodes remaining in G")
+    print(f"\t{len(G.nodes())} nodes remaining in G")
 
     # Step 2: For a given combination of elements, randomly select a composition from one of the valence-balanced compounds available as a lookup table
     # As a sanity check, see how many compositions there are for a given combination of elements (top 20):
     print("Top 5 element combinations with the greatest number of compositions:")
     print(sorted(
-        {eles: len(comps) for eles, comps in comp_elements.items()}.items(),
+        {eles: len(comps) for eles, comps in eles_to_comp.items()}.items(),
         key=lambda item: item[1], reverse=True)[:5])
 
     print("example key and value:")
-    print(list(comp_elements.items())[0])
+    print(list(eles_to_comp.items())[0])
 
     print("Adding the edges from the element combinations to the compositions")
+    G_comp_types = set()
+    G_comps = set()
     if limit_to_comp_types:
         print(f"Limiting to {len(limit_to_comp_types)} comp_types")
         skipped = set()
-    for ele_combo, comps in comp_elements.items():
+    for ele_combo, comps in eles_to_comp.items():
         for comp in comps:
             comp_type = comp_to_comp_type[comp]
             # skip comp_types that don't have a prototype structure
             if limit_to_comp_types and comp_type not in limit_to_comp_types:
                 skipped.add(comp)
                 continue
+            G_comp_types.add(comp_type)
+            G_comps.add(comp)
+
             G.add_edge(ele_combo, comp)
 
-    print(f'{G.number_of_nodes()} nodes, {G.number_of_edges()} edges')
+    print(f"\t{len(G_comp_types)} comp types among {len(G_comps)} compositions in G")
     if limit_to_comp_types:
         print(f"\tskipped {len(skipped)} compositions without a prototype")
-    return G
 
-#    # Wait to write this network until we build the second graph.
-#    # Need to ensure that all compositions will have a prototype.
-#    out_file = f"{working_dir}/elements_to_compositions.edgelist.gz"
-#    print(f"writing graph to {out_file}")
-#    nx.write_edgelist(G, out_file, delimiter='\t', data=False)
+    print(f'{G.number_of_nodes()} nodes, {G.number_of_edges()} edges in G')
+    return G, G_comp_types, G_comps
 
 
 # ## Second half of graph structure
@@ -254,10 +290,6 @@ def build_G2_mappings(strc_ids, comp_type_prototypes):
           "available to choose from per composition type")
     print(sorted([len(vals) for vals in comp_type_prototypes.values()], reverse=True)[:20])
     print(sorted([len(vals) for vals in comp_type_prototypes.values()])[:20])
-
-    # total number of prototypes for these compositions
-    prototype_strcs = set(p for vals in comp_type_prototypes.values() for p in vals)
-    print(f'{len(prototype_strcs)} prototype_strcs for these comp_types')
 
     # map the poscar files to their crystal system
     prototype_to_crystal_sys = {}
@@ -337,10 +369,10 @@ def get_comp_type(strc):
     stoich = split[range(1, len(split), 2)]
     # sort the stoichiometry to get the correct order of the comp type
     comp_type = '_' + '_'.join(map(str, sorted(map(int, stoich))))
-    return comp_type
+    return comp_type, comp
 
 
-def main(proto_strcs, df_comp, out_pref, write_proto_json=False):
+def main(proto_strcs, df_comp, out_pref, write_proto_json=False, enum_decors=True):
     """ Builds two graphs:
     1. Graph for selecting elements to the composition (steps 1-2)
     2. Graph for selecting the prototype and decoration (steps 3-4)
@@ -349,10 +381,10 @@ def main(proto_strcs, df_comp, out_pref, write_proto_json=False):
     comp_type_prototypes = defaultdict(set)
     comp_types_skipped = defaultdict(set)
     for strc_id, strc in proto_strcs.items():
-        comp_type = get_comp_type(strc)
+        comp_type, comp = get_comp_type(strc)
         # skip some problematic prototypes 
         if '0' in comp_type or comp_type == "_2_2":
-            comp_types_skipped[comp_type].add(strc_id) 
+            comp_types_skipped[comp_type].add((strc_id, comp)) 
             continue
         comp_type_prototypes[comp_type].add(strc_id)
 
@@ -361,11 +393,24 @@ def main(proto_strcs, df_comp, out_pref, write_proto_json=False):
 
     comp_types = set(list(comp_type_prototypes.keys()))
 
-    G = build_graph_from_eles_to_comps(df_comp, limit_to_comp_types=comp_types)
+    G, G_comp_types, G_comps = build_graph_from_eles_to_comps(
+        df_comp,
+        limit_to_comp_types=comp_types)
     # write this network as the action tree
     out_file = f"{out_pref}eles_to_comps.edgelist.gz"
-    print(f"writing G to {out_file}")
+    print(f"writing G to {out_file}\n")
     nx.write_edgelist(G, out_file, delimiter='\t', data=False)
+
+    # Limit the composition types to those with a composition
+    # Don't need to limit the proto_strcs here because they will be limited
+    # to those with a composition type
+    orig_num_comp_types = len(comp_type_prototypes)
+    comp_type_prototypes = {ct: ps for ct, ps in comp_type_prototypes.items() \
+                            if ct in G_comp_types}
+    print(f"{len(comp_type_prototypes)} / {orig_num_comp_types} prototype composition types "
+          f"have a corresponding comp type in G.")
+    num_protos = len([p for ps in comp_type_prototypes.values() for p in ps])
+    print(f"\t{num_protos} / {len(proto_strcs)} prototypes")
 
     prototype_to_crystal_sys = build_G2_mappings(
         proto_strcs.keys(),
@@ -389,7 +434,59 @@ def main(proto_strcs, df_comp, out_pref, write_proto_json=False):
         # https://pymatgen.org/usage.html#side-note-as-dict-from-dict
         with gzip.open(out_file, 'w') as out:
             out.write(json.dumps(proto_strcs_dict).encode())
+
+    # print a table of stats
+    stats = {"G # nodes":     G.number_of_nodes(),
+             "# comps":       len(G_comps),
+             "G2 # nodes":    G2.number_of_nodes(),
+             "# comp types":  len(comp_type_prototypes),
+             "# prototypes":  len(proto_to_action_node),
+    }
+
+    if enum_decors:
+        # now enumerate all possible decorations given the compositions and prototype structures
+        decorations = enumerate_decorations(G, G2)
+        stats["# decorations"] = len(decorations)
+
+    print('\t'.join(stats.keys()))
+    print('\t'.join([str(s) for s in stats.values()]))
+    
     return G, G2
+
+
+def enumerate_decorations(G, G2):
+    """ enumerate all possible decorations given G and G2
+    """
+    from rlmolecule.crystal.builder import CrystalBuilder
+    from rlmolecule.crystal.crystal_state import CrystalState
+
+    builder = CrystalBuilder(G=G, G2=G2)
+
+    root_state = CrystalState('root')
+
+    n = 16*10**6  # estimated number of decorations
+    progress_bar = tqdm(total=n)
+    visited = set()
+    decorations = list(generate_decoration_ids(builder, root_state, visited, progress_bar))
+    return decorations
+
+
+def generate_decoration_ids(builder, state, visited, progress_bar):
+    """ DFS to generate all decorations (state string only) from the ICSD prototype structures
+    """
+    if str(state) in visited:
+        return
+    children = state.get_next_actions(builder)
+    for c in children:
+        yield from generate_decoration_ids(builder, c, visited, progress_bar)
+        visited.add(str(c))
+
+    if len(children) == 0:
+        progress_bar.update(1)
+        yield(str(state))
+        
+        # generate the decorated structure
+        #decorated_structure = generate_decoration(state)
 
 
 ## write a version of the file with just the icsd ID that matches 
@@ -448,6 +545,9 @@ if __name__ == "__main__":
                         action='store_true',
                         help="Write the prototype structures to a file, "
                         "where the key will be the action node e.g., 1_1_1_1_6|cubic|icsd_174512")
+    parser.add_argument('--enumerate-decorations',
+                        action='store_true',
+                        help="Enumerate all possible decorations")
     
     args = parser.parse_args()
 
@@ -487,8 +587,9 @@ if __name__ == "__main__":
     proto_strcs = correct_key_protos
     print(f"{len(proto_strcs)} prototype structures after correcting keys")
 
-    main(proto_strcs,
-         df_comp,
-         args.out_pref,
-         write_proto_json=args.write_proto_json)
-
+    G, G2 = main(proto_strcs,
+                 df_comp,
+                 args.out_pref,
+                 write_proto_json=args.write_proto_json,
+                 enum_decors=args.enumerate_decorations,
+                 )

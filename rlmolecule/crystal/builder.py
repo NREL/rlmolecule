@@ -1,6 +1,6 @@
 import logging
 import os, sys
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Union
 from collections import defaultdict
 
 import networkx as nx
@@ -21,8 +21,8 @@ action_graph2_file = os.path.join(dir_path,
 
 class CrystalBuilder:
     def __init__(self,
-                 G: Optional[nx.DiGraph] = None,
-                 G2: Optional[nx.DiGraph] = None,
+                 G: Optional[Union[nx.DiGraph, str]] = None,
+                 G2: Optional[Union[nx.DiGraph, str]] = None,
                  actions_to_ignore: Optional[set] = None,
                  ) -> None:
         """A class to build crystals according to a number of different options
@@ -36,19 +36,25 @@ class CrystalBuilder:
         structures: Mapping from a decoration string to a pymatgen structure object
         """
 
-        if G is None:
+        if G is None or isinstance(G, str):
+            action_graph_file = G if isinstance(G, str) else action_graph_file
             G = nx.read_edgelist(action_graph_file,
                                  delimiter='\t',
                                  data=False,
                                  create_using=nx.DiGraph())
             # some of the nodes are meant to be tuples. Fix that here
             nx.relabel_nodes(G, {n: eval(n) for n in G.nodes(data=False) if '(' in n}, copy=False)
+            print(f"Read G1: {action_graph_file} "
+                  f"({G.number_of_nodes()} nodes, {G.number_of_edges()} edges)")
 
-        if G2 is None:
+        if G2 is None or isinstance(G2, str):
+            action_graph2_file = G2 if isinstance(G2, str) else action_graph2_file
             G2 = nx.read_edgelist(action_graph2_file,
                                   delimiter='\t',
                                   data=False,
                                   create_using=nx.DiGraph())
+            print(f"Read G2: {action_graph2_file} "
+                  f"({G2.number_of_nodes()} nodes, {G2.number_of_edges()} edges)")
 
         self.G = G
         self.G2 = G2
@@ -84,7 +90,7 @@ class CrystalBuilder:
                      G2.has_node(action_node):
                     self.states_to_ignore[comp].add(action_node)
                 else:
-                    actions_not_recognized.add(a) 
+                    actions_not_recognized.add(a)
             print(f"{len(self.actions_to_ignore)} and {len(self.actions_to_ignore_G2)} "
                    "actions to ignore in G and G2, respectively")
             if len(self.states_to_ignore) > 0:
@@ -204,7 +210,7 @@ class CrystalBuilder:
                 states_to_ignore_update[comp].add(a)
         self.states_to_ignore = states_to_ignore_update
 
-        # 3. Check if any compositions no longer have a prototype structure available
+        # 3. Cleanup: Check if any compositions no longer have a prototype structure available
         # 3a. check the states_to_ignore dict
         comps = set(self.states_to_ignore.keys())
         for c in comps:
