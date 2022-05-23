@@ -17,6 +17,12 @@ fi
 WORKING_DIR="/projects/rlmolecule/$USER/logs/crystal_energy/${run_id}"
 mkdir -p $WORKING_DIR
 
+#ENERGY_MODEL="inputs/models/2022_05_04/battery_unrel_pred_vol/no_2xbound_randsub0_05_seed1/best_model.hdf5"
+ENERGY_MODEL="inputs/models/2022_05_04/icsd_battrel_vol_pred_vol/randsub0_05_randsub0_05_holdout_match_seed1/best_model.hdf5"
+# Use this option when the energy model was trained on structures with predicted volume
+# so that the input structures will also have their predicted volume applied
+VOL_PRED="--vol-pred-site-bias /projects/rlmolecule/pstjohn/crystal_inputs/site_volumes_from_icsd.csv"
+
 # copy the config file with the rest of the results
 SCRIPT_CONFIG="$WORKING_DIR/run.yaml"
 cp $config_file $SCRIPT_CONFIG
@@ -35,7 +41,8 @@ echo """#!/bin/bash
 #SBATCH --gres=gpu:2
 # --- MCTS Rollouts ---
 #SBATCH hetjob
-#SBATCH -N 10
+# Use 5 worker nodes for now since we keep hitting the limit of yuma connections
+#SBATCH -N 5
 
 
 # Track which version of the code generated this output
@@ -60,8 +67,8 @@ conda activate /projects/rlmolecule/jlaw/envs/crystals_nfp0_3
 python -u optimize_crystal_energy_stability.py \
     --train-policy \
     --config $SCRIPT_CONFIG \
-    --energy-model inputs/models/icsd_battery_vol/20220421_volunrelax_linear_dls1.5/best_model.hdf5 \
-    --vol-pred-site-bias /projects/rlmolecule/pstjohn/crystal_inputs/site_volumes_from_icsd.csv
+    --energy-model $ENERGY_MODEL \
+    $VOL_PRED
 EOF
 
 cat << EOF > "\$START_ROLLOUT_SCRIPT"
@@ -73,8 +80,8 @@ conda activate /projects/rlmolecule/jlaw/envs/crystals_nfp0_3
 python -u optimize_crystal_energy_stability.py \
     --rollout \
     --config $SCRIPT_CONFIG \
-    --energy-model inputs/models/icsd_battery_vol/20220421_volunrelax_linear_dls1.5/best_model.hdf5 \
-    --vol-pred-site-bias /projects/rlmolecule/pstjohn/crystal_inputs/site_volumes_from_icsd.csv
+    --energy-model $ENERGY_MODEL \
+    $VOL_PRED
 EOF
 
 
