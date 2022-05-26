@@ -70,13 +70,16 @@ def convex_hull_stability(comp,
         stable_state = stability.run_stability(inputs, comp, out_file=out_file)
         stoic = frac_stoic(comp)
         if stable_state == 'UNSTABLE':
-            hull_nrg = stability_nrg(stoic, comp, inputs, stable=False)
+            hull_nrg, ii = stability_nrg(stoic, comp, inputs, stable=False)
         elif stable_state == 'STABLE':
-            hull_nrg = stability_nrg(stoic, comp, inputs, stable=True)
-        else:
-            print(f"ERR: unrecognized stable_state: '{stable_state}'.")
-            print(f"\tcomp: {comp}")
-            return
+            hull_nrg, ii = stability_nrg(stoic, comp, inputs, stable=True)
+
+        # for some reason, some structures are labeled as stable even though they're in an unstable configuration. 
+        # Try flipping to unstable to check if this really is stable
+        if stable_state == 'STABLE' and ii == 0:
+            Hd, ii = stability_nrg(stoic, comp, inputs, stable=False)
+            if Hd > 0.1:
+                hull_nrg = Hd
     except SystemError as e:
         print(e)
         print(f"Failed at stability.run_stability for {comp} "
@@ -137,7 +140,7 @@ def stability_nrg(stoich, phase, inputs, stable=False):
     #print(f"{stable = } switched: {original_nrg =} to {B[index] =}.")
     #print(f"{ii = }, {discrete_nrgs[ii] = }, {Hd =}")
 
-    return Hd
+    return Hd, ii
 
 
 '''
