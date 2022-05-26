@@ -65,26 +65,54 @@ def convex_hull_stability(comp,
         with open(inputs_file, 'w') as out:
             out.write('\n'.join(inputs) + '\n')
 
-    # Run stability function (args: input filename, composition)
+    hull_nrg = compute_stability_energy_wrapper(inputs, comp, num_perturbations=3, out_file=out_file)
+
+    return hull_nrg
+
+
+def compute_stability_energy(inputs, comp, B=None, out_file=None):
     try:
-        stable_state = stability.run_stability(inputs, comp, out_file=out_file)
+        stable_state, orig_borders = stability.run_stability(inputs, comp, B=B, out_file=out_file)
         stoic = frac_stoic(comp)
         if stable_state == 'UNSTABLE':
-            hull_nrg, ii = stability_nrg(stoic, comp, inputs, stable=False)
+            hull_nrg, ii = stability_nrg(stoic, comp, inputs, B=B, stable=False)
         elif stable_state == 'STABLE':
-            hull_nrg, ii = stability_nrg(stoic, comp, inputs, stable=True)
-
-        # for some reason, some structures are labeled as stable even though they're in an unstable configuration. 
-        # Try flipping to unstable to check if this really is stable
-        if stable_state == 'STABLE' and ii == 0:
-            Hd, ii = stability_nrg(stoic, comp, inputs, stable=False)
-            if Hd > 0.1:
-                hull_nrg = Hd
+            hull_nrg, ii = stability_nrg(stoic, comp, inputs, B=B, stable=True)
     except SystemError as e:
         print(e)
         print(f"Failed at stability.run_stability for {comp} "
               f"(pred_energy: {predicted_energy}). Skipping\n")
-        return
+        return None, None
+    return hull_nrg, ii
+
+
+def compute_stability_energy_wrapper(inputs, comp, num_perturbations=3, out_file=None):
+     
+    #hull_nrg, ii = compute_stability_energy(inputs, comp, out_file=out_file)
+
+    # for some reason, some structures are labeled as stable even though they're in an unstable configuration. 
+    # Try slightly perturbing the energy to see if this fixes the issue
+    #if ii == 0:
+    A_, B, els_, stoich_ = stability.read_input(inputs)  # read input file for stoichiometry list
+    B = B.copy()
+    original_nrg = B[-1]  # save the original formation energy corresponding index found in the above loop
+    perturbed_energies = []
+    for i in range(num_perturbations):
+        e = np.round(np.random.uniform(low=-0.1, high=0.1), 3)
+        perturbed_nrg = original_nrg + e
+        B[-1] = perturbed_nrg
+        curr_out_file = out_file + str(i) if out_file else None
+        curr_hull_nrg, ii = compute_stability_energy(inputs, comp, B=B, out_file=curr_out_file)
+        perturbed_energies += [(perturbed_nrg, e, curr_hull_nrg)]
+
+    # subtract out the perturbation, and keep the maximum hull energy
+    #max_hull_nrg = max([hull_nrg] + [h - e for p, e, h in perturbed_energies])
+    med_hull_nrg = np.median([h - e for p, e, h in perturbed_energies])
+
+    #print(perturbed_energies)
+    #print(f"{comp} ii == 0. New {med_hull_nrg = }")
+    hull_nrg = med_hull_nrg
+
     return hull_nrg
 
 
@@ -105,10 +133,12 @@ def frac_stoic(sortedformula):
 # (args: fractional stoichiometry and phase)
 # stable: if unstable, slowly decrease the discrete energies from above until stability is reached
 # if stable, slowly increase until unstability is reached
-def stability_nrg(stoich, phase, inputs, stable=False):
+def stability_nrg(stoich, phase, inputs, B=None, stable=False):
     stoich_dummy = deepcopy(stoich)
 
-    A_, B, els_, stoich_ = stability.read_input(inputs)  # read input file for stoichiometry list
+    A_, b, els_, stoich_ = stability.read_input(inputs)  # read input file for stoichiometry list
+    B = b if B is None else B
+    B = B.copy()
 
     for j in range(len(A_)):  # loop over all stoichiometries in A_ to find the phase of interest
         if list(A_[j]) == stoich:
@@ -116,29 +146,53 @@ def stability_nrg(stoich, phase, inputs, stable=False):
 
     original_nrg = B[index]  # save the original formation energy corresponding index found in the above loop
 
-    discrete_nrgs = np.arange(0.001, 6.002, 0.002)  # discretize formation energies
-    for jj in range(len(discrete_nrgs)):
-        if stable:
-            # if the structure is already stable, 
-            # then increase the energy untill its unstable
-            discrete_nrgs[jj] = B[index] + discrete_nrgs[jj]
-        else:
-            # if its unstable, then decrease the energy until its stable
-            discrete_nrgs[jj] = B[index] - discrete_nrgs[jj]
+    # To speed up, first use a broad discretization
+    orig_discrete_nrgs = np.arange(0.001, 6.002, 0.02)  # discretize formation energies
+    if stable:
+        # if the structure is already stable, 
+        # then increase the energy untill its unstable
+        discrete_nrgs = B[index] + orig_discrete_nrgs
+    else:
+        # if its unstable, then decrease the energy until its stable
+        discrete_nrgs = B[index] - orig_discrete_nrgs
 
+    Hd, ii = find_stability_flip(stoich, phase, inputs, B, index, stable, original_nrg, discrete_nrgs)
+
+    if Hd is None:
+        return Hd, ii
+
+    #print("first time", B[-1], Hd, ii)
+
+    # Now use a finer binning
+    # go to the bin before it flipped to stable/unstable
+    start_nrg = orig_discrete_nrgs[ii - 1] if ii > 1 else 0.001
+    orig_discrete_nrgs = np.arange(start_nrg, 6.002, 0.001)  # discretize formation energies
+    if stable:
+        discrete_nrgs = B[index] + orig_discrete_nrgs
+    else:
+        discrete_nrgs = B[index] - orig_discrete_nrgs
+
+    Hd, ii = find_stability_flip(stoich, phase, inputs, B, index, stable, original_nrg, discrete_nrgs)
+    #print("second time", B[-1], Hd, ii)
+    #print(f"{stable = } switched: {original_nrg =} to {B[index] =}.")
+    #print(f"{ii = }, {discrete_nrgs[ii] = }, {Hd =}")
+
+    return Hd, ii
+
+
+def find_stability_flip(stoich, phase, inputs, B, index, stable, original_nrg, discrete_nrgs):
+    B = B.copy()
     Hd = None
     # for each discretized formation energy, check if the opposite stability is achieved
     for ii in range(len(discrete_nrgs)):
         B[index] = discrete_nrgs[ii]
-        new_stability = stability.run_stability(inputs, phase, B=B) 
+        new_stability, borders = stability.run_stability(inputs, phase, B=B) 
         if stable and new_stability == 'UNSTABLE':
             Hd = original_nrg - discrete_nrgs[ii]
             break
         elif not stable and new_stability == 'STABLE':
             Hd = original_nrg - discrete_nrgs[ii]
             break
-    #print(f"{stable = } switched: {original_nrg =} to {B[index] =}.")
-    #print(f"{ii = }, {discrete_nrgs[ii] = }, {Hd =}")
 
     return Hd, ii
 
