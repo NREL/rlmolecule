@@ -10,11 +10,11 @@ from rlmolecule.crystal.crystal_state import CrystalState
 logger = logging.getLogger(__name__)
 dir_path = os.path.dirname(os.path.realpath(__file__))
 # elements to compositions
-action_graph_file = os.path.join(dir_path,
+default_action_graph_file = os.path.join(dir_path,
                                  'inputs',
                                  'eles_to_comps_lt50atoms_lt100dist.edgelist.gz')
 # comp_type to decorations
-action_graph2_file = os.path.join(dir_path,
+default_action_graph2_file = os.path.join(dir_path,
                                   'inputs',
                                   'comp_type_to_decors_lt50atoms_lt100dist.edgelist.gz')
 
@@ -37,7 +37,7 @@ class CrystalBuilder:
         """
 
         if G is None or isinstance(G, str):
-            action_graph_file = G if isinstance(G, str) else action_graph_file
+            action_graph_file = G if isinstance(G, str) else default_action_graph_file
             G = nx.read_edgelist(action_graph_file,
                                  delimiter='\t',
                                  data=False,
@@ -48,7 +48,7 @@ class CrystalBuilder:
                   f"({G.number_of_nodes()} nodes, {G.number_of_edges()} edges)")
 
         if G2 is None or isinstance(G2, str):
-            action_graph2_file = G2 if isinstance(G2, str) else action_graph2_file
+            action_graph2_file = G2 if isinstance(G2, str) else default_action_graph2_file
             G2 = nx.read_edgelist(action_graph2_file,
                                   delimiter='\t',
                                   data=False,

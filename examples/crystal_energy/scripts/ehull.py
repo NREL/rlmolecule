@@ -1,5 +1,6 @@
 from copy import deepcopy
 
+import pandas as pd
 import numpy as np
 import re
 from scripts import stability
@@ -47,10 +48,9 @@ def convex_hull_stability(comp,
         decomp_energy = predicted_energy - competing_energy
         return decomp_energy
     else:
-        df_cp = df_cp.append({'sortedformula': comp,
-                              'energyperatom': predicted_energy,
-                              'reduced_composition': comp},
-                             ignore_index=True)
+        df_row = pd.DataFrame([[comp, predicted_energy, comp]],
+                              columns=['sortedformula', 'energyperatom', 'reduced_composition'])
+        df_cp = pd.concat([df_cp, df_row])
 
     # Create input file for stability analysis
     inputs = nrelmatdbtaps.create_input_DFT(eles, df_cp, chempot='ferev2')
@@ -80,8 +80,7 @@ def compute_stability_energy(inputs, comp, B=None, out_file=None):
             hull_nrg, ii = stability_nrg(stoic, comp, inputs, B=B, stable=True)
     except SystemError as e:
         print(e)
-        print(f"Failed at stability.run_stability for {comp} "
-              f"(pred_energy: {predicted_energy}). Skipping\n")
+        print(f"Failed at stability.run_stability for {comp} ({B = }). Skipping\n")
         return None, None
     return hull_nrg, ii
 
@@ -103,7 +102,11 @@ def compute_stability_energy_wrapper(inputs, comp, num_perturbations=3, out_file
         B[-1] = perturbed_nrg
         curr_out_file = out_file + str(i) if out_file else None
         curr_hull_nrg, ii = compute_stability_energy(inputs, comp, B=B, out_file=curr_out_file)
-        perturbed_energies += [(perturbed_nrg, e, curr_hull_nrg)]
+        if curr_hull_nrg is not None:
+            perturbed_energies += [(perturbed_nrg, e, curr_hull_nrg)]
+
+    if len(perturbed_energies) == 0:
+        return
 
     # subtract out the perturbation, and keep the maximum hull energy
     #max_hull_nrg = max([hull_nrg] + [h - e for p, e, h in perturbed_energies])
