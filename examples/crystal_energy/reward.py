@@ -7,6 +7,7 @@ import pandas as pd
 import tensorflow as tf
 import tensorflow_addons as tfa
 from pymatgen.analysis import local_env
+from pymatgen.analysis.structure_prediction.volume_predictor import DLSVolumePredictor
 from pymatgen.core import Composition, Element, Structure
 from nfp.preprocessing.crystal_preprocessor import PymatgenPreprocessor
 
@@ -133,6 +134,18 @@ def get_conducting_ion_fraction(comp: Composition) -> float:
     return frac
 
 
+def calc_decomp_energy(structure: Structure, predicted_energy, df_competing_phases, state=None):
+    comp = structure.composition.reduced_composition \
+                                .alphabetical_formula \
+                                .replace(' ', '')
+    decomp_energy, stability_borders = \
+        ehull.convex_hull_stability(comp,
+                                    predicted_energy,
+                                    df_competing_phases)
+
+    return predicted_energy, decomp_energy, stability_borders
+
+
 def get_electrochem_stability_window(comp: Composition,
                                      stability_borders: dict) -> Tuple[float, float]:
     """ Get the stability window of the conducting ion for this composition.
@@ -174,6 +187,7 @@ class CrystalReward:
         #self.dist_model = dist_model
         self.df_competing_phases = df_competing_phases
         self.vol_pred_site_bias = vol_pred_site_bias
+        self.dls_vol_predictor = DLSVolumePredictor()
         self.default_reward = default_reward
 
         # set the weights of the individual rewards
@@ -196,7 +210,7 @@ class CrystalReward:
         # store the original reward values
         self.sub_rewards = {k: None for k in self.reward_weights.keys()}
 
-    def get_reward(self, state: CrystalState) -> (float, {}):
+    def get_reward(self, state: CrystalState = None, structure: Structure = None) -> (float, {}):
         """Get the reward for the CrystalState.
         The following sub-rewards are combined:
         1. Decomposition energy: predicts the total energy using a GNN model
@@ -212,65 +226,75 @@ class CrystalReward:
             float: reward
             dict: info
         """
-        if not state.terminal:
-            return self.default_reward, {'terminal': False,
-                                         'state_repr': repr(state)}
-        # skip this structure if it is too large for the model.
-        # I removed these structures from the action space (see builder.py "action_graph2_file"),
-        # so shouldn't be a problem anymore
-        structure_key = '|'.join(state.action_node.split('|')[:-1])
-        icsd_prototype = self.prototypes[structure_key]
+        assert state is not None or structure is not None, "Must pass either state or structure"
+        info = {}
+        if structure is None:
+            if not state.terminal:
+                return self.default_reward, {'terminal': False,
+                                            'state_repr': repr(state)}
+            # skip this structure if it is too large for the model.
+            # I removed these structures from the action space (see builder.py "action_graph2_file"),
+            # so shouldn't be a problem anymore
+            structure_key = '|'.join(state.action_node.split('|')[:-1])
+            icsd_prototype = self.prototypes[structure_key]
 
-        # generate the decoration for this state
-        try:
-            structure = generate_decoration(state, icsd_prototype)
-        except AssertionError as e:
-            print(f"AssertionError: {e}")
-            return self.default_reward, {'terminal': True,
-                                         'state_repr': repr(state)}
+            # generate the decoration for this state
+            try:
+                structure = generate_decoration(state, icsd_prototype)
+            except AssertionError as e:
+                print(f"AssertionError: {e}")
+                return self.default_reward, {'terminal': True,
+                                             'state_repr': repr(state)}
 
-        if self.vol_pred_site_bias is not None:
-            # predict the volume of the decorated structure before
-            # passing it to the GNN. Use a linear model + pymatgen's DLS predictor
-            structure = self.scale_by_pred_vol(structure)
+            if self.vol_pred_site_bias is not None:
+                # predict the volume of the decorated structure before
+                # passing it to the GNN. Use a linear model + pymatgen's DLS predictor
+                structure = self.scale_by_pred_vol(structure)
 
-        info = {'terminal': True,
-                'num_sites': len(structure.sites),
-                'volume': structure.volume,
-                'state_repr': repr(state)}
+            info.update({'terminal': True,
+                         'num_sites': len(structure.sites),
+                         'volume': structure.volume,
+                         'state_repr': repr(state)})
 
-        # Predict the total energy and stability of this decorated structure
-        predicted_energy, decomp_energy, stability_borders = \
-            self.calc_energy_stability(structure)
+        # Predict the total energy of this decorated structure
+        predicted_energy = self.predict_energy(structure, state) 
         if predicted_energy is None:
             decomp_energy_reward = self.default_reward - 2
-        elif decomp_energy is None:
-            # subtract 1 to the default energy to distinguish between
-            # failed calculation here, and failing to decorate the structure 
-            decomp_energy_reward = self.default_reward - 1
         else:
-            # Since more negative is more stable, and higher is better for the reward values,
-            # flip the hull energy
-            decomp_energy_reward = -1 * decomp_energy.astype(float)
+            decomp_energy, stability_borders = calc_decomp_energy(structure,
+                                                                  predicted_energy,
+                                                                  self.df_competing_phases,
+                                                                  state)
+            if decomp_energy is None:
+                # subtract 1 to the default energy to distinguish between
+                # failed calculation here, and failing to decorate the structure 
+                decomp_energy_reward = self.default_reward - 1
+                info.update({'predicted_energy': predicted_energy.astype(float)})
+            else:
+                # Since more negative is more stable, and higher is better for the reward values,
+                # flip the hull energy
+                decomp_energy_reward = -1 * decomp_energy.astype(float)
 
-            # also compute the stability window rewards
-            if decomp_energy < 0:
-                electrochem_stability_window = get_electrochem_stability_window(
-                    structure.composition,
-                    stability_borders)
-                # Apply some hard cutoffs on the oxidation and reduction rewards
-                oxidation, reduction = electrochem_stability_window
-                if oxidation < -3:
-                    self.sub_rewards['oxidation'] = oxidation
-                if reduction > -3:
-                    self.sub_rewards['reduction'] = reduction
-                stability_window_size = reduction - oxidation
-                if stability_window_size > 2:
-                    self.sub_rewards['stability_window'] = stability_window_size
+                info.update({'predicted_energy': predicted_energy.astype(float),
+                            'decomp_energy': decomp_energy})
+                # also compute the stability window rewards
+                if decomp_energy < 0:
+                    electrochem_stability_window = get_electrochem_stability_window(
+                        structure.composition,
+                        stability_borders)
+                    # Apply some hard cutoffs on the oxidation and reduction rewards
+                    oxidation, reduction = electrochem_stability_window
+                    if oxidation < -3:
+                        self.sub_rewards['oxidation'] = oxidation
+                    if reduction > -3:
+                        self.sub_rewards['reduction'] = reduction
+                    stability_window_size = reduction - oxidation
+                    if stability_window_size > 2:
+                        self.sub_rewards['stability_window'] = stability_window_size
 
-                info.update({'oxidation': oxidation,
-                             'reduction': reduction,
-                             'stability_window': stability_window_size})
+                    info.update({'oxidation': oxidation,
+                                 'reduction': reduction,
+                                 'stability_window': stability_window_size})
 
         self.sub_rewards['decomp_energy'] = decomp_energy_reward
 
@@ -282,10 +306,10 @@ class CrystalReward:
 
         combined_reward = self.combine_rewards()
 
-        info.update({'pred_energy': predicted_energy,
-                     'decomp_energy': decomp_energy,
-                     'cond_ion_frac': cond_ion_frac,
+        info.update({'cond_ion_frac': cond_ion_frac,
                      'cond_ion_vol_frac': cond_ion_vol_frac})
+
+        #print(combined_reward, info)
 
         return combined_reward, info
 
@@ -309,13 +333,10 @@ class CrystalReward:
             scaled_rewards[key] = scaled_reward
 
         # Now apply the weights to each sub-reward
-        weighted_rewards = {k: v * self.reward_weights[k] for k, v in scaled_rewards.items()}
+        #weighted_rewards = {k: v * self.reward_weights[k] for k, v in scaled_rewards.items()}
         combined_reward = sum([v * self.reward_weights[k] for k, v in scaled_rewards.items()])
 
-        print(self.sub_rewards)
-        print(scaled_rewards)
-        print(weighted_rewards)
-        print(combined_reward)
+        #print(self.sub_rewards)
 
         return combined_reward
 
@@ -343,13 +364,14 @@ class CrystalReward:
             return None
             #raise RuntimeError(f"Error with {structure}")
 
-        inputs["distance"] /= inputs["distance"].min()
+        # only normalize if the volume is not being predicted
+        if self.vol_pred_site_bias is None:
+            inputs["distance"] /= inputs["distance"].min()
         return inputs
 
     # @collect_metrics
-    def calc_energy_stability(self, structure: Structure, state=None):
+    def predict_energy(self, structure: Structure, state=None):
         """ Predict the total energy of the structure using a GNN model (trained on unrelaxed structures)
-        Then use that predicted energy to compute the decomposition (hull) energy
         """
         model_inputs = self.get_model_inputs(structure)
         if model_inputs is None:
@@ -366,15 +388,8 @@ class CrystalReward:
                 padding_values=(self.preprocessor.padding_values),
             )
         predicted_energy = self.energy_model.predict(dataset)
+        #print(f"{predicted_energy = }, {state = }")
         predicted_energy = predicted_energy[0][0]
 
-        comp = structure.composition.reduced_composition \
-                                    .alphabetical_formula \
-                                    .replace(' ', '')
-        decomp_energy, stability_borders = \
-            ehull.convex_hull_stability(comp,
-                                        predicted_energy,
-                                        self.df_competing_phases)
-
-        return predicted_energy, decomp_energy, stability_borders
+        return predicted_energy
 
