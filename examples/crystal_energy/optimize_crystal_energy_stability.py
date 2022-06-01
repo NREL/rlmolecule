@@ -20,10 +20,10 @@ import tensorflow as tf
 import tensorflow_addons as tfa
 from pymatgen.core import Structure
 from pymatgen.analysis.structure_prediction.volume_predictor import DLSVolumePredictor
-from collections import Counter
 from nfp import custom_objects
 from nfp.layers import RBFExpansion
 from nfp.preprocessing.crystal_preprocessor import PymatgenPreprocessor
+from pymatgen.core.periodic_table import Element
 
 from rlmolecule.crystal.builder import CrystalBuilder
 from rlmolecule.crystal.crystal_problem import CrystalTFAlphaZeroProblem
@@ -33,12 +33,22 @@ from rlmolecule.sql.run_config import RunConfig
 from rlmolecule.tree_search.reward import RankedRewardFactory
 from rlmolecule.sql import Base, Session
 from rlmolecule.sql.tables import GameStore, RewardStore
-from scripts import nrelmatdbtaps
-from scripts import stability
-from scripts import ehull
+
+from reward import CrystalReward
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+class AtomicNumberPreprocessor(PymatgenPreprocessor):
+    def __init__(self, max_atomic_num=83, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.site_tokenizer = lambda x: Element(x).Z
+        self._max_atomic_num = max_atomic_num
+
+    @property
+    def site_classes(self):
+        return self._max_atomic_num
 
 
 def read_structures_file(structures_file):
@@ -81,134 +91,24 @@ def predict(model: 'tf.keras.Model', inputs):
 class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
     def __init__(self,
                  engine: 'sqlalchemy.engine.Engine',
-                 energy_model: 'tf.keras.Model',
-                 df_competing_phases: 'pd.DataFrame',
-                 vol_pred_site_bias: 'pd.Series' = None,
+                 rewarder: CrystalReward,
                  # initial_state: str,
                  **kwargs) -> None:
         """ A class to estimate the suitability of a crystal structure as a solid state battery
 
         :param engine: A sqlalchemy engine pointing to a suitable database backend
         :param builder: A CrystalBuilder class to handle crystal construction based on ICSD structures
-        :param energy_model: A tensorflow model to estimate the total energy of a structure
         """
         # self.initial_state = initial_state
         self.engine = engine
-        self.energy_model = energy_model
-        self.df_competing_phases = df_competing_phases
-        self.dls_vol_predictor = DLSVolumePredictor()
-        self.vol_pred_site_bias = vol_pred_site_bias
+        self.rewarder = rewarder
         # since the reward values can take positive or negative values, centered around 0,
         # set the default reward lower so that failed runs have a smaller reward
         self.default_reward = np.float64(-5)
         super(CrystalEnergyStabilityOptProblem, self).__init__(engine, **kwargs)
 
     def get_reward(self, state: CrystalState) -> (float, {}):
-        if not state.terminal:
-            return self.default_reward, {'terminal': False, 'state_repr': repr(state)}
-        # skip this structure if it is too large for the model.
-        # I removed these structures from the action space (see builder.py "action_graph2_file"),
-        # so shouldn't be a problem anymore
-        structure_key = '|'.join(state.action_node.split('|')[:-1])
-        icsd_prototype = structures[structure_key]
-
-        # generate the decoration for this state
-        try:
-            decorated_structure = generate_decoration(state, icsd_prototype)
-        except AssertionError as e:
-            print(f"AssertionError: {e}")
-            return self.default_reward, {'terminal': True, 'state_repr': repr(state)}
-
-        if self.vol_pred_site_bias is not None:
-            # predict the volume of the decorated structure before
-            # passing it to the GNN. Use a linear model + pymatgen's DLS predictor
-            decorated_structure = self.scale_by_pred_vol(decorated_structure)
-
-        # Predict the total energy and stability of this decorated structure
-        predicted_energy, decomp_energy = self.calc_energy_stability(decorated_structure)
-        if predicted_energy is None:
-            reward = self.default_reward - 2
-            return reward, {'terminal': True,
-                            'num_sites': len(icsd_prototype.sites),
-                            'state_repr': repr(state)}
-        if decomp_energy is not None:
-            # Since more negative is more stable, and higher is better for the reward values,
-            # flip the hull energy
-            reward = - decomp_energy.astype(float)
-        else:
-            # subtract 1 to the default energy to distinguish between
-            # failed calculation here, and failing to decorate the structure 
-            reward = self.default_reward + 1
-
-        # print(str(state), predicted_energy)
-        info = {
-            'terminal': True,
-            'predicted_energy': predicted_energy.astype(float),
-            'decomp_energy': decomp_energy,
-            'num_sites': len(decorated_structure.sites),
-            'state_repr': repr(state),
-        }
-        return reward, info
-
-    def scale_by_pred_vol(self, structure):
-        # first predict the volume using the average volume per element (from ICSD)
-        site_counts = pd.Series(Counter(
-            str(site.specie) for site in structure.sites)).fillna(0)
-        curr_site_bias = self.vol_pred_site_bias[
-            self.vol_pred_site_bias.index.isin(site_counts.index)]
-        linear_pred = site_counts @ curr_site_bias
-        structure.scale_lattice(linear_pred)
-
-        # then apply Pymatgen's DLS predictor
-        pred_volume = self.dls_vol_predictor.predict(structure)
-        structure.scale_lattice(pred_volume)
-        return structure
-
-    def get_model_inputs(self, structure, preprocessor) -> {}:
-        inputs = preprocessor(structure, train=False)
-        # scale structures to a minimum of 1A interatomic distance
-        min_distance = inputs["distance"].min()
-        if np.isclose(min_distance, 0):
-            # if some atoms are on top of each other, then this normalization fails
-            return None
-            #raise RuntimeError(f"Error with {structure}")
-
-        # only normalize if the volume is not being predicted
-        if self.vol_pred_site_bias is None:
-            inputs["distance"] /= inputs["distance"].min()
-        return inputs
-
-    # @collect_metrics
-    def calc_energy_stability(self, structure: Structure, state=None):
-        """ Predict the total energy of the structure using a GNN model (trained on unrelaxed structures)
-        Then use that predicted energy to compute the decomposition (hull) energy
-        """
-        model_inputs = self.get_model_inputs(structure, preprocessor)
-        if model_inputs is None:
-            return None, None
-        # predicted_energy = predict(self.energy_model, model_inputs)
-        dataset = tf.data.Dataset.from_generator(
-            lambda: (s for s in [model_inputs]),
-            #lambda: (preprocessor.construct_feature_matrices(s, train=False) for s in [structure]),
-            output_signature=(preprocessor.output_signature),
-            )
-        dataset = dataset \
-            .padded_batch(
-                batch_size=1,
-                padding_values=(preprocessor.padding_values),
-            )
-        predicted_energy = self.energy_model.predict(dataset)
-        predicted_energy = predicted_energy[0][0]
-
-        comp = structure.composition.reduced_composition.alphabetical_formula.replace(' ', '')
-        # TODO: this is a bit of a bottleneck.
-        # if the decomposition energy has already been computed
-        # for a structure of this composition, then figure out how to use that
-        decomp_energy = ehull.convex_hull_stability(comp,
-                                                    predicted_energy,
-                                                    self.df_competing_phases)
-
-        return predicted_energy, decomp_energy
+        return self.rewarder.get_reward(state)
 
 
 def create_problem():
@@ -224,10 +124,14 @@ def create_problem():
     # reward_factory = LinearBoundedRewardFactory(min_reward=train_config.get('min_reward', 0),
     #                                             max_reward=train_config.get('max_reward', 1))
 
+    rewarder = CrystalReward(prototype_structures,
+                             energy_model,
+                             preprocessor,
+                             df_competing_phases,
+                             vol_pred_site_bias=site_bias)
+
     problem = CrystalEnergyStabilityOptProblem(engine,
-                                               energy_model,
-                                               df_competing_phases,
-                                               vol_pred_site_bias=site_bias,
+                                               rewarder,
                                                run_id=run_id,
                                                reward_class=reward_factory,
                                                features=train_config.get('features', 64),
@@ -365,7 +269,7 @@ def monitor():
 # load the icsd prototype structures
 # https://pymatgen.org/usage.html#side-note-as-dict-from-dict
 icsd_prototypes_file = "../../rlmolecule/crystal/inputs/icsd_prototypes_lt50atoms_lt100dist.json.gz"
-structures = read_structures_file(icsd_prototypes_file)
+prototype_structures = read_structures_file(icsd_prototypes_file)
 
 if __name__ == "__main__":
 
@@ -392,6 +296,7 @@ if __name__ == "__main__":
     engine = run_config.start_engine()
 
     # Initialize the preprocessor class
+    #preprocessor = AtomicNumberPreprocessor()
     preprocessor = PymatgenPreprocessor()
     preprocessor_file = os.path.dirname(args.energy_model) + '/preprocessor.json'
     preprocessor.from_json(preprocessor_file)

@@ -1,5 +1,6 @@
 from copy import deepcopy
 
+from collections import defaultdict
 import pandas as pd
 import numpy as np
 import re
@@ -65,14 +66,15 @@ def convex_hull_stability(comp,
         with open(inputs_file, 'w') as out:
             out.write('\n'.join(inputs) + '\n')
 
-    hull_nrg = compute_stability_energy_wrapper(inputs, comp, num_perturbations=3, out_file=out_file)
+    hull_nrg, borders = compute_stability_energy_wrapper(inputs, comp, num_perturbations=3, out_file=out_file)
 
-    return hull_nrg
+    return hull_nrg, borders
 
 
 def compute_stability_energy(inputs, comp, B=None, out_file=None):
     try:
         stable_state, orig_borders = stability.run_stability(inputs, comp, B=B, out_file=out_file)
+        print(f"{orig_borders = }")
         stoic = frac_stoic(comp)
         if stable_state == 'UNSTABLE':
             hull_nrg, ii = stability_nrg(stoic, comp, inputs, B=B, stable=False)
@@ -92,8 +94,8 @@ def compute_stability_energy_wrapper(inputs, comp, num_perturbations=3, out_file
     # for some reason, some structures are labeled as stable even though they're in an unstable configuration. 
     # Try slightly perturbing the energy to see if this fixes the issue
     #if ii == 0:
-    A_, B, els_, stoich_ = stability.read_input(inputs)  # read input file for stoichiometry list
-    B = B.copy()
+    A_, b, els_, stoich_ = stability.read_input(inputs)  # read input file for stoichiometry list
+    B = b.copy()
     original_nrg = B[-1]  # save the original formation energy corresponding index found in the above loop
     perturbed_energies = []
     for i in range(num_perturbations):
@@ -115,8 +117,22 @@ def compute_stability_energy_wrapper(inputs, comp, num_perturbations=3, out_file
     #print(perturbed_energies)
     #print(f"{comp} ii == 0. New {med_hull_nrg = }")
     hull_nrg = med_hull_nrg
+    borders = None
 
-    return hull_nrg
+    # if this is stable, then also get the voltages at the borders to compute the 
+    # electrochemical stability window
+    if hull_nrg < 0:
+        stable_state, orig_borders = stability.run_stability(inputs, comp, out_file=out_file)
+        assert stable_state == "STABLE", \
+            "hull_nrg < 0 ({hull_nrg:0.3f}, but {comp} marked as unstable"
+
+        # now convert the borders list into a dictionary of lists, one for each elememnt
+        borders = defaultdict(list)
+        for i, e in enumerate(els_):
+            for j in range(len(orig_borders)):
+                borders[e].append(orig_borders[j][i])
+
+    return hull_nrg, borders
 
 
 # --------------------------------------------------------------------------------------------
