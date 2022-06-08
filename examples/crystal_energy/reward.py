@@ -143,7 +143,7 @@ def calc_decomp_energy(structure: Structure, predicted_energy, df_competing_phas
                                     predicted_energy,
                                     df_competing_phases)
 
-    return predicted_energy, decomp_energy, stability_borders
+    return decomp_energy, stability_borders
 
 
 def get_electrochem_stability_window(comp: Composition,
@@ -167,16 +167,12 @@ class CrystalReward:
     """
 
     def __init__(self,
-                 prototypes: dict,
-                 energy_model: 'tf.keras.Model',
-                 preprocessor: PymatgenPreprocessor,
-                 #dist_model: 'tf.keras.Model',
                  df_competing_phases: 'pd.DataFrame',
-                 vol_pred_site_bias: Optional['pd.Series'] = None,
                  reward_weights: dict = None,
-                 default_reward: float = -5,
+                 default_reward: float = 0,
         ):
-        """ A class to estimate the suitability of a crystal structure as a solid state battery interface
+        """ A class to estimate the suitability of a crystal structure as a solid state battery interface.
+        If computing rewards for 
 
         :param prototypes: Dictionary mapping from ID to structure. Used for decorating new structures
         :param energy_model: A tensorflow model to estimate the total energy of a structure
@@ -189,6 +185,7 @@ class CrystalReward:
         self.vol_pred_site_bias = vol_pred_site_bias
         self.dls_vol_predictor = DLSVolumePredictor()
         self.default_reward = default_reward
+        self.default_decomp_energy = -5
 
         # set the weights of the individual rewards
         self.reward_weights = reward_weights
@@ -210,7 +207,15 @@ class CrystalReward:
         # store the original reward values
         self.sub_rewards = {k: None for k in self.reward_weights.keys()}
 
-    def get_reward(self, state: CrystalState = None, structure: Structure = None) -> (float, {}):
+    def generate_structure(self,
+                           prototypes: Optional[dict],
+                           energy_model: Optional['tf.keras.Model'],
+                           preprocessor: Optional[PymatgenPreprocessor],
+                           #dist_model: 'tf.keras.Model',
+                           vol_pred_site_bias: Optional['pd.Series'] = None,
+                           ):
+
+    def get_reward(self, structure: Structure = None, state: CrystalState = None) -> (float, {}):
         """Get the reward for the CrystalState.
         The following sub-rewards are combined:
         1. Decomposition energy: predicts the total energy using a GNN model
@@ -259,7 +264,7 @@ class CrystalReward:
         # Predict the total energy of this decorated structure
         predicted_energy = self.predict_energy(structure, state) 
         if predicted_energy is None:
-            decomp_energy_reward = self.default_reward - 2
+            decomp_energy_reward = self.default_decomp_energy - 2
         else:
             decomp_energy, stability_borders = calc_decomp_energy(structure,
                                                                   predicted_energy,
@@ -268,7 +273,7 @@ class CrystalReward:
             if decomp_energy is None:
                 # subtract 1 to the default energy to distinguish between
                 # failed calculation here, and failing to decorate the structure 
-                decomp_energy_reward = self.default_reward - 1
+                decomp_energy_reward = self.default_decomp_energy - 1
                 info.update({'predicted_energy': predicted_energy.astype(float)})
             else:
                 # Since more negative is more stable, and higher is better for the reward values,
@@ -278,7 +283,7 @@ class CrystalReward:
                 info.update({'predicted_energy': predicted_energy.astype(float),
                             'decomp_energy': decomp_energy})
                 # also compute the stability window rewards
-                if decomp_energy < 0:
+                if decomp_energy < 0 and stability_borders is not None:
                     electrochem_stability_window = get_electrochem_stability_window(
                         structure.composition,
                         stability_borders)

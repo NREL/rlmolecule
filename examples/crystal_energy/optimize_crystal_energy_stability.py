@@ -19,7 +19,6 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
 from pymatgen.core import Structure
-from pymatgen.analysis.structure_prediction.volume_predictor import DLSVolumePredictor
 from nfp import custom_objects
 from nfp.layers import RBFExpansion
 from nfp.preprocessing.crystal_preprocessor import PymatgenPreprocessor
