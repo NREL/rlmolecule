@@ -6,6 +6,7 @@ import logging
 import math
 import os
 import time
+from typing import Tuple
 import pandas as pd
 ## Apparently there's an issue with the latest version of pandas.
 ## Got this fix from here:
@@ -23,17 +24,20 @@ from nfp import custom_objects
 from nfp.layers import RBFExpansion
 from nfp.preprocessing.crystal_preprocessor import PymatgenPreprocessor
 from pymatgen.core.periodic_table import Element
+from pymatgen.core import Composition, Structure
+from pymatgen.analysis.phase_diagram import PDEntry
 
 from rlmolecule.crystal.builder import CrystalBuilder
 from rlmolecule.crystal.crystal_problem import CrystalTFAlphaZeroProblem
 from rlmolecule.crystal.crystal_state import CrystalState
+from rlmolecule.crystal.ehull import fere_entries
 from rlmolecule.sql.run_config import RunConfig
 # from rlmolecule.tree_search.reward import RankedRewardFactory
 from rlmolecule.tree_search.reward import RankedRewardFactory
 from rlmolecule.sql import Base, Session
 from rlmolecule.sql.tables import GameStore, RewardStore
 
-from reward import CrystalReward
+from rlmolecule.crystal.crystal_reward import CrystalStateReward
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -90,7 +94,7 @@ def predict(model: 'tf.keras.Model', inputs):
 class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
     def __init__(self,
                  engine: 'sqlalchemy.engine.Engine',
-                 rewarder: CrystalReward,
+                 rewarder: CrystalStateReward,
                  # initial_state: str,
                  **kwargs) -> None:
         """ A class to estimate the suitability of a crystal structure as a solid state battery
@@ -106,7 +110,7 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         self.default_reward = np.float64(-5)
         super(CrystalEnergyStabilityOptProblem, self).__init__(engine, **kwargs)
 
-    def get_reward(self, state: CrystalState) -> (float, {}):
+    def get_reward(self, state: CrystalState) -> Tuple[float, dict]:
         return self.rewarder.get_reward(state)
 
 
@@ -123,11 +127,11 @@ def create_problem():
     # reward_factory = LinearBoundedRewardFactory(min_reward=train_config.get('min_reward', 0),
     #                                             max_reward=train_config.get('max_reward', 1))
 
-    rewarder = CrystalReward(prototype_structures,
-                             energy_model,
-                             preprocessor,
-                             df_competing_phases,
-                             vol_pred_site_bias=site_bias)
+    rewarder = CrystalStateReward(competing_phases,
+                                  prototype_structures, 
+                                  energy_model,
+                                  preprocessor,
+                                  vol_pred_site_bias=site_bias)
 
     problem = CrystalEnergyStabilityOptProblem(engine,
                                                rewarder,
@@ -308,6 +312,13 @@ if __name__ == "__main__":
     df_competing_phases = pd.read_csv('inputs/competing_phases.csv')
     print(f"\t{len(df_competing_phases)} lines")
     print(df_competing_phases.head(2))
+    # convert the dataframe to a list of PDEntries used to create the convex hull
+    pd_entries = df_competing_phases.progress_apply(
+        lambda row: PDEntry(Composition(row.sortedformula),
+                            row.energy), 
+        axis=1
+    )
+    competing_phases = pd.concat([pd.Series(fere_entries), pd_entries]).reset_index()[0]
 
     site_bias = None
     if args.vol_pred_site_bias is not None:

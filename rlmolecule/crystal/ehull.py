@@ -1,6 +1,7 @@
 from copy import deepcopy
 
 from collections import defaultdict
+from typing import List
 import pandas as pd
 import numpy as np
 import re
@@ -35,11 +36,11 @@ fere_entries = [PDEntry(e, energy) for e, energy in ferev2_chempot.items() if "i
 
 def convex_hull_stability(comp: Composition,
                           predicted_energy: float,
-                          competing_phases: list[PDEntry]):
+                          competing_phases: List[PDEntry]):
     """ compute the decomposition energy for a given composition 
     :param comp: composition such as Li1Sc1F4
     :param predicted_energy: predicted eV/atom for the structure corresponding to this composition
-    :param competing_phases: list of  of competing phases used to 
+    :param competing_phases: list of competing phases used to 
         construct the convex hull for the elements of the given composition
     """
     energy = predicted_energy * comp.num_atoms
