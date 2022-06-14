@@ -46,8 +46,8 @@ def convex_hull_stability(comp,
     if comp in df_cp.reduced_composition.values:
         competing_energy = df_cp.set_index(
             'reduced_composition').loc[comp].energyperatom
-        decomp_energy = predicted_energy - competing_energy
-        return decomp_energy
+        decomp_energy1 = predicted_energy - competing_energy
+        #return decomp_energy, None
     else:
         df_row = pd.DataFrame([[comp, predicted_energy, comp]],
                               columns=['sortedformula', 'energyperatom', 'reduced_composition'])
@@ -57,7 +57,7 @@ def convex_hull_stability(comp,
     inputs = nrelmatdbtaps.create_input_DFT(eles, df_cp, chempot='ferev2')
     # if this function failed to create the input, then skip this structure
     if inputs is None:
-        return
+        return None, None
 
     # The inputs used to be written to a file, and then read back in.
     # I updated the functions to store the inputs in a list, and then parse that list 
@@ -68,18 +68,23 @@ def convex_hull_stability(comp,
 
     hull_nrg, borders = compute_stability_energy_wrapper(inputs, comp, num_perturbations=3, out_file=out_file)
 
+    if comp in df_competing_phases.reduced_composition.values:
+        print(f"COMPARE: {decomp_energy1 = }, {hull_nrg = }")
+
     return hull_nrg, borders
 
 
 def compute_stability_energy(inputs, comp, B=None, out_file=None):
     try:
         stable_state, orig_borders = stability.run_stability(inputs, comp, B=B, out_file=out_file)
-        print(f"{orig_borders = }")
         stoic = frac_stoic(comp)
         if stable_state == 'UNSTABLE':
             hull_nrg, ii = stability_nrg(stoic, comp, inputs, B=B, stable=False)
         elif stable_state == 'STABLE':
             hull_nrg, ii = stability_nrg(stoic, comp, inputs, B=B, stable=True)
+        else:
+            print(f"Expected 'STABLE' or 'UNSTABLE', not {stable_state}")
+            return None, None
     except SystemError as e:
         print(e)
         print(f"Failed at stability.run_stability for {comp} ({B = }). Skipping\n")
@@ -108,7 +113,7 @@ def compute_stability_energy_wrapper(inputs, comp, num_perturbations=3, out_file
             perturbed_energies += [(perturbed_nrg, e, curr_hull_nrg)]
 
     if len(perturbed_energies) == 0:
-        return
+        return None, None
 
     # subtract out the perturbation, and keep the maximum hull energy
     #max_hull_nrg = max([hull_nrg] + [h - e for p, e, h in perturbed_energies])
@@ -123,8 +128,10 @@ def compute_stability_energy_wrapper(inputs, comp, num_perturbations=3, out_file
     # electrochemical stability window
     if hull_nrg < 0:
         stable_state, orig_borders = stability.run_stability(inputs, comp, out_file=out_file)
-        assert stable_state == "STABLE", \
-            "hull_nrg < 0 ({hull_nrg:0.3f}, but {comp} marked as unstable"
+        #assert stable_state == "STABLE", \
+        if stable_state != "STABLE":
+            print(f"WARNING: hull_nrg < 0 ({hull_nrg:0.3f}, but {comp} marked as unstable. {len(orig_borders) = }")
+            return hull_nrg, None
 
         # now convert the borders list into a dictionary of lists, one for each elememnt
         borders = defaultdict(list)
