@@ -36,7 +36,8 @@ fere_entries = [PDEntry(e, energy) for e, energy in ferev2_chempot.items() if "i
 
 def convex_hull_stability(comp: Composition,
                           predicted_energy: float,
-                          competing_phases: List[PDEntry]):
+                          competing_phases: List[PDEntry],
+                          ):
     """ compute the decomposition energy for a given composition 
     :param comp: composition such as Li1Sc1F4
     :param predicted_energy: predicted eV/atom for the structure corresponding to this composition
@@ -44,19 +45,19 @@ def convex_hull_stability(comp: Composition,
         construct the convex hull for the elements of the given composition
     """
     energy = predicted_energy * comp.num_atoms
-    
     entry = PDEntry(comp, energy)
     elements = set(comp.elements)
+
     curr_entries = [e for e in competing_phases
                     if len(set(e.composition.elements) - elements) == 0]
-
     phase_diagram = PhaseDiagram(curr_entries, elements=elements)
-    decomp, decomp_energy = phase_diagram.get_decomp_and_e_above_hull(entry,
-                                                                      allow_negative=True,
-                                                                      # docs say: "if you have a huge proportion
-                                                                      # of unstable entries, then this
-                                                                      # check can slow things down."
-                                                                      check_stable=False)
+
+    decomp, decomp_energy = phase_diagram.get_decomp_and_e_above_hull(
+        entry,
+        allow_negative=True,
+        # docs say: "if you have a huge proportion of unstable entries,
+        # then this check can slow things down."
+        check_stable=False)
 
     # if this structure is not stable, then skip the stability range calculation
     if decomp_energy > 0:
@@ -64,10 +65,18 @@ def convex_hull_stability(comp: Composition,
 
     # since the decomposition energy is negative,
     # add the current entry to the hull to get the electrochem_stability_window
-    phase_diagram_w_comp = PhaseDiagram(curr_entries + [entry], elements=comp.elements)
+    phase_diagram_w_comp = PhaseDiagram(phase_diagram.entries + [entry],
+                                        elements=comp.elements)
 
-    cond_ion = Element(get_conducting_ion(comp))
-    stability_ranges = phase_diagram_w_comp.get_chempot_range_stability_range(comp, cond_ion)
+    # if for some reason there is no conducting ion,
+    # then just return the decomposition energy
+    try:
+        cond_ion = Element(get_conducting_ion(comp))
+    except ValueError:
+        return decomp_energy, None
+
+    stability_ranges = phase_diagram_w_comp.get_chempot_range_stability_phase(
+        comp, cond_ion)
 
     # now correct for the base element energy
     low, high = stability_ranges[cond_ion]

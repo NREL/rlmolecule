@@ -1,0 +1,49 @@
+conducting_ions: {'Na', 'Li', 'K'}
+anions: {'F', 'Br', 'S', 'Cl', 'N', 'P_A', 'O', 'I'}
+framework_cations: {'Cd', 'Ti', 'Sn', 'B', 'Ge', 'Zn', 'Sb', 'Si', 'W', 'Hg', 'Zr', 'Sc', 'Y', 'P_F', 'La', 'Al', 'Hf'}
+reading ../../rlmolecule/crystal/inputs/max_comp_atoms15/max_comp_atoms15prototypes.json.gz
+	12943 structures read
+reading ../../rlmolecule/crystal/inputs/icsd_prototypes_lt50atoms_lt100dist.json.gz
+	3304 structures read
+14803 prototype structures after correcting keys
+	184 comp_types
+	3 comp_types_skipped: defaultdict(<class 'set'>, {'_0_1_1': {('icsd_040252', 'D0+1I1')}, '_2_2': {('icsd_036641', 'K2O2'), ('icsd_024143', 'Li2O2'), ('icsd_034253', 'H2O2')}, '_0_1_1_1_2': {('icsd_086231', 'D0+2Li1I1O1')}})
+16228 nodes, 30615 edges
+Building valence-balanced compositions
+220848 compositions
+15315 out of 15867 element combinations have a corresponding valence-balanced composition
+	15319 nodes remaining in G
+Top 5 element combinations with the greatest number of compositions:
+[(('Cd', 'F', 'I', 'Na'), 62), (('F', 'Hg', 'I', 'Na'), 62), (('F', 'I', 'Na', 'Zn'), 62), (('Br', 'Cd', 'F', 'Na'), 62), (('Br', 'F', 'Hg', 'Na'), 62)]
+example key and value:
+(('Cd', 'F', 'I', 'Na', 'Zn'), ['Na1Zn1Cd1F1I4', 'Na1Zn1Cd1F4I1', 'Na1Zn1Cd1F2I3', 'Na1Zn1Cd1F3I2', 'Na1Zn2Cd1F2I5', 'Na1Zn2Cd1F5I2', 'Na1Zn1Cd2F2I5', 'Na1Zn1Cd2F5I2', 'Na2Zn1Cd1F3I3', 'Na1Zn2Cd1F1I6', 'Na1Zn2Cd1F6I1', 'Na1Zn1Cd2F1I6', 'Na1Zn1Cd2F6I1', 'Na2Zn1Cd1F2I4', 'Na2Zn1Cd1F4I2', 'Na2Zn2Cd1F1I7', 'Na2Zn2Cd1F7I1', 'Na2Zn1Cd2F1I7', 'Na2Zn1Cd2F7I1', 'Na2Zn1Cd1F1I5', 'Na2Zn1Cd1F5I1', 'Na1Zn2Cd2F1I8', 'Na1Zn2Cd2F8I1', 'Na4Zn1Cd1F4I4', 'Na2Zn2Cd1F4I4', 'Na2Zn1Cd2F4I4', 'Na4Zn1Cd1F2I6', 'Na4Zn1Cd1F6I2'])
+Adding the edges from the element combinations to the compositions
+	177 comp types among 220848 compositions in G
+236167 nodes, 250002 edges in G
+writing G to ../../rlmolecule/crystal/inputs/icsd_train_and_proto_max_comp_atoms15/combined_KLiNa_eles_to_comps.edgelist.gz
+
+177 / 184 prototype composition types have a corresponding comp type in G.
+	14409 / 14803 prototypes
+head and tail of number of prototypes available to choose from per composition type
+[1286, 1070, 1029, 1023, 911, 897, 641, 521, 486, 456, 388, 334, 239, 229, 221, 210, 190, 176, 153, 137]
+[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2]
+monoclinic 2912
+orthorhombic 3999
+trigonal 1525
+hexagonal 1573
+cubic 2025
+tetragonal 2268
+triclinic 501
+histogram of number of crystal structures per comp_type (out of 177 comp_types):
+26 comp_types have 1 crystal_systems
+25 comp_types have 2 crystal_systems
+21 comp_types have 3 crystal_systems
+27 comp_types have 4 crystal_systems
+26 comp_types have 5 crystal_systems
+21 comp_types have 6 crystal_systems
+31 comp_types have 7 crystal_systems
+48785 nodes, 48608 edges
+writing G2 to ../../rlmolecule/crystal/inputs/icsd_train_and_proto_max_comp_atoms15/combined_KLiNa_comp_type_to_decors.edgelist.gz
+writing ../../rlmolecule/crystal/inputs/icsd_train_and_proto_max_comp_atoms15/combined_KLiNa_prototypes.json.gz
+G # nodes	# comps	G2 # nodes	# comp types	# prototypes	# decorations
+236167	220848	48785	177	14409	14138070

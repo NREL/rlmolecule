@@ -11,7 +11,6 @@ from pymatgen.core import Composition, Element, Structure
 from nfp.preprocessing.crystal_preprocessor import PymatgenPreprocessor
 
 from rlmolecule.crystal.crystal_state import CrystalState
-from rlmolecule.crystal.ehull import convex_hull_stability
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -82,16 +81,19 @@ def compute_cond_ion_vol(structure: Structure, state=None):
             break
         # this function often fails for large or spaced out structures
         except ValueError as e:
-            if state:
-                logger.warning(f"compute_structure_vol:ValueError: {e}  -  {state}")
+            if state is not None:
+                logger.warning(f"nn.get_all_voronoi_polyhedra(structure):"
+                               f"ValueError: {e} - {state}")
             return None
         except MemoryError as e:
-            if state:
-                logger.warning(f"compute_structure_vol:MemoryError: {e}  -  {state}")
+            if state is not None:
+                logger.warning(f"nn.get_all_voronoi_polyhedra(structure):"
+                               f"MemoryError: {e} - {state}")
             return None
         except RuntimeError as e:
-            if state:
-                logger.warning(f"compute_structure_vol:RuntimeError: {e}  -  {state}")
+            if state is not None:
+                logger.warning(f"nn.get_all_voronoi_polyhedra(structure):"
+                               f"RuntimeError: {e} - {state}")
             return None
 
     total_vol = 0
@@ -102,8 +104,10 @@ def compute_cond_ion_vol(structure: Structure, state=None):
             total_vol += vol
 
             element = site_info['site'].as_dict()['species'][0]['element']
-            if element == conducting_ion:
+            if Element(element) == conducting_ion:
                 conducting_ion_vol += vol
+
+    assert conducting_ion_vol != 0
 
     total_vol = np.round(total_vol, 4)
     vol = np.round(structure.volume, 4)

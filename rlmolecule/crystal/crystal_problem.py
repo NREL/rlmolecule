@@ -38,7 +38,7 @@ class CrystalTFAlphaZeroProblem(CrystalProblem, TFAlphaZeroProblem, ABC):
         self.num_messages = num_messages
         self.num_heads = num_heads
         self.features = features
-        self.preprocessor = preprocessor if preprocessor else CrystalPreprocessor()
+        self.preprocessor = preprocessor if preprocessor is not None else CrystalPreprocessor()
         self.actions_to_ignore = actions_to_ignore
         super(CrystalTFAlphaZeroProblem, self).__init__(engine=engine, **kwargs)
 

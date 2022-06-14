@@ -17,6 +17,15 @@ fi
 WORKING_DIR="/projects/rlmolecule/$USER/logs/crystal_energy/${run_id}"
 mkdir -p $WORKING_DIR
 
+#ENERGY_MODEL="inputs/models/2022_05_04/battery_unrel_pred_vol/no_2xbound_randsub0_05_seed1/best_model.hdf5"
+#ENERGY_MODEL="inputs/models/2022_05_04/icsd_battrel_vol_pred_vol/randsub0_05_randsub0_05_holdout_match_seed1/best_model.hdf5"
+ENERGY_MODEL="inputs/models/2022_06_07_pruned_outliers/icsd_and_battery_pred_vol/best_model.hdf5"
+# This model was trained on the normalized / scaled structures
+#ENERGY_MODEL="inputs/models/2022_06_07_pruned_outliers/icsd_and_battery_scaled/best_model.hdf5"
+# Use this option when the energy model was trained on structures with predicted volume
+# so that the input structures will also have their predicted volume applied
+VOL_PRED="--vol-pred-site-bias /projects/rlmolecule/pstjohn/crystal_inputs/site_volumes_from_icsd.csv"
+
 # copy the config file with the rest of the results
 SCRIPT_CONFIG="$WORKING_DIR/run.yaml"
 cp $config_file $SCRIPT_CONFIG
@@ -54,12 +63,12 @@ cat << EOF > "\$START_POLICY_SCRIPT"
 source $HOME/.bashrc_conda
 module use /nopt/nrel/apps/modules/test/modulefiles/
 module load cudnn/8.1.1/cuda-11.2
-conda activate /projects/rlmolecule/jlaw/envs/crystals_nfp0_3
+conda activate ~/.conda-envs/crystals_nfp0_3
 python -u optimize_crystal_energy_stability.py \
     --train-policy \
     --config $SCRIPT_CONFIG \
-    --energy-model inputs/models/icsd_battery_relaxed/20211227_icsd_and_battery/best_model.hdf5 \
-    --dist-model inputs/models/cos_dist/model_b64_dist_class_0_1/best_model.hdf5
+    --energy-model $ENERGY_MODEL \
+    $VOL_PRED
 EOF
 
 cat << EOF > "\$START_ROLLOUT_SCRIPT"
@@ -67,12 +76,12 @@ cat << EOF > "\$START_ROLLOUT_SCRIPT"
 source $HOME/.bashrc_conda
 module use /nopt/nrel/apps/modules/test/modulefiles/
 module load cudnn/8.1.1/cuda-11.2
-conda activate /projects/rlmolecule/jlaw/envs/crystals_nfp0_3
+conda activate ~/.conda-envs/crystals_nfp0_3
 python -u optimize_crystal_energy_stability.py \
     --rollout \
     --config $SCRIPT_CONFIG \
-    --energy-model inputs/models/icsd_battery_relaxed/20211227_icsd_and_battery/best_model.hdf5 \
-    --dist-model inputs/models/cos_dist/model_b64_dist_class_0_1/best_model.hdf5
+    --energy-model $ENERGY_MODEL \
+    $VOL_PRED
 EOF
 
 chmod +x "\$START_POLICY_SCRIPT" "\$START_ROLLOUT_SCRIPT"

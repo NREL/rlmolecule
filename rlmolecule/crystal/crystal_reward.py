@@ -6,13 +6,16 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import tensorflow_addons as tfa
+from tqdm import tqdm
+import time
 from pymatgen.core import Composition, Structure
-from pymatgen.analysis.phase_diagram import PDEntry
+from pymatgen.analysis.phase_diagram import PhaseDiagram, PDEntry
 from pymatgen.analysis.structure_prediction.volume_predictor import DLSVolumePredictor
 from nfp.preprocessing.crystal_preprocessor import PymatgenPreprocessor
 
 from rlmolecule.crystal.crystal_state import CrystalState
 from rlmolecule.crystal import reward_utils
+from rlmolecule.crystal import ehull
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -59,9 +62,9 @@ class StructureRewardBattInterface:
                               "stability_window": (0, 5),
                               }
 
-    def compute_reward(self, 
-                       structure: Structure, 
-                       predicted_energy = None, 
+    def compute_reward(self,
+                       structure: Structure,
+                       predicted_energy: float = None,
                        state: CrystalState = None,
                        ):
         """
@@ -85,11 +88,13 @@ class StructureRewardBattInterface:
             decomp_energy_reward = self.default_decomp_energy
         else:
             info.update({'predicted_energy': predicted_energy})
-            decomp_energy, stability_borders = reward_utils.calc_decomp_energy(
-                    structure,
+            start = time.process_time()
+            decomp_energy, stability_window = ehull.convex_hull_stability(
+                    structure.composition,
                     predicted_energy,
                     self.competing_phases,
-                    state)
+            )
+            info['decomp_time'] = time.process_time() - start
             if decomp_energy is None:
                 # add 1 to the default energy to distinguish between
                 # failed calculation here, and failing to decorate the structure 
@@ -101,12 +106,9 @@ class StructureRewardBattInterface:
 
                 info.update({'decomp_energy': decomp_energy})
                 # also compute the stability window rewards
-                if decomp_energy < 0 and stability_borders is not None:
-                    electrochem_stability_window = reward_utils.get_electrochem_stability_window(
-                        structure.composition,
-                        stability_borders)
+                if decomp_energy < 0 and stability_window is not None:
                     # Apply some hard cutoffs on the oxidation and reduction rewards
-                    oxidation, reduction = electrochem_stability_window
+                    oxidation, reduction = stability_window
                     if oxidation < -3:
                         # flip the oxidation reward so that higher is better
                         sub_rewards['oxidation'] = -1 * oxidation
@@ -122,25 +124,44 @@ class StructureRewardBattInterface:
 
         sub_rewards['decomp_energy'] = decomp_energy_reward
 
-        cond_ion_frac = reward_utils.get_conducting_ion_fraction(structure.composition)
-        sub_rewards['cond_ion_frac'] = cond_ion_frac
+        try:
+            cond_ion_frac = reward_utils.get_conducting_ion_fraction(structure.composition)
+            sub_rewards['cond_ion_frac'] = cond_ion_frac
 
-        cond_ion_vol_frac = reward_utils.compute_cond_ion_vol(structure, state=state)
-        sub_rewards['cond_ion_vol_frac'] = cond_ion_vol_frac
+            start = time.process_time()
+            cond_ion_vol_frac = reward_utils.compute_cond_ion_vol(structure, state=state)
+            # if the voronoi volume calculation failed, give a default of
+            # the conducting ion's fraction * .5
+            if cond_ion_vol_frac is None:
+                cond_ion_vol_frac = cond_ion_frac / 2
+            sub_rewards['cond_ion_vol_frac'] = cond_ion_vol_frac
+            info['cond_ion_vol_time'] = time.process_time() - start
 
-        info.update({'cond_ion_frac': cond_ion_frac,
-                     'cond_ion_vol_frac': cond_ion_vol_frac})
+            info.update({'cond_ion_frac': cond_ion_frac,
+                        'cond_ion_vol_frac': cond_ion_vol_frac})
+        # some structures don't have a conducting ion
+        except ValueError as e:
+            print(f"ValueError: {e}. State: {state}")
 
         combined_reward = self.combine_rewards(sub_rewards)
-        #print(combined_reward, info)
+        #print(str(state), combined_reward, info)
 
         return combined_reward, info
+
+#    def precompute_convex_hulls(self, compositions):
+#        self.phase_diagrams = {}
+#        for comp in tqdm(compositions):
+#            comp = Composition(comp)
+#            elements = set(comp.elements)
+#            curr_entries = [e for e in self.competing_phases
+#                            if len(set(e.composition.elements) - elements) == 0]
+#
+#            phase_diagram = PhaseDiagram(curr_entries, elements=elements)
+#            self.phase_diagrams[comp] = phase_diagram
 
     def combine_rewards(self, sub_rewards) -> float:
         """ Take the weighted average of the normalized sub-rewards
         For example, decomposition energy: 1.2, conducting ion frac: 0.1.
-        First, normalize each value between their ranges:
-          - decomp_energy: 
         """
         scaled_rewards = {}
         for key, rew in sub_rewards.items():
@@ -169,7 +190,7 @@ class CrystalStateReward(StructureRewardBattInterface):
 
     def __init__(self,
                  competing_phases: List[PDEntry],
-                 prototypes: Dict[str: Structure],
+                 prototypes: Dict[str, Structure],
                  energy_model: 'tf.keras.Model',
                  preprocessor: PymatgenPreprocessor,
                  #dist_model: 'tf.keras.Model',
@@ -209,23 +230,32 @@ class CrystalStateReward(StructureRewardBattInterface):
         """
         if not state.terminal:
             return self.default_reward, {'terminal': False,
-                                        'state_repr': repr(state)}
+                                         'state_repr': repr(state)}
         info = {}
+        start = time.process_time()
         structure = self.generate_structure(state)
+        gen_strc_time = time.process_time() - start
         if structure is None:
             return self.default_reward, {'terminal': True,
-                                         'state_repr': repr(state)}
+                                         'state_repr': repr(state),
+                                         'gen_strc_time': gen_strc_time}
 
         info.update({'terminal': True,
                      'num_sites': len(structure.sites),
                      'volume': structure.volume,
-                     'state_repr': repr(state)})
+                     'state_repr': repr(state),
+                     'gen_strc_time': gen_strc_time,
+                     })
 
         # Predict the total energy of this decorated structure
-        predicted_energy = self.predict_energy(structure, state) 
-        reward, reward_info = self.compute_reward(structure, 
-                                                  predicted_energy, 
+        start = time.process_time()
+        predicted_energy = self.predict_energy(structure, state)
+        rew_start = time.process_time()
+        reward, reward_info = self.compute_reward(structure,
+                                                  predicted_energy,
                                                   state)
+        info['pred_time'] = rew_start - start
+        info['reward_time'] = time.process_time() - rew_start
         info.update(reward_info)
         return reward, info
 

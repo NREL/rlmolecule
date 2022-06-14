@@ -30,6 +30,7 @@ from pymatgen.analysis.phase_diagram import PDEntry
 from rlmolecule.crystal.builder import CrystalBuilder
 from rlmolecule.crystal.crystal_problem import CrystalTFAlphaZeroProblem
 from rlmolecule.crystal.crystal_state import CrystalState
+from rlmolecule.crystal.preprocessor import CrystalPreprocessor
 from rlmolecule.crystal.ehull import fere_entries
 from rlmolecule.sql.run_config import RunConfig
 # from rlmolecule.tree_search.reward import RankedRewardFactory
@@ -128,13 +129,18 @@ def create_problem():
     #                                             max_reward=train_config.get('max_reward', 1))
 
     rewarder = CrystalStateReward(competing_phases,
-                                  prototype_structures, 
+                                  prototype_structures,
                                   energy_model,
                                   preprocessor,
                                   vol_pred_site_bias=site_bias)
 
+    proto_strc_names = [p.split("|")[-1] for p in prototype_structures.keys()]
+    gnn_preprocessor = CrystalPreprocessor(proto_strc_names=proto_strc_names,
+                                           max_stoich=12)
+
     problem = CrystalEnergyStabilityOptProblem(engine,
                                                rewarder,
+                                               preprocessor=gnn_preprocessor,
                                                run_id=run_id,
                                                reward_class=reward_factory,
                                                features=train_config.get('features', 64),
@@ -269,11 +275,6 @@ def monitor():
         time.sleep(5)
 
 
-# load the icsd prototype structures
-# https://pymatgen.org/usage.html#side-note-as-dict-from-dict
-icsd_prototypes_file = "../../rlmolecule/crystal/inputs/icsd_prototypes_lt50atoms_lt100dist.json.gz"
-prototype_structures = read_structures_file(icsd_prototypes_file)
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Run the battery structure stable energy optimization. ' +
@@ -299,25 +300,32 @@ if __name__ == "__main__":
     engine = run_config.start_engine()
 
     # Initialize the preprocessor class
-    #preprocessor = AtomicNumberPreprocessor()
-    preprocessor = PymatgenPreprocessor()
-    preprocessor_file = os.path.dirname(args.energy_model) + '/preprocessor.json'
-    preprocessor.from_json(preprocessor_file)
+    #preprocessor_file = os.path.dirname(args.energy_model) + '/preprocessor.json'
+    #if os.path.isfile(preprocessor_file):
+    #    print(f"Loading {preprocessor_file}")
+    #    preprocessor = PymatgenPreprocessor()
+    #    preprocessor.from_json(preprocessor_file)
+    #else:
+    preprocessor = AtomicNumberPreprocessor()
 
+    print(f"Reading {args.energy_model}")
     energy_model = tf.keras.models.load_model(args.energy_model,
                                               custom_objects={**custom_objects,
                                                               **{'RBFExpansion': RBFExpansion}})
     # Dataframe containing competing phases from NRELMatDB
-    print("Reading inputs/competing_phases.csv")
+    print("Building phase diagram entries from inputs/competing_phases.csv")
     df_competing_phases = pd.read_csv('inputs/competing_phases.csv')
-    print(f"\t{len(df_competing_phases)} lines")
-    print(df_competing_phases.head(2))
+    df_competing_phases['energy'] = (
+        df_competing_phases.energyperatom *
+        df_competing_phases.sortedformula.apply(lambda x: Composition(x).num_atoms)
+    )
     # convert the dataframe to a list of PDEntries used to create the convex hull
-    pd_entries = df_competing_phases.progress_apply(
+    pd_entries = df_competing_phases.apply(
         lambda row: PDEntry(Composition(row.sortedformula),
-                            row.energy), 
+                            row.energy),
         axis=1
     )
+    print(f"\t{len(pd_entries)} entries")
     competing_phases = pd.concat([pd.Series(fere_entries), pd_entries]).reset_index()[0]
 
     site_bias = None
@@ -343,6 +351,16 @@ if __name__ == "__main__":
               f"{len(actions_to_ignore) - num_acts} new actions to ignore")
         prob_config['actions_to_ignore'] = actions_to_ignore
 
+    # load the icsd prototype structures
+    prototypes_file = "../../rlmolecule/crystal/inputs/icsd_prototypes_lt50atoms_lt100dist.json.gz"
+    prototypes_file = prob_config.get('prototypes_file', prototypes_file)
+    prototype_structures = read_structures_file(prototypes_file)
+    # make sure the prototype structures don't have oxidation states
+    from pymatgen.transformations.standard_transformations import OxidationStateRemovalTransformation
+    oxidation_remover = OxidationStateRemovalTransformation()
+    prototype_structures = {s_id: oxidation_remover.apply_transformation(s)
+                            for s_id, s in prototype_structures.items()}
+
     Base.metadata.create_all(engine, checkfirst=True)
     Session.configure(bind=engine)
     session = Session()
@@ -351,7 +369,7 @@ if __name__ == "__main__":
         train_model()
     if args.rollout:
         # make sure the rollouts do not use the GPU
-        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+        #os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
         run_games()
     else:
         monitor()
