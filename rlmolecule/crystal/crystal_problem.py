@@ -29,25 +29,30 @@ class CrystalTFAlphaZeroProblem(CrystalProblem, TFAlphaZeroProblem, ABC):
     def __init__(self,
                  engine: sqlalchemy.engine.Engine,
                  preprocessor: Optional[CrystalPreprocessor] = None,
-                 preprocessor_data: Optional[str] = None,
                  features: int = 64,
                  num_heads: int = 4,
                  num_messages: int = 3,
-                 actions_to_ignore: Optional[set] = None,
                  **kwargs) -> None:
         self.num_messages = num_messages
         self.num_heads = num_heads
         self.features = features
         self.preprocessor = preprocessor if preprocessor is not None else CrystalPreprocessor()
-        self.actions_to_ignore = actions_to_ignore
+        # Each element has a stoichiometry, so just multiply by 2
+        self.num_eles_and_stoich = 2 * self.preprocessor.max_num_elements
+        # This is the size of the vocabulary
+        # UPDATE 20220614: rather than use a mapping for each element,
+        # and each element with its stoichiometry
+        # (e.g., Li1Sc1F4 would be Li, Li1, Sc, Sc1, F, F4),
+        # just use a mapping for the elements, and keep the stoichiometry separate
+        # e.g., Li1Sc1F4 would be Li, 1, Sc, 1, F, 4)
+        self.num_eles_and_stoich_comb = (len(self.preprocessor.elements)
+                                         + self.preprocessor.max_stoich)
+        self.num_crystal_sys = len(self.preprocessor.crystal_systems)
+        self.num_proto_strc = len(self.preprocessor.proto_strc_names)
         super(CrystalTFAlphaZeroProblem, self).__init__(engine=engine, **kwargs)
 
     def policy_model(self,
                      features: int = 64,
-                     num_eles_and_stoich: int = 10,
-                     num_eles_and_stoich_comb: int = 252,
-                     num_crystal_sys: int = 7,
-                     num_proto_strc: int = 4170,
                      ) -> tf.keras.Model:
         """ Constructs a policy model that predicts value, pi_logits from a batch of crystal inputs. Main model used in
         policy training and loading weights
@@ -56,37 +61,47 @@ class CrystalTFAlphaZeroProblem(CrystalProblem, TFAlphaZeroProblem, ABC):
         :return: The constructed policy model
         """
         # Define inputs
-        # 5 conducting ions, 8 anions, 17 framework cations, up to 8 elements in a composition.
-        # I will include the elements by themselves, and the elements with a stoichiometry e.g., 'Cl', 'Cl6'
-        # TODO Many element stoichiometries are not present. For now I will just include all of them
+        # 5 conducting ions, 8 anions, 17 framework cations, up to 5 elements in a composition.
+        # I will include the elements by themselves,
+        # and the elements with a stoichiometry e.g., 'Cl', 'Cl6'
+        # TODO Many element stoichiometries are not present.
+        # For now I will just include all of them
         # There are up to 10 items here:
         # 1 conducting ion, 2 anions, 2 framework cations, and a stoichiometry for each
-        # e.g., for K1La1Sb2I2N4: K, K1, La, La1, Sb, Sb2, I, I2, N, N4
-        element_class = layers.Input(shape=[num_eles_and_stoich], dtype=tf.int64, name='eles_and_stoich')
+        # e.g., for K1La1Sb2I2N4: K, 1, La, 1, Sb, 2, I, 2, N, 4
+        element_class = layers.Input(shape=[self.num_eles_and_stoich],
+                                     dtype=tf.int64, name='eles_and_stoich')
         # 7 crystal systems
-        crystal_sys_class = layers.Input(shape=[1], dtype=tf.int64, name='crystal_sys')
+        crystal_sys_class = layers.Input(shape=[1],
+                                         dtype=tf.int64, name='crystal_sys')
         # 4170 total prototype structures
-        proto_strc_class = layers.Input(shape=[1], dtype=tf.int64, name='proto_strc')
+        proto_strc_class = layers.Input(shape=[1],
+                                        dtype=tf.int64, name='proto_strc')
 
         input_tensors = [element_class, crystal_sys_class, proto_strc_class]
 
         element_embedding = layers.Embedding(
-            input_dim=num_eles_and_stoich_comb + 1, output_dim=features,
-            input_length=num_eles_and_stoich, mask_zero=True, name='element_embedding')(element_class)
+            input_dim=self.num_eles_and_stoich_comb + 1, output_dim=features,
+            input_length=self.num_eles_and_stoich, mask_zero=True,
+            name='element_embedding')(element_class)
         # sum the embeddings of each of the elements
         element_embedding = layers.Lambda(lambda x: tf.keras.backend.sum(x, axis=-2, keepdims=True),
                                           output_shape=lambda s: (s[-1],))(element_embedding)
         element_embedding = layers.Reshape((-1, features))(element_embedding)
 
         crystal_sys_embedding = layers.Embedding(
-            input_dim=num_crystal_sys + 1, output_dim=features,
-            input_length=1, mask_zero=True, name='crystal_sys_embedding')(crystal_sys_class)
+            input_dim=self.num_crystal_sys + 1, output_dim=features,
+            input_length=1, mask_zero=True,
+            name='crystal_sys_embedding')(crystal_sys_class)
         proto_strc_embedding = layers.Embedding(
-            input_dim=num_proto_strc + 1, output_dim=features,
-            input_length=1, mask_zero=True, name='proto_strc_embedding')(proto_strc_class)
+            input_dim=self.num_proto_strc + 1, output_dim=features,
+            input_length=1, mask_zero=True,
+            name='proto_strc_embedding')(proto_strc_class)
 
         # Merge all available features into a single large vector via concatenation
-        x = layers.concatenate([element_embedding, crystal_sys_embedding, proto_strc_embedding])
+        x = layers.concatenate([element_embedding,
+                                crystal_sys_embedding,
+                                proto_strc_embedding])
 
         # pass the features through a couple of dense layers
         x = layers.Dense(features, activation='relu')(x)

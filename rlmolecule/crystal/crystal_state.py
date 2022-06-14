@@ -117,7 +117,8 @@ class CrystalState(GraphSearchState):
         comp = Composition(composition)
 
         prototype_comp = Composition(icsd_prototype.formula).reduced_composition
-        prototype_stoic = tuple([int(p) for p in prototype_comp.formula if p.isdigit()])
+        ele_to_stoich = prototype_comp.to_data_dict['unit_cell_composition']
+        prototype_stoic = tuple([int(s) for s in ele_to_stoich.values()])
 
         # create permutations of order of elements within a composition
         # e.g., for K1Br1: [('K1', 'Br1'), ('Br1', 'K1')]

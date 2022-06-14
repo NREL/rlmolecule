@@ -135,8 +135,11 @@ def create_problem():
                                   vol_pred_site_bias=site_bias)
 
     proto_strc_names = [p.split("|")[-1] for p in prototype_structures.keys()]
+    # TODO get the maximum stoichiometry and num elements automatically
     gnn_preprocessor = CrystalPreprocessor(proto_strc_names=proto_strc_names,
-                                           max_stoich=12)
+                                           max_stoich=11,
+                                           max_num_elements=5,
+                                           )
 
     problem = CrystalEnergyStabilityOptProblem(engine,
                                                rewarder,
