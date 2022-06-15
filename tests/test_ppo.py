@@ -2,7 +2,6 @@ import pytest
 import rdkit.Chem
 from graphenv.graph_env import GraphEnv
 from ray.rllib.agents import ppo
-from ray.rllib.env.env_context import EnvContext
 from ray.rllib.models import ModelCatalog
 from ray.tune.registry import register_env
 from rlmolecule.builder import MoleculeBuilder
@@ -34,23 +33,16 @@ def ppo_config():
     return ppo_config
 
 
-def test_ppo(ray_init, ppo_config):
+def test_ppo(qed_root, ray_init, ppo_config):
 
     ModelCatalog.register_custom_model("MoleculeModel", MoleculeModel)
     register_env("GraphEnv", lambda config: GraphEnv(config))
 
-    qed_state = QEDState(
-        rdkit.Chem.MolFromSmiles("C"),
-        builder=MoleculeBuilder(max_atoms=5),
-        smiles="C",
-        max_num_actions=20,
-    )
-
     config = {
         "env": "GraphEnv",
         "env_config": {
-            "state": qed_state,
-            "max_num_children": qed_state.max_num_actions,
+            "state": qed_root,
+            "max_num_children": qed_root.max_num_actions,
         },
         "model": {
             "custom_model": "MoleculeModel",

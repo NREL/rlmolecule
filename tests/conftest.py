@@ -38,4 +38,9 @@ def tmpdirname():
 
 @pytest.fixture
 def qed_root(builder: MoleculeBuilder) -> QEDState:
-    return QEDState(rdkit.Chem.MolFromSmiles("C"), builder)
+    return QEDState(
+        rdkit.Chem.MolFromSmiles("C"),
+        builder,
+        smiles="C",
+        max_num_actions=20,
+    )
