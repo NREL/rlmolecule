@@ -11,20 +11,6 @@ from rlmolecule.molecule_model import MoleculeModel
 from rlmolecule.policy.preprocessor import load_preprocessor
 
 
-class MoleculeEnv(GraphEnv):
-    def __init__(self, config: EnvContext, *args, **kwargs) -> None:
-        mol = rdkit.Chem.MolFromSmiles(config["initial_smiles"])
-        builder = MoleculeBuilder(**config.pop("builder", {}))
-        state = config.pop("molecule_state")(
-            mol,
-            builder=builder,
-            smiles=config["initial_smiles"],
-            max_num_actions=config["max_num_children"],
-        )
-        config["state"] = state
-        super().__init__(config, *args, **kwargs)
-
-
 @pytest.fixture
 def ppo_config():
 

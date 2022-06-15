@@ -6,6 +6,7 @@ import rdkit
 from ray.rllib.utils.framework import try_import_tf
 from rdkit.Chem.QED import qed
 from rlmolecule.builder import MoleculeBuilder
+from rlmolecule.examples.qed import QEDState
 from rlmolecule.molecule_state import MoleculeState
 
 tf1, tf, tfv = try_import_tf(error=True)
@@ -33,15 +34,6 @@ def tmpdirname():
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         yield tmpdir
-
-
-class QEDState(MoleculeState):
-    @property
-    def reward(self) -> float:
-        if self.forced_terminal:
-            return qed(self.molecule)
-        else:
-            return 0.0
 
 
 @pytest.fixture
