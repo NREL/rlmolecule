@@ -5,9 +5,12 @@ from typing import Optional, Sequence
 
 import rdkit
 from rdkit import Chem
-from rdkit.Chem import Mol, FragmentCatalog
-
-from rlmolecule.molecule.builder.builder import MoleculeBuilder, AddNewAtomsAndBonds, MoleculeFilter
+from rdkit.Chem import FragmentCatalog, Mol
+from rlmolecule.molecule.builder.builder import (
+    AddNewAtomsAndBonds,
+    MoleculeBuilder,
+    MoleculeFilter,
+)
 from rlmolecule.molecule.molecule_state import MoleculeState
 from rlmolecule.tree_search.metrics import collect_metrics
 
@@ -32,16 +35,18 @@ class MoleculeBuilderWithFingerprint(MoleculeBuilder):
 class MoleculeBuilderProtectRadical(MoleculeBuilderWithFingerprint):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.transformation_stack[0] = AddNewAtomsAndBondsProtectRadical(kwargs['atom_additions'])
+        self.transformation_stack[0] = AddNewAtomsAndBondsProtectRadical(
+            kwargs["atom_additions"]
+        )
 
 
 class FingerprintFilter(MoleculeFilter):
     def __init__(self):
         super(FingerprintFilter, self).__init__()
-        with gzip.open(os.path.join(dir_path, 'redox_fragment_data.pz')) as f:
+        with gzip.open(os.path.join(dir_path, "redox_fragment_data.pz")) as f:
             data = pickle.load(f)
-        self.fcat = data['fcat']
-        self.valid_fps = set(data['valid_fps'])
+        self.fcat = data["fcat"]
+        self.valid_fps = set(data["valid_fps"])
 
     def get_fingerprint(self, mol):
         fcgen.AddFragsFromMol(mol, self.fcat)
@@ -59,33 +64,45 @@ class FingerprintFilter(MoleculeFilter):
 
 class StableRadMoleculeState(MoleculeState):
     """
-    A State implementation which uses simple transformations (such as adding a bond) to define a
-    graph of molecules that can be navigated.
+    A State implementation which uses simple transformations (such as adding a bond) to
+    define a graph of molecules that can be navigated.
     
-    Molecules are stored as rdkit Mol instances, and the rdkit-generated SMILES string is also stored for
-    efficient hashing.
+    Molecules are stored as rdkit Mol instances, and the rdkit-generated SMILES string
+    is also stored for efficient hashing.
     """
 
     def __init__(
-            self,
-            molecule: Mol,
-            builder: any,
-            force_terminal: bool = False,
-            smiles: Optional[str] = None,
+        self,
+        molecule: Mol,
+        builder: any,
+        force_terminal: bool = False,
+        smiles: Optional[str] = None,
     ) -> None:
-        super(StableRadMoleculeState, self).__init__(molecule, builder, force_terminal, smiles)
+        super(StableRadMoleculeState, self).__init__(
+            molecule, builder, force_terminal, smiles
+        )
 
     @collect_metrics
-    def get_next_actions(self) -> Sequence['StableRadMoleculeState']:
+    def get_next_actions(self) -> Sequence["StableRadMoleculeState"]:
         result = []
         if not self._forced_terminal:
             if self.num_atoms < self.builder.max_atoms:
                 result.extend(
-                    (StableRadMoleculeState(molecule, self.builder) for molecule in self.builder(self.molecule)))
+                    (
+                        StableRadMoleculeState(molecule, self.builder)
+                        for molecule in self.builder(self.molecule)
+                    )
+                )
 
             if self.num_atoms >= self.builder.min_atoms:
-                result.extend((StableRadMoleculeState(radical, self.builder, force_terminal=True)
-                               for radical in build_radicals(self.molecule)))
+                result.extend(
+                    (
+                        StableRadMoleculeState(
+                            radical, self.builder, force_terminal=True
+                        )
+                        for radical in build_radicals(self.molecule)
+                    )
+                )
 
         return result
 

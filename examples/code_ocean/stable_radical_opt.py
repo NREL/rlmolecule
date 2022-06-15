@@ -135,6 +135,7 @@ if __name__ == "__main__":
         jobs = [
             multiprocessing.Process(target=monitor, args=(run_config,), kwargs=kwargs)
         ]
+        jobs[0].daemon = True
         jobs[0].start()
         time.sleep(1)
 
@@ -152,7 +153,12 @@ if __name__ == "__main__":
         ]
 
         for job in jobs[1:]:
+            job.daemon = True
             job.start()
 
-        for job in jobs:
-            job.join(300)
+        # Wait for 30 minutes, and then exit
+        start_time = time.time()
+        while True:
+            time.sleep(30)
+            if (time.time() - start_time) > 1800:
+                break

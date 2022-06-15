@@ -6,10 +6,12 @@ import rdkit
 import tensorflow as tf
 from rdkit import Chem
 
-sys.path.append('/projects/rlmolecule/pstjohn/models/20201031_bde/')
+sys.path.append("/projects/rlmolecule/pstjohn/models/20201031_bde/")
 from preprocess_inputs import preprocessor as bde_preprocessor
 
-bde_preprocessor.from_json('/projects/rlmolecule/pstjohn/models/20201031_bde/preprocessor.json')
+bde_preprocessor.from_json(
+    "/projects/rlmolecule/pstjohn/models/20201031_bde/preprocessor.json"
+)
 
 
 def prepare_for_bde(mol: rdkit.Chem.Mol) -> pd.Series:
@@ -31,30 +33,39 @@ def prepare_for_bde(mol: rdkit.Chem.Mol) -> pd.Series:
     # TODO this line seems redundant
     mol = Chem.MolFromSmiles(mol_smiles)
 
-    radical_index_reordered = list(Chem.CanonicalRankAtoms(mol, includeChirality=True)).index(radical_rank)
+    radical_index_reordered = list(
+        Chem.CanonicalRankAtoms(mol, includeChirality=True)
+    ).index(radical_rank)
 
     molH = Chem.AddHs(mol)
     for bond in molH.GetAtomWithIdx(radical_index_reordered).GetBonds():
-        if 'H' in {bond.GetBeginAtom().GetSymbol(), bond.GetEndAtom().GetSymbol()}:
+        if "H" in {bond.GetBeginAtom().GetSymbol(), bond.GetEndAtom().GetSymbol()}:
             bond_index = bond.GetIdx()
             break
     else:
-        raise RuntimeError('Bond not found')
+        raise RuntimeError("Bond not found")
 
     h_bond_indices = [
-        bond.GetIdx() for bond in filter(
-            lambda bond: ((bond.GetEndAtom().GetSymbol() == 'H')
-                          | (bond.GetBeginAtom().GetSymbol() == 'H')), molH.GetBonds())
+        bond.GetIdx()
+        for bond in filter(
+            lambda bond: (
+                (bond.GetEndAtom().GetSymbol() == "H")
+                | (bond.GetBeginAtom().GetSymbol() == "H")
+            ),
+            molH.GetBonds(),
+        )
     ]
 
     other_h_bonds = list(set(h_bond_indices) - {bond_index})
 
-    return pd.Series({
-        'mol_smiles': mol_smiles,
-        'radical_index_mol': radical_index_reordered,
-        'bond_index': bond_index,
-        'other_h_bonds': other_h_bonds
-    })
+    return pd.Series(
+        {
+            "mol_smiles": mol_smiles,
+            "radical_index_mol": radical_index_reordered,
+            "bond_index": bond_index,
+            "other_h_bonds": other_h_bonds,
+        }
+    )
 
 
 def bde_get_inputs(mol_smiles) -> {}:
@@ -62,5 +73,5 @@ def bde_get_inputs(mol_smiles) -> {}:
     so we need to use corresponding preprocessor here
     """
     inputs = bde_preprocessor.construct_feature_matrices(mol_smiles, train=False)
-    assert not (inputs['atom'] == 1).any() | (inputs['bond'] == 1).any()
+    assert not (inputs["atom"] == 1).any() | (inputs["bond"] == 1).any()
     return {key: tf.constant(np.expand_dims(val, 0)) for key, val in inputs.items()}
