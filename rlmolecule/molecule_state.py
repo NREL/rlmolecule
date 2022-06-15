@@ -65,9 +65,9 @@ class MoleculeState(Vertex):
             return []
 
         next_molecules = list(self.builder(self.molecule))
-        if len(next_molecules) > self.max_num_actions:
+        if len(next_molecules) >= self.max_num_actions:
             logger.warning(
-                f"{self} has {len(next_molecules)} next actions when the "
+                f"{self} has {len(next_molecules) + 1} next actions when the "
                 f"maximum is {self.max_num_actions}"
             )
             next_molecules = random.sample(next_molecules, self.max_num_actions)
@@ -76,6 +76,9 @@ class MoleculeState(Vertex):
         next_actions.append(
             self.new(self.molecule, force_terminal=True, smiles=self.smiles)
         )
+
+        logger.debug(f"Returning {len(next_actions)} for state {self.smiles}")
+
         return next_actions
 
     def _make_observation(self) -> Dict[str, np.ndarray]:

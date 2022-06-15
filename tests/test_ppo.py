@@ -5,20 +5,10 @@ from ray.rllib.agents import ppo
 from ray.rllib.env.env_context import EnvContext
 from ray.rllib.models import ModelCatalog
 from ray.tune.registry import register_env
-from rdkit.Chem.QED import qed
 from rlmolecule.builder import MoleculeBuilder
+from rlmolecule.examples.qed import QEDState
 from rlmolecule.molecule_model import MoleculeModel
-from rlmolecule.molecule_state import MoleculeState
 from rlmolecule.policy.preprocessor import load_preprocessor
-
-
-class QEDState(MoleculeState):
-    @property
-    def reward(self) -> float:
-        if self.forced_terminal:
-            return qed(self.molecule)
-        else:
-            return 0.0
 
 
 class MoleculeEnv(GraphEnv):
@@ -61,15 +51,20 @@ def ppo_config():
 def test_ppo(ray_init, ppo_config):
 
     ModelCatalog.register_custom_model("MoleculeModel", MoleculeModel)
-    register_env("MoleculeEnv", lambda config: MoleculeEnv(config))
+    register_env("GraphEnv", lambda config: GraphEnv(config))
+
+    qed_state = QEDState(
+        rdkit.Chem.MolFromSmiles("C"),
+        builder=MoleculeBuilder(max_atoms=5),
+        smiles="C",
+        max_num_actions=20,
+    )
 
     config = {
-        "env": "MoleculeEnv",
+        "env": "GraphEnv",
         "env_config": {
-            "molecule_state": QEDState,
-            "initial_smiles": "C",
-            "builder": {"max_atoms": 5},
-            "max_num_children": 20,
+            "state": qed_state,
+            "max_num_children": qed_state.max_num_actions,
         },
         "model": {
             "custom_model": "MoleculeModel",
