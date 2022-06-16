@@ -143,8 +143,7 @@ class StructureRewardBattInterface:
         except ValueError as e:
             print(f"ValueError: {e}. State: {state}")
 
-        info.update({s: np.round(r, 4) for s, r in sub_rewards.items()})
-        print(str(state))
+        info.update({s: round(r, 4) for s, r in sub_rewards.items()})
         combined_reward = self.combine_rewards(sub_rewards)
         #print(str(state), combined_reward, info)
 
@@ -205,14 +204,14 @@ class StructureRewardBattInterface:
             scaled_rewards[key] = scaled_reward
 
         # Now apply the weights to each sub-reward
-        weighted_rewards = {k: v * self.reward_weights[k]
-                            for k, v in scaled_rewards.items()}
-        print(raw_scores)
-        print(scaled_rewards)
-        print(weighted_rewards)
+        #weighted_rewards = {k: v * self.reward_weights[k]
+        #                    for k, v in scaled_rewards.items()}
+        #print(raw_scores)
+        #print(scaled_rewards)
+        #print(weighted_rewards)
         combined_reward = sum([v * self.reward_weights[k]
                                for k, v in scaled_rewards.items()])
-        print(combined_reward)
+        #print(combined_reward)
 
         return combined_reward
 
