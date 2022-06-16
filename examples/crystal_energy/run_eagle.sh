@@ -19,12 +19,12 @@ mkdir -p $WORKING_DIR
 
 #ENERGY_MODEL="inputs/models/2022_05_04/battery_unrel_pred_vol/no_2xbound_randsub0_05_seed1/best_model.hdf5"
 #ENERGY_MODEL="inputs/models/2022_05_04/icsd_battrel_vol_pred_vol/randsub0_05_randsub0_05_holdout_match_seed1/best_model.hdf5"
-ENERGY_MODEL="inputs/models/2022_06_07_pruned_outliers/icsd_and_battery_pred_vol/best_model.hdf5"
+#ENERGY_MODEL="inputs/models/2022_06_07_pruned_outliers/icsd_and_battery_pred_vol/best_model.hdf5"
 # This model was trained on the normalized / scaled structures
-#ENERGY_MODEL="inputs/models/2022_06_07_pruned_outliers/icsd_and_battery_scaled/best_model.hdf5"
+ENERGY_MODEL="inputs/models/2022_06_07_pruned_outliers/icsd_and_battery_scaled/best_model.hdf5"
 # Use this option when the energy model was trained on structures with predicted volume
 # so that the input structures will also have their predicted volume applied
-VOL_PRED="--vol-pred-site-bias /projects/rlmolecule/pstjohn/crystal_inputs/site_volumes_from_icsd.csv"
+#VOL_PRED="--vol-pred-site-bias /projects/rlmolecule/pstjohn/crystal_inputs/site_volumes_from_icsd.csv"
 
 # copy the config file with the rest of the results
 SCRIPT_CONFIG="$WORKING_DIR/run.yaml"
@@ -34,7 +34,7 @@ sed -i "s/crystal_energy_example/$run_id/" $SCRIPT_CONFIG
 
 echo """#!/bin/bash
 #SBATCH --account=rlmolecule
-#SBATCH --time=4:00:00  
+#SBATCH --time=0:30:00  
 #SBATCH --job-name=$run_id
 #SBATCH --mail-type=END
 #SBATCH --mail-user=$USER@nrel.gov

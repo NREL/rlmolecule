@@ -183,7 +183,7 @@ def run_games():
     # game = MCTS(
     #    create_problem(),
     # )
-    i = 0
+    i = 1
     states_seen = set()
     # remove deadends before starting the rollouts
     set_states_seen(game, states_seen)
@@ -194,7 +194,7 @@ def run_games():
         )
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1]}')
 
-        if i % 2 == 0:
+        if i % 3 == 0:
             set_states_seen(game, states_seen)
         i += 1
 
@@ -210,8 +210,8 @@ def set_states_seen(game, states_seen):
                             .statement, session.bind)
     # only keep the terminal states, and those with a reward value above a cutoff
     # Since states with low reward values won't be repeatedly selected,
-    # the reward cutoff should be able to be relatively high e.g., > 0
-    reward_cutoff = -.5
+    # not all previously seen decorations need to be removed 
+    reward_cutoff = 0.25
     df['state'] = df['data'].apply(lambda x: x['state_repr'])
     df['terminal'] = df['data'].apply(lambda x: str(x['terminal']).lower() == "true")
     states = set(df[(df['terminal']) & (df['reward'] > reward_cutoff)]['state'].values)
