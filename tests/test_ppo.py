@@ -1,11 +1,8 @@
 import pytest
-import rdkit.Chem
 from graphenv.graph_env import GraphEnv
 from ray.rllib.agents import ppo
 from ray.rllib.models import ModelCatalog
 from ray.tune.registry import register_env
-from rlmolecule.builder import MoleculeBuilder
-from rlmolecule.examples.qed import QEDState
 from rlmolecule.molecule_model import MoleculeModel
 from rlmolecule.policy.preprocessor import load_preprocessor
 

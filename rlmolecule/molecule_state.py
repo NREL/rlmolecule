@@ -70,7 +70,7 @@ class MoleculeState(Vertex):
                 f"{self} has {len(next_molecules) + 1} next actions when the "
                 f"maximum is {self.max_num_actions}"
             )
-            next_molecules = random.sample(next_molecules, self.max_num_actions)
+            next_molecules = random.sample(next_molecules, self.max_num_actions - 1)
 
         next_actions = [self.new(molecule) for molecule in next_molecules]
         next_actions.append(
@@ -114,12 +114,17 @@ class MoleculeState(Vertex):
         )
 
     def new(
-        self,
-        molecule: Mol,
-        force_terminal: bool = False,
-        smiles: Optional[str] = None,
+        self, molecule: Mol, force_terminal: bool = False, smiles: Optional[str] = None,
     ) -> V:
-        return self.__class__(molecule, self.builder, force_terminal, smiles)
+        return self.__class__(
+            molecule,
+            self.builder,
+            force_terminal,
+            smiles,
+            max_num_actions=self.max_num_actions,
+            max_num_bonds=self.max_num_bonds,
+            preprocessor=self.preprocessor,
+        )
 
     @property
     def forced_terminal(self) -> bool:
