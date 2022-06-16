@@ -10,7 +10,7 @@ from typing import Dict, Optional, Tuple
 import numpy as np
 import sqlalchemy
 import tensorflow as tf
-from tensorflow.python.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 from rlmolecule.alphazero.alphazero_problem import AlphaZeroProblem
 from rlmolecule.alphazero.alphazero_vertex import AlphaZeroVertex
@@ -50,13 +50,19 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
         return {key: np.array(0, dtype=val.dtype.as_numpy_dtype)
                 for key, val in zip(initial_inputs.keys(), model_inputs)}
 
+    @collect_metrics
     def initialize_run(self):
         """
         Load the most recent policy checkpoint
         """
         super().initialize_run()
 
-        new_checkpoint = tf.train.latest_checkpoint(self.policy_checkpoint_dir)
+        policy_checkpoint_dir = self.policy_checkpoint_dir
+        local_checkpoint = "/tmp/scratch/checkpoint"
+        if os.path.isfile(local_checkpoint):
+            policy_checkpoint_dir = "/tmp/scratch"
+
+        new_checkpoint = tf.train.latest_checkpoint(policy_checkpoint_dir)
         if new_checkpoint != self._checkpoint:
             self._checkpoint = new_checkpoint
             status = self.batched_policy_model.load_weights(self._checkpoint)
