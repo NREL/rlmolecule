@@ -5,7 +5,7 @@ import argparse
 import logging
 import os
 import sys
-from tqdm import tqdm
+from tqdm.auto import tqdm
 import random
 import json
 import gzip
@@ -50,6 +50,26 @@ class AtomicNumberPreprocessor(PymatgenPreprocessor):
         return self._max_atomic_num
 
 
+def load_competing_phases(competing_phases_file):
+    df_competing_phases = pd.read_csv(competing_phases_file)
+    print(f"\t{len(df_competing_phases)} lines")
+    print(df_competing_phases.head(2))
+
+    df_competing_phases['energy'] = (
+        df_competing_phases.energyperatom *
+        df_competing_phases.sortedformula.apply(lambda x: Composition(x).num_atoms)
+    )
+    # convert the dataframe to a list of PDEntries used to create the convex hull
+    pd_entries = df_competing_phases.apply(
+        lambda row: PDEntry(Composition(row.sortedformula),
+                            row.energy),
+        axis=1
+    )
+    print(f"\t{len(pd_entries)} entries")
+    competing_phases = pd.concat([pd.Series(fere_entries), pd_entries]).reset_index()[0]
+    return competing_phases
+
+
 def read_structures_file(structures_file):
     logger.info(f"reading {structures_file}")
     with gzip.open(structures_file, 'r') as f:
@@ -84,19 +104,23 @@ def generate_structures(decor_ids, rewarder):
 
 def compute_rewards(decor_ids, rewarder, info_to_keep=None):
     for decor_id in tqdm(decor_ids):
-        # generate the decorated structure and get the reward
-        #Example state:
-        # CrystalState("_1_3_6|trigonal|icsd_401335|1", composition="Li3Sc1Br6", terminal=True)
-        comp = decor_id.split('|')[0]
-        action_node = '|'.join(decor_id.split('|')[1:])
-        state = CrystalState(action_node, composition=comp, terminal=True)
-        reward, info = rewarder.get_reward(state)
-        if info_to_keep is not None:
-            info = [round(info[c], 3) for c in info_to_keep if c in info]
-        else:
-            info = [round(val, 3) for key, val in info.items()]
+        yield from compute_reward(decor_id, rewarder, info_to_keep)
 
-        yield(tuple([decor_id, round(reward, 3)] + info))
+
+def compute_reward(decor_id, rewarder, info_to_keep=None):
+    # generate the decorated structure and get the reward
+    #Example state:
+    # CrystalState("_1_3_6|trigonal|icsd_401335|1", composition="Li3Sc1Br6", terminal=True)
+    comp = decor_id.split('|')[0]
+    action_node = '|'.join(decor_id.split('|')[1:])
+    state = CrystalState(action_node, composition=comp, terminal=True)
+    reward, info = rewarder.get_reward(state)
+    if info_to_keep is not None:
+        info = [round(info[c], 3) for c in info_to_keep if c in info]
+    else:
+        info = [round(val, 3) for key, val in info.items()]
+
+    return tuple([decor_id, round(reward, 3)] + info)
 
 
 class GenerateDecorations:
@@ -190,6 +214,14 @@ def main():
     #            # if there are missing rows, then add nans in their place
     #            row = list(row) + [''] * (len(info_to_keep) + 2 - len(row))
     #        out.write((','.join(str(x) for x in row) + '\n').encode())
+
+
+def load_model(model_file):
+    print(f"Reading {model_file}")
+    energy_model = tf.keras.models.load_model(model_file,
+                                              custom_objects={**custom_objects,
+                                                              **{'RBFExpansion': RBFExpansion}})
+    return energy_model
     
 
 if __name__ == "__main__":
@@ -218,23 +250,8 @@ if __name__ == "__main__":
     run_id = run_config.run_id
 
     # Dataframe containing competing phases from NRELMatDB
-    print("Reading inputs/competing_phases.csv")
-    df_competing_phases = pd.read_csv('inputs/competing_phases.csv')
-    print(f"\t{len(df_competing_phases)} lines")
-    print(df_competing_phases.head(2))
-
-    df_competing_phases['energy'] = (
-        df_competing_phases.energyperatom *
-        df_competing_phases.sortedformula.apply(lambda x: Composition(x).num_atoms)
-    )
-    # convert the dataframe to a list of PDEntries used to create the convex hull
-    pd_entries = df_competing_phases.apply(
-        lambda row: PDEntry(Composition(row.sortedformula),
-                            row.energy),
-        axis=1
-    )
-    print(f"\t{len(pd_entries)} entries")
-    competing_phases = pd.concat([pd.Series(fere_entries), pd_entries]).reset_index()[0]
+    print("Loading inputs/competing_phases.csv")
+    competing_phases = load_competing_phases("inputs/competing_phases.csv")
 
     # load the icsd prototype structures
     prob_config = run_config.problem_config
@@ -248,10 +265,7 @@ if __name__ == "__main__":
                             for s_id, s in prototype_structures.items()}
 
     preprocessor = AtomicNumberPreprocessor()
-    print(f"Reading {args.energy_model}")
-    energy_model = tf.keras.models.load_model(args.energy_model,
-                                              custom_objects={**custom_objects,
-                                                              **{'RBFExpansion': RBFExpansion}})
+    energy_model = load_model(args.energy_model)
 
     decor_ids = set()
     if args.decor_ids_file is not None:
