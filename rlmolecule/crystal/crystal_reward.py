@@ -35,7 +35,8 @@ class StructureRewardBattInterface:
                  competing_phases: List[PDEntry],
                  reward_weights: dict = None,
                  reward_cutoffs: dict = None,
-                 cutoff_penalty: float = 3,
+                 cutoff_penalty: float = 2,
+                 sub_rewards: Optional[List[str]] = None,
                  **kwargs) -> None:
         """ A class to estimate the suitability of a crystal structure as a solid state battery interface.
 
@@ -43,27 +44,34 @@ class StructureRewardBattInterface:
             construct the convex hull for the elements of the given composition
         :param reward_weights: Weights specifying how the individual rewards will be combined.
         For example: `{"decomp_energy": 0.5, "cond_ion_frac": 0.1, [...]}`
+        :param sub_rewards: Use only the specified sub rewards e.g., ['decomp_energy']
         """
         self.competing_phases = competing_phases
+        self.reward_weights = reward_weights
+        self.reward_cutoffs = reward_cutoffs
+        self.sub_rewards = sub_rewards
+        self.cutoff_penalty = cutoff_penalty
+        # if the structure passes all cutoffs, then it gets a bonus
+        # added to the combined reward
+        self.cutoff_bonus = .25
+        # For these rewards, smaller is better
+        self.rewards_to_minimize = ['decomp_energy', 'oxidation']
 
         # set the weights of the individual rewards
-        self.reward_weights = reward_weights
         if self.reward_weights is None:
-            self.reward_weights = {"decomp_energy": .5,
-                                   "cond_ion_frac": .3,
+            self.reward_weights = {"decomp_energy": 2/3,
+                                   "cond_ion_frac": 1/6,
                                    #"cond_ion_vol_frac": .1,
-                                   "reduction": .2 / 3,
-                                   "oxidation": .2 / 3,
-                                   "stability_window": .2 / 3,
+                                   "reduction": 1/18,
+                                   "oxidation": 1/18,
+                                   "stability_window": 1/18,
                                    }
         # set the cutoffs for the individual rewards
         # If the value does not fall in the desired range,
         # then apply a penalty.
-        # The penalty is: reward -= (reward_range / 3)
-        self.cutoff_penalty = 3  
-        self.reward_cutoffs = reward_cutoffs
+        # The penalty is: scaled_reward / cutoff_penalty
         if self.reward_cutoffs is None:
-            self.reward_cutoffs = {"decomp_energy": 0,
+            self.reward_cutoffs = {"decomp_energy": -0.1,
                                    "cond_ion_frac": .3,
                                    #"cond_ion_vol_frac": .3,
                                    "reduction": -2,
@@ -71,15 +79,35 @@ class StructureRewardBattInterface:
                                    "stability_window": 2,
                                    }
         self.reward_ranges = {"decomp_energy": (-1, 5),
-                              "cond_ion_frac": (.1, 0.6),
+                              "cond_ion_frac": (0, 0.6),
                               #"cond_ion_vol_frac": (0, 0.8),
                               "reduction": (-5, 0),
                               "oxidation": (-5, 0),
                               "stability_window": (0, 5),
                               }
-        # For these rewards, smaller is better
-        self.rewards_to_minimize = ['decomp_energy', 'oxidation']
         self.default_decomp_energy = self.reward_ranges['decomp_energy'][1]
+
+        # make sure the different reward dictionaries line up
+        matching_keys = (set(self.reward_weights.keys())
+                         & set(self.reward_cutoffs.keys())
+                         & set(self.reward_ranges.keys()))
+        assert len(matching_keys) == len(self.reward_weights), \
+               (f"reward_weights (len = {len(self.reward_weights)}), "
+                f"reward_cutoffs (len = {len(self.reward_cutoffs)}), "
+                f"and reward_ranges (len = {len(self.reward_ranges)}), "
+                f"must have matching keys. Keys that match all three: {matching_keys}")
+
+        if self.sub_rewards is not None:
+            num_matching = len(set(self.sub_rewards)
+                               & set(self.reward_weights.keys()))
+            assert num_matching == len(self.sub_rewards), \
+                   "sub_rewards must be a subset of reward_weights"
+            # don't use a cutoff bonus if not all subrewards are being used
+            if len(self.sub_rewards) < len(self.reward_weights):
+                print(f"Using {len(self.sub_rewards)} rewards: "
+                      f"{self.sub_rewards}")
+                print("Setting cutoff_bonus to 0")
+                self.cutoff_bonus = 0
 
     def compute_reward(self,
                        structure: Structure,
@@ -144,11 +172,15 @@ class StructureRewardBattInterface:
             print(f"ValueError: {e}. State: {state}")
 
         info.update({s: round(r, 4) for s, r in sub_rewards.items()})
+        if self.sub_rewards is not None:
+            # limit to the specified sub rewards
+            sub_rewards = {n: r for n, r in sub_rewards.items() if n in self.sub_rewards}
         combined_reward = self.combine_rewards(sub_rewards)
         #print(str(state), combined_reward, info)
 
         return combined_reward, info
 
+    # This actually takes longer than just computing the convex hull each time
 #    def precompute_convex_hulls(self, compositions):
 #        self.phase_diagrams = {}
 #        for comp in tqdm(compositions):
@@ -160,11 +192,17 @@ class StructureRewardBattInterface:
 #            phase_diagram = PhaseDiagram(curr_entries, elements=elements)
 #            self.phase_diagrams[comp] = phase_diagram
 
-    def combine_rewards(self, raw_scores) -> float:
+    def combine_rewards(self, raw_scores, return_weighted=False) -> float:
         """ Take the weighted average of the normalized sub-rewards
         For example, decomposition energy: 1.2, conducting ion frac: 0.1.
+        
+        :param raw_scores: Dictionary with the raw scores
+            for each type of sub-reward e.g., 'decomp_energy': 0.2
+        :param return_weighted: Return the weighted sub-rewards 
+            instead of their combined sum
         """
         scaled_rewards = {}
+        passed_cutoffs = True
         for key, score in raw_scores.items():
             if score is None:
                 continue
@@ -194,26 +232,33 @@ class StructureRewardBattInterface:
 
             # If the value does not fall in the desired range,
             # then apply a penalty
-            if key in self.reward_cutoffs:
+            if key in self.reward_cutoffs and len(raw_scores) > 1:
                 cutoff = self.reward_cutoffs[key]
                 if key in self.rewards_to_minimize:
                     cutoff = -1 * cutoff
                 if reward < cutoff:
                     scaled_reward /= float(self.cutoff_penalty)
+                    passed_cutoffs = False
 
             scaled_rewards[key] = scaled_reward
 
         # Now apply the weights to each sub-reward
-        #weighted_rewards = {k: v * self.reward_weights[k]
-        #                    for k, v in scaled_rewards.items()}
+        weighted_rewards = {k: v * self.reward_weights[k]
+                            for k, v in scaled_rewards.items()}
+        combined_reward = sum([v * self.reward_weights[k]
+                               for k, v in scaled_rewards.items()])
+        # If this structure passed all the cutoffs,
+        # then add a bonus to the reward
+        if passed_cutoffs and len(raw_scores) > 1:
+            combined_reward += self.cutoff_bonus
         #print(raw_scores)
         #print(scaled_rewards)
         #print(weighted_rewards)
-        combined_reward = sum([v * self.reward_weights[k]
-                               for k, v in scaled_rewards.items()])
         #print(combined_reward)
-
-        return combined_reward
+        if return_weighted:
+            return weighted_rewards
+        else:
+            return combined_reward
 
 
 class CrystalStateReward(StructureRewardBattInterface):
