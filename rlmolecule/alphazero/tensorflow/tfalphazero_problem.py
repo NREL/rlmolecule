@@ -63,7 +63,7 @@ class TFAlphaZeroProblem(AlphaZeroProblem):
             policy_checkpoint_dir = "/tmp/scratch"
 
         new_checkpoint = tf.train.latest_checkpoint(policy_checkpoint_dir)
-        if new_checkpoint != self._checkpoint:
+        if (new_checkpoint != self._checkpoint) & (new_checkpoint is not None):
             self._checkpoint = new_checkpoint
             status = self.batched_policy_model.load_weights(self._checkpoint)
             status.assert_existing_objects_matched()

@@ -15,14 +15,15 @@ import pandas as pd
 import random
 import json
 import gzip
+import zlib
 import pathlib
 import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
-from pymatgen.core import Structure
 from nfp import custom_objects
 from nfp.layers import RBFExpansion
 from nfp.preprocessing.crystal_preprocessor import PymatgenPreprocessor
+from pymatgen.core import Structure
 from pymatgen.core.periodic_table import Element
 from pymatgen.core import Composition, Structure
 from pymatgen.analysis.phase_diagram import PDEntry
@@ -33,7 +34,7 @@ from rlmolecule.crystal.crystal_state import CrystalState
 from rlmolecule.crystal.preprocessor import CrystalPreprocessor
 from rlmolecule.crystal.ehull import fere_entries
 from rlmolecule.sql.run_config import RunConfig
-# from rlmolecule.tree_search.reward import RankedRewardFactory
+from rlmolecule.tree_search.reward import LinearBoundedRewardFactory
 from rlmolecule.tree_search.reward import RankedRewardFactory
 from rlmolecule.sql import Base, Session
 from rlmolecule.sql.tables import GameStore, RewardStore
@@ -106,9 +107,6 @@ class CrystalEnergyStabilityOptProblem(CrystalTFAlphaZeroProblem):
         # self.initial_state = initial_state
         self.engine = engine
         self.rewarder = rewarder
-        # since the reward values can take positive or negative values, centered around 0,
-        # set the default reward lower so that failed runs have a smaller reward
-        self.default_reward = np.float64(-5)
         super(CrystalEnergyStabilityOptProblem, self).__init__(engine, **kwargs)
 
     def get_reward(self, state: CrystalState) -> Tuple[float, dict]:
@@ -119,20 +117,28 @@ def create_problem():
     run_id = run_config.run_id
     train_config = run_config.train_config
 
-    reward_factory = RankedRewardFactory(engine=engine,
-                                         run_id=run_id,
-                                         reward_buffer_min_size=train_config.get('reward_buffer_min_size', 10),
-                                         reward_buffer_max_size=train_config.get('reward_buffer_max_size', 50),
-                                         ranked_reward_alpha=train_config.get('ranked_reward_alpha', 0.75))
+    reward_type = train_config.get('reward_type', 'ranked')
+    if reward_type == "ranked":
+        reward_factory = RankedRewardFactory(engine=engine,
+                                             run_id=run_id,
+                                             reward_buffer_min_size=train_config.get('reward_buffer_min_size', 10),
+                                             reward_buffer_max_size=train_config.get('reward_buffer_max_size', 50),
+                                             ranked_reward_alpha=train_config.get('ranked_reward_alpha', 0.75))
 
-    # reward_factory = LinearBoundedRewardFactory(min_reward=train_config.get('min_reward', 0),
-    #                                             max_reward=train_config.get('max_reward', 1))
+    elif reward_type == "linear":
+        reward_factory = LinearBoundedRewardFactory(min_reward=train_config.get('min_reward', 0),
+                                                    max_reward=train_config.get('max_reward', 1))
+    else:
+        raise ValueError(f"reward_type '{reward_type}' not recognized. "
+                         f"Use either 'ranked' or 'linear'")
 
     rewarder = CrystalStateReward(competing_phases,
                                   prototype_structures,
                                   energy_model,
                                   preprocessor,
-                                  vol_pred_site_bias=site_bias)
+                                  vol_pred_site_bias=site_bias,
+                                  sub_rewards=train_config.get('sub_rewards')
+                                  )
 
     proto_strc_names = [p.split("|")[-1] for p in prototype_structures.keys()]
     # TODO get the maximum stoichiometry and num elements automatically
@@ -180,13 +186,12 @@ def run_games():
         ucb_constant=config.get('ucb_constant', math.sqrt(2)),
         state_builder=builder,
     )
-    # game = MCTS(
-    #    create_problem(),
-    # )
+
     i = 1
+    states_seen_file = "/tmp/scratch/states_seen.csv.gz"
     states_seen = set()
     # remove deadends before starting the rollouts
-    set_states_seen(game, states_seen)
+    set_states_seen(game, states_seen, states_seen_file)
     while True:
         path, reward = game.run(
             num_mcts_samples=config.get('num_mcts_samples', 5),
@@ -194,27 +199,41 @@ def run_games():
         )
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1]}')
 
-        if i % 3 == 0:
-            set_states_seen(game, states_seen)
+        if i % 5 == 0:
+            set_states_seen(game, states_seen, states_seen_file)
         i += 1
 
 
-def set_states_seen(game, states_seen):
-    start = time.process_time()
-    # UPDATE 2022-03-01:
+def set_states_seen(game, states_seen, states_seen_file=None):
+    start = time.time()
     # load the crystal states with a computed reward,
     # and add them to the states_to_ignore so they will not be
     # available as part of the search space anymore
-    df = pd.read_sql(session.query(RewardStore)
-                            .filter_by(run_id=run_config.run_id)
-                            .statement, session.bind)
-    # only keep the terminal states, and those with a reward value above a cutoff
-    # Since states with low reward values won't be repeatedly selected,
-    # not all previously seen decorations need to be removed 
-    reward_cutoff = 0.25
-    df['state'] = df['data'].apply(lambda x: x['state_repr'])
-    df['terminal'] = df['data'].apply(lambda x: str(x['terminal']).lower() == "true")
-    states = set(df[(df['terminal']) & (df['reward'] > reward_cutoff)]['state'].values)
+    if states_seen_file is None:
+        df = pd.read_sql(session.query(RewardStore)
+                                .filter_by(run_id=run_config.run_id)
+                                .statement, session.bind)
+        # only keep the terminal states, and those with a reward value above a cutoff
+        # Since states with low reward values won't be repeatedly selected,
+        # not all previously seen decorations need to be removed 
+        reward_cutoff = 0.25
+        df['state'] = df['data'].apply(lambda x: x['state_repr'])
+        df['terminal'] = df['data'].apply(lambda x: str(x['terminal']).lower() == "true")
+        states = set(df[(df['terminal']) & (df['reward'] > reward_cutoff)]['state'].values)
+    # UPDATE 2022-06-17: Reading from the RewardStore is taking way too long.
+    # Have a separate process read the RewardStore, and write to a file
+    else:
+        states = set()
+        if os.path.isfile(states_seen_file):
+            try:
+                states = set(pd.read_csv(states_seen_file)['states'])
+            except (OSError, ValueError, EOFError,
+                    gzip.BadGzipFile, zlib.error) as e:
+                logger.warning(e)
+                logger.warning(f"Failed loading {states_seen_file}.")
+        else:
+            logger.warning(f"states_seen_file '{states_seen_file}' not found")
+
     for state in states - states_seen:
         comp = state.split('|')[0]
         decoration_node = '|'.join(state.split('|')[1:])
@@ -225,11 +244,11 @@ def set_states_seen(game, states_seen):
     #      f"len(states_seen): {len(states_seen)}")
     # check to make sure there are no dead-ends e.g., compositions with no prototypes available
     game.state_builder.remove_dead_ends()
-    print(f"{len(game.state_builder.actions_to_ignore)}, "
-          f"{len(game.state_builder.actions_to_ignore_G2)}, "
-          f"{len(game.state_builder.states_to_ignore)} "
-          "actions to ignore in G, G2, and states, respectively")
-    print(f"\t took {time.process_time() - start:0.2f} sec")
+    logger.info(f"{len(game.state_builder.actions_to_ignore)}, "
+                f"{len(game.state_builder.actions_to_ignore_G2)}, "
+                f"{len(game.state_builder.states_to_ignore)} "
+                f"actions to ignore in G, G2, and states, respectively. "
+                f"Took {time.time() - start:0.2f} sec")
     return states_seen
 
 
