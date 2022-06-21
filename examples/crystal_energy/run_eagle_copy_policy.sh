@@ -33,13 +33,11 @@ cp $config_file $SCRIPT_CONFIG
 # also set the run_id in the config file
 sed -i "s/crystal_energy_example/$run_id/" $SCRIPT_CONFIG
 
-POLICY_CHECKPOINTS_DIR="$WORKING_DIR/policy_checkpoints"
 ROLLOUT_NODES_FILE="$WORKING_DIR/.rollout_nodes.txt"
 if [ -f $ROLLOUT_NODES_FILE ]; then
     rm $ROLLOUT_NODES_FILE
 fi
 
-##SBATCH --partition=debug
 echo """#!/bin/bash
 #SBATCH --account=rlmolecule
 #SBATCH --time=4:00:00  
@@ -106,7 +104,7 @@ source $HOME/.bashrc_conda
 module use /nopt/nrel/apps/modules/test/modulefiles/
 module load cudnn/8.1.1/cuda-11.2
 conda activate $CONDA_ENV
-python -u copy_policy.py $POLICY_CHECKPOINTS_DIR $ROLLOUT_NODES_FILE
+python -u copy_policy.py $SCRIPT_CONFIG 
 EOF
 
 
@@ -125,9 +123,11 @@ srun --pack-group=0 \
      "\$COPY_SCRIPT" &
 
 # there are 36 cores on each eagle node.
+# I tried using all 36 cores, 
+# but for some reason the node would then only run a couple at a time 
 srun --pack-group=1 \
-     --ntasks-per-node=36 \
-     --cpus-per-task=1 \
+     --ntasks-per-node=17 \
+     --cpus-per-task=2 \
      --job-name="az-rollout" \
      --output=$WORKING_DIR/%j-mcts.out \
      "\$ROLLOUT_SCRIPT"
