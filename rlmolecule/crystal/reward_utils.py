@@ -1,14 +1,9 @@
+
 import logging
-from collections import Counter
 from typing import Optional, Tuple
 import numpy as np
-import pandas as pd
-import tensorflow as tf
-import tensorflow_addons as tfa
 from pymatgen.analysis import local_env
-from pymatgen.analysis.structure_prediction.volume_predictor import DLSVolumePredictor
 from pymatgen.core import Composition, Element, Structure
-from nfp.preprocessing.crystal_preprocessor import PymatgenPreprocessor
 
 from rlmolecule.crystal.crystal_state import CrystalState
 
@@ -21,15 +16,6 @@ anions = set(['F', 'Cl', 'Br', 'I', 'O', 'S', 'N', 'P'])
 framework_cations = set(
     ['Sc', 'Y', 'La', 'Ti', 'Zr', 'Hf', 'W', 'Zn', 'Cd', 'Hg',
      'B', 'Al', 'Si', 'Ge', 'Sn', 'P', 'Sb'])
-
-# default weights for combining the rewards
-reward_weights = {"decomp_energy": .5,
-                  "cond_ion_frac": .1,
-                  "cond_ion_vol_frac": .1,
-                  "reduction": .1,
-                  "oxidation": .1,
-                  "stability_window": .1,
-                  }
 
 # Many structures fail with the default cutoff radius in Angstrom to look for near-neighbor atoms (13.0)
 # with the error: "No Voronoi neighbors found for site".
