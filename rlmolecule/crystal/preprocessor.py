@@ -19,7 +19,7 @@ default_crystal_systems = {'triclinic', 'monoclinic',
 dir_path = os.path.dirname(os.path.realpath(__file__))
 default_proto_names_file = os.path.join(dir_path,
                                         'inputs',
-                                        'icsd_prototype_filenames_lt50atoms_lt100dist.txt')
+                                        'icsd_prototype_filenames.txt')
 default_proto_strc_names = set()
 with open(default_proto_names_file, 'r') as f:
     for line in f:
