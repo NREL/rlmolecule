@@ -89,14 +89,6 @@ def generate_structures(decor_ids, rewarder):
         comp = decor_id.split('|')[0]
         action_node = '|'.join(decor_id.split('|')[1:])
         state = CrystalState(action_node, composition=comp, terminal=True)
-        # rather than compute the reward, just generate the structure
-        #reward, info = rewarder.get_reward(state)
-        #if info_to_keep is not None:
-        #    info = [round(info[c], 3) for c in info_to_keep if c in info]
-        #else:
-        #    info = [round(val, 3) for key, val in info.items()]
-
-        #yield(tuple([decor_id, round(reward, 3)] + info))
 
         structure = rewarder.generate_structure(state)
         yield(decor_id, structure)
@@ -104,7 +96,7 @@ def generate_structures(decor_ids, rewarder):
 
 def compute_rewards(decor_ids, rewarder, info_to_keep=None):
     for decor_id in tqdm(decor_ids):
-        yield from compute_reward(decor_id, rewarder, info_to_keep)
+        yield compute_reward(decor_id, rewarder, info_to_keep)
 
 
 def compute_reward(decor_id, rewarder, info_to_keep=None):
@@ -173,7 +165,7 @@ class GenerateDecorations:
                 yield(tuple([str(state), round(reward, 3)] + info))
 
 
-def main():
+def main(decor_ids):
     rewarder = CrystalStateReward(competing_phases,
                                   prototype_structures,
                                   energy_model,
@@ -186,34 +178,43 @@ def main():
         # generate all the decoration IDs
         prob_config = run_config.problem_config
         builder = CrystalBuilder(G=prob_config.get('action_graph1'),
-                                G2=prob_config.get('action_graph2'),
-                                actions_to_ignore=prob_config.get('actions_to_ignore'))
+                                 G2=prob_config.get('action_graph2'),
+                                 actions_to_ignore=prob_config.get('actions_to_ignore'))
 
         gen_decors = GenerateDecorations(builder, rewarder=rewarder, visited=states_seen)
         decor_ids = gen_decors.generate_all_decorations()
 
-    # now generate the decorations
-    decorations = generate_structures(decor_ids, rewarder)
+        if energy_model is None:
+            df = pd.DataFrame(decor_ids, columns=['decor_id'])
+            print(f"writing {args.out_file}")
+            df.to_csv(args.out_file)
 
-    # TODO Now write the structures
+    if energy_model is None:
+        # generate the decorated structures
+        decorations = generate_structures(decor_ids, rewarder)
+        # Now write the structures
+        df = pd.DataFrame(list(decorations), columns=['decor_id', 'structure'])
+        print(f"Writing pickle file {args.out_file}")
+        df.to_pickle(args.out_file)
+        return
 
     # code to compute the reward for each decoration
-    #info_to_keep = ['predicted_energy',
-    #                'decomp_energy',
-    #                'cond_ion_frac',
-    #                'reduction',
-    #                'oxidation',
-    #                'stability_window',
-    #                ]
-    #decoration_rewards = compute_rewards(decor_ids, rewarder, info_to_keep=info_to_keep)
-    #with gzip.open(args.out_file, 'w') as out:
-    #    #header = ','.join(["id", "reward"] + info_to_keep) + '\n'
-    #    #out.write(header.encode())
-    #    for row in decoration_rewards:
-    #        if len(row) != len(info_to_keep) + 2:
-    #            # if there are missing rows, then add nans in their place
-    #            row = list(row) + [''] * (len(info_to_keep) + 2 - len(row))
-    #        out.write((','.join(str(x) for x in row) + '\n').encode())
+    info_to_keep = ['predicted_energy',
+                    'decomp_energy',
+                    'cond_ion_frac',
+                    'reduction',
+                    'oxidation',
+                    'stability_window',
+                    ]
+    decoration_rewards = compute_rewards(decor_ids, rewarder, info_to_keep=info_to_keep)
+    with gzip.open(args.out_file, 'w') as out:
+        #header = ','.join(["id", "reward"] + info_to_keep) + '\n'
+        #out.write(header.encode())
+        for row in decoration_rewards:
+            if len(row) != len(info_to_keep) + 2:
+                # if there are missing rows, then add nans in their place
+                row = list(row) + [''] * (len(info_to_keep) + 2 - len(row))
+            out.write((','.join(str(x) for x in row) + '\n').encode())
 
 
 def load_model(model_file):
@@ -230,7 +231,6 @@ if __name__ == "__main__":
     parser.add_argument('--config', type=str, help='Configuration file')
     parser.add_argument('--energy-model',
                         type=pathlib.Path,
-                        required=True,
                         help='Model for predicting total energy of a battery system')
     parser.add_argument('--out-file',
                         type=pathlib.Path,
@@ -264,8 +264,11 @@ if __name__ == "__main__":
     prototype_structures = {s_id: oxidation_remover.apply_transformation(s)
                             for s_id, s in prototype_structures.items()}
 
-    preprocessor = AtomicNumberPreprocessor()
-    energy_model = load_model(args.energy_model)
+    energy_model = None
+    preprocessor = None
+    if args.energy_model is not None:
+        preprocessor = AtomicNumberPreprocessor()
+        energy_model = load_model(args.energy_model)
 
     decor_ids = set()
     if args.decor_ids_file is not None:
@@ -275,4 +278,4 @@ if __name__ == "__main__":
             print(f"{len(states)} states read from {decor_ids_file}")
         print(f"{len(decor_ids)} total")
 
-    main()
+    main(decor_ids)
