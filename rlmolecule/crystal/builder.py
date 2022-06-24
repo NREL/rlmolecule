@@ -24,6 +24,7 @@ class CrystalBuilder:
                  G: Optional[Union[nx.DiGraph, str]] = None,
                  G2: Optional[Union[nx.DiGraph, str]] = None,
                  actions_to_ignore: Optional[set] = None,
+                 prototypes: Optional[dict] = None,
                  ) -> None:
         """A class to build crystals according to a number of different options
 
@@ -58,6 +59,7 @@ class CrystalBuilder:
 
         self.G = G
         self.G2 = G2
+        self.prototypes = prototypes
 
         # Update: build the comp_to_comp_type dictionary on the fly
         # the first action graph G ends in the compositions, so we can extract those using the out degree
@@ -159,6 +161,11 @@ class CrystalBuilder:
                                               # structure=decorated_structure,
                                               terminal=terminal,
                                               )
+                    if terminal and self.prototypes is not None:
+                        # add the element replacements to the state
+                        structure_key = '|'.join(next_state.action_node.split('|')[:-1])
+                        icsd_prototype = self.prototypes[structure_key]
+                        next_state.set_proto_ele_replacements(icsd_prototype)
                     next_states.append(next_state)
                 return next_states
 

@@ -1,7 +1,9 @@
 import os
 from typing import List
+import itertools
 
 import numpy as np
+from pymatgen.core import Element
 
 from rlmolecule.crystal.crystal_state import CrystalState
 
@@ -54,10 +56,22 @@ class CrystalPreprocessor:
         self.proto_strc_names = proto_strc_names if proto_strc_names is not None else default_proto_strc_names
         self.max_stoich = max_stoich
         self.max_num_elements = max_num_elements
+        # we will use the set of all elements up to 83 for the prototype elements
+        self.max_ele_Z = 100
 
-        self.element_mapping = {ele: i for i, ele in enumerate(self.elements)}
+        #self.element_mapping = {ele: i for i, ele in enumerate(self.elements)}
+        elements_and_soich = [(ele + str(i)).replace('0', '')
+                              for ele in self.elements
+                              for i in range(self.max_stoich + 1)]
+        self.element_mapping = {ele: i for i, ele in enumerate(elements_and_soich)}
         self.crystal_sys_mapping = {c: i for i, c in enumerate(self.crystal_systems)}
         self.proto_strc_mapping = {p: i for i, p in enumerate(self.proto_strc_names)}
+        
+        self.proto_eles = [str(Element.from_Z(i)) for i in range(1, self.max_ele_Z)]
+        self.ele_replacement_mapping = {ele_comb: i
+                                        for i, ele_comb in enumerate(
+                                                itertools.product(sorted(self.elements),
+                                                                  self.proto_eles))}
 
     def construct_feature_matrices(self, state: CrystalState, train: bool = False) -> {}:
         """ Convert a crystal state to a list of tensors
@@ -94,9 +108,18 @@ class CrystalPreprocessor:
         for i, ele in enumerate(eles):
             ele_and_stoich_features += [self.element_mapping[ele] + 1]
             if stoich is not None:
-                ele_and_stoich_features += [stoich[i]]
+                ele_and_stoich = ele + str(stoich[i])
+                ele_and_stoich_features += [self.element_mapping[ele_and_stoich] + 1]
             else:
                 ele_and_stoich_features += [0]
+
+        # This vector has each element as well as its stoichiometry.
+        # Since there can be anywhere from 1 to 5 elements,
+        # maintain the length of the vector, and use 0 as the default
+        eles_stoich_vec = np.zeros(self.max_num_elements * 2)
+        eles_stoich_vec[:len(ele_and_stoich_features)] = np.asarray(
+                ele_and_stoich_features,
+                dtype=np.int64)
 
         crystal_sys = state.get_crystal_sys()
         if crystal_sys is not None:
@@ -110,17 +133,27 @@ class CrystalPreprocessor:
         else:
             proto_strc = 0
 
-        # This vector has each element as well as its stoichiometry.
-        # Since there can be anywhere from 1 to 5 elements,
-        # maintain the length of the vector, and use 0 as the default
-        eles_stoich_vec = np.zeros(self.max_num_elements * 2)
-        eles_stoich_vec[:len(ele_and_stoich_features)] = np.asarray(
-                ele_and_stoich_features,
-                dtype=np.int64)
+        proto_ele_vec = np.zeros(self.max_num_elements)
+        if state.terminal:
+            assert state.ele_replacements is not None, \
+                ("State is terminal. "
+                 "Element replacements used to decorate prototype structure should have been chosen")
+            proto_ele_replacements = []
+            # keep the same ordering as the composition elements
+            #for ele_replacement in state.ele_replacements.items():
+            for ele in eles:
+                ele_replacement = (ele, state.ele_replacements[ele])
+                proto_ele_replacements += [
+                    self.ele_replacement_mapping[ele_replacement]]
+
+            proto_ele_vec[:len(eles)] = np.asarray(
+                    proto_ele_replacements,
+                    dtype=np.int64)
 
         return {'eles_and_stoich': eles_stoich_vec,
                 'crystal_sys': np.asarray([crystal_sys], dtype=np.int64),
                 'proto_strc': np.asarray([proto_strc], dtype=np.int64),
+                'proto_ele_replacements': proto_ele_vec,
                 }
 
         # return {'eles_and_stoich': np.asarray([element_features]),

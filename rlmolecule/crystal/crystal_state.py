@@ -37,6 +37,9 @@ class CrystalState(GraphSearchState):
         self._composition: str = composition
         # self._structure: Optional[Structure] = structure
         self._terminal: bool = terminal
+        # these are the element replacements used
+        # to decorate the prototype structure
+        self._ele_replacements: Optional[dict] = None
 
     def __repr__(self) -> str:
         """
@@ -72,6 +75,46 @@ class CrystalState(GraphSearchState):
             result.extend(builder(self))
 
         return result
+
+    # TODO combine this function and decorate_prototype_structure
+    def set_proto_ele_replacements(self, icsd_prototype: Structure) -> None:
+        """
+        Replace the atoms in the icsd prototype structure with the elements of this composition.
+        The decoration index is used to figure out which combination of
+        elements in this composition should replace the elements in the icsd prototype
+        """
+        decoration_idx = int(self.action_node.split("|")[-1]) - 1
+         
+        comp = Composition(self.composition)
+
+        prototype_comp = Composition(icsd_prototype.formula).reduced_composition
+        ele_to_stoich = prototype_comp.to_data_dict['unit_cell_composition']
+        prototype_stoic = tuple([int(s) for s in ele_to_stoich.values()])
+
+        # create permutations of order of elements within a composition
+        # e.g., for K1Br1: [('K1', 'Br1'), ('Br1', 'K1')]
+        comp_permutations = itertools.permutations(comp.formula.split(' '))
+        # only keep the permutations that match the stoichiometry of the prototype structure
+        valid_comp_permutations = []
+        for comp_permu in comp_permutations:
+            comp_stoich = CrystalState.get_stoich_from_comp(''.join(comp_permu))
+            if comp_stoich == prototype_stoic:
+                valid_comp_permutations.append(''.join(comp_permu))
+
+        # TODO find a better way than matching the decoration_idx here
+        assert decoration_idx < len(valid_comp_permutations), \
+            f"decoration_idx {decoration_idx} must be < num valid comp permutations {len(valid_comp_permutations)} -- " + \
+            f"{self.action_node = } {prototype_stoic = }, {comp_permu = }, " + \
+            f"{self.composition = }, {prototype_comp = }"
+
+        # now build the decorated structure for the specific index passed in
+        original_ele = ''.join(i for i in prototype_comp.formula if not i.isdigit()).split(' ')
+        replacement_ele = CrystalState.get_eles_from_comp(valid_comp_permutations[decoration_idx])
+
+        # dictionary containing original elements as keys and new elements as values
+        replacement = {replacement_ele[i]: original_ele[i] for i in range(len(original_ele))}
+
+        self._ele_replacements = replacement
 
     @staticmethod
     def split_comp_to_eles_and_type(comp: str) -> Tuple[Iterable[str], str]:
@@ -164,6 +207,10 @@ class CrystalState(GraphSearchState):
     @property
     def action_node(self) -> Union[str, tuple]:
         return self._action_node
+
+    @property
+    def ele_replacements(self) -> dict:
+        return self._ele_replacements
 
     def get_crystal_sys(self) -> str:
         if '|' not in self.action_node:

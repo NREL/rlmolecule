@@ -171,7 +171,9 @@ def run_games():
     prob_config = run_config.problem_config
     builder = CrystalBuilder(G=prob_config.get('action_graph1'),
                              G2=prob_config.get('action_graph2'),
-                             actions_to_ignore=prob_config.get('actions_to_ignore'))
+                             actions_to_ignore=prob_config.get('actions_to_ignore'),
+                             prototypes=prototype_structures,
+                             )
 
     config = run_config.mcts_config
     game = AlphaZero(
@@ -187,11 +189,12 @@ def run_games():
         state_builder=builder,
     )
 
-    i = 1
-    states_seen_file = "/tmp/scratch/states_seen.csv.gz"
-    states_seen = set()
-    # remove deadends before starting the rollouts
-    set_states_seen(game, states_seen, states_seen_file)
+    # TEMP: Try running without removing states already seen
+    #i = 1
+    #states_seen_file = "/tmp/scratch/states_seen.csv.gz"
+    #states_seen = set()
+    ## remove deadends before starting the rollouts
+    #set_states_seen(game, states_seen, states_seen_file)
     while True:
         path, reward = game.run(
             num_mcts_samples=config.get('num_mcts_samples', 5),
@@ -199,9 +202,9 @@ def run_games():
         )
         logger.info(f'Game Finished -- Reward {reward.raw_reward:.3f} -- Final state {path[-1]}')
 
-        if i % 5 == 0:
-            set_states_seen(game, states_seen, states_seen_file)
-        i += 1
+        #if i % 5 == 0:
+        #    set_states_seen(game, states_seen, states_seen_file)
+        #i += 1
 
 
 def set_states_seen(game, states_seen, states_seen_file=None):

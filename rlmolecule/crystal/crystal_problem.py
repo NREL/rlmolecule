@@ -39,16 +39,20 @@ class CrystalTFAlphaZeroProblem(CrystalProblem, TFAlphaZeroProblem, ABC):
         self.preprocessor = preprocessor if preprocessor is not None else CrystalPreprocessor()
         # Each element has a stoichiometry, so just multiply by 2
         self.num_eles_and_stoich = 2 * self.preprocessor.max_num_elements
-        # This is the size of the vocabulary
-        # UPDATE 20220614: rather than use a mapping for each element,
-        # and each element with its stoichiometry
+        # This is the size of the vocabulary for the elements,
+        # as well as each element with its stoichiometry
         # (e.g., Li1Sc1F4 would be Li, Li1, Sc, Sc1, F, F4),
-        # just use a mapping for the elements, and keep the stoichiometry separate
+        # UPDATE 20220614: just use a mapping for the elements,
+        # and keep the stoichiometry separate
         # e.g., Li1Sc1F4 would be Li, 1, Sc, 1, F, 4)
         self.num_eles_and_stoich_comb = (len(self.preprocessor.elements)
-                                         + self.preprocessor.max_stoich)
+                                         + (len(self.preprocessor.elements)
+                                            * self.preprocessor.max_stoich))
         self.num_crystal_sys = len(self.preprocessor.crystal_systems)
         self.num_proto_strc = len(self.preprocessor.proto_strc_names)
+        self.num_proto_eles = self.preprocessor.max_ele_Z
+        self.num_proto_ele_replacements = (len(self.preprocessor.elements)
+                                           * self.num_proto_eles)
         super(CrystalTFAlphaZeroProblem, self).__init__(engine=engine, **kwargs)
 
     def policy_model(self,
@@ -77,8 +81,14 @@ class CrystalTFAlphaZeroProblem(CrystalProblem, TFAlphaZeroProblem, ABC):
         # 4170 total prototype structures
         proto_strc_class = layers.Input(shape=[1],
                                         dtype=tf.int64, name='proto_strc')
+        proto_ele_class = layers.Input(shape=[self.preprocessor.max_num_elements],
+                                       dtype=tf.int64, name='proto_ele_replacements')
 
-        input_tensors = [element_class, crystal_sys_class, proto_strc_class]
+        input_tensors = [element_class,
+                         crystal_sys_class,
+                         proto_strc_class,
+                         proto_ele_class,
+                         ]
 
         element_embedding = layers.Embedding(
             input_dim=self.num_eles_and_stoich_comb + 1, output_dim=features,
@@ -98,10 +108,21 @@ class CrystalTFAlphaZeroProblem(CrystalProblem, TFAlphaZeroProblem, ABC):
             input_length=1, mask_zero=True,
             name='proto_strc_embedding')(proto_strc_class)
 
+        # also add the element replacements
+        proto_ele_embedding = layers.Embedding(
+            input_dim=self.num_proto_ele_replacements + 1, output_dim=features,
+            input_length=self.preprocessor.max_num_elements, mask_zero=True,
+            name='proto_ele_embedding')(proto_ele_class)
+        # sum the embeddings of each of the elements
+        proto_ele_embedding = layers.Lambda(lambda x: tf.keras.backend.sum(x, axis=-2, keepdims=True),
+                                            output_shape=lambda s: (s[-1],))(proto_ele_embedding)
+        proto_ele_embedding = layers.Reshape((-1, features))(proto_ele_embedding)
+
         # Merge all available features into a single large vector via concatenation
         x = layers.concatenate([element_embedding,
                                 crystal_sys_embedding,
-                                proto_strc_embedding])
+                                proto_strc_embedding,
+                                proto_ele_embedding])
 
         # pass the features through a couple of dense layers
         x = layers.Dense(features, activation='relu')(x)

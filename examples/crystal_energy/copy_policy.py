@@ -70,19 +70,19 @@ while True:
     else:
         print(f"Waiting for new checkpoint from {policy_checkpoint_dir}")
 
-    # now load the rewards, and write the states seen to a file
-    #states_seen = get_states_seen(session, run_id)
-    # For now, just get all states
-    states_seen = get_states_seen(session, run_id, reward_cutoff=0)
-    df = pd.DataFrame(states_seen, columns=['states'])
-    # also write a csv for now to compare size, load time
-    df.to_csv(states_seen_file, index=False)
-    for node in rollout_nodes:
-        command = f"rsync {states_seen_file} {node}:/tmp/scratch/"
-        print(f"running {command}")
-        try:
-            subprocess.check_call(command, shell=True)
-        except subprocess.CalledProcessError as e:
-            print(f"CalledProcessError {e}")
+#    # now load the rewards, and write the states seen to a file
+#    #states_seen = get_states_seen(session, run_id)
+#    # For now, just get all states
+#    states_seen = get_states_seen(session, run_id, reward_cutoff=0)
+#    df = pd.DataFrame(states_seen, columns=['states'])
+#    # also write a csv for now to compare size, load time
+#    df.to_csv(states_seen_file, index=False)
+#    for node in rollout_nodes:
+#        command = f"rsync {states_seen_file} {node}:/tmp/scratch/"
+#        print(f"running {command}")
+#        try:
+#            subprocess.check_call(command, shell=True)
+#        except subprocess.CalledProcessError as e:
+#            print(f"CalledProcessError {e}")
 
     time.sleep(game_count_delay)
