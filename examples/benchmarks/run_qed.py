@@ -89,6 +89,9 @@ if __name__ == "__main__":
         extra_config = {"num_workers": 35}
         custom_model = MoleculeModel
 
+        if args.run == "IMPALA":
+            extra_config.update({"vtrace_drop_last_ts": False})
+
     tune.run(
         args.run,
         config=dict(
