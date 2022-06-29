@@ -26,7 +26,7 @@ cache_dir = Path(os.environ["LOCAL_SCRATCH"], "pstjohn")
 
 qed_state = QEDState(
     rdkit.Chem.MolFromSmiles("C"),
-    builder=MoleculeBuilder(max_atoms=30, cache_dir=cache_dir),
+    builder=MoleculeBuilder(max_atoms=40, cache_dir=cache_dir),
     smiles="C",
     max_num_actions=32,
     warn=False,
@@ -82,6 +82,7 @@ if __name__ == "__main__":
                 "num_workers": 30,
                 "framework": "tf2",
                 "eager_tracing": True,
+                "batch_mode": "complete_episodes",
             },
         ),
         local_dir=Path("/scratch", os.environ["USER"], "ray_results"),
