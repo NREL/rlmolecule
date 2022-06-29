@@ -45,19 +45,48 @@ if __name__ == "__main__":
             "v_max": 1,
         }
 
+        if args.run == "DQN":
+            extra_config.update(
+                {
+                    "lr": 1e-2,
+                    "num_workers": 1,
+                    "exploration_config": {
+                        "type": "EpsilonGreedy",
+                        "initial_epsilon": 1.0,
+                        "final_epsilon": 0.05,
+                        "warmup_timesteps": 0,
+                        "epsilon_timesteps": int(1e5),
+                    },
+                }
+            )
+
         if args.run == "APEX":
             extra_config.update(
                 {
-                    "learning_starts": 5000,
-                    "target_network_update_freq": 50000,
-                    "timesteps_per_iteration": 2500,
+                    "num_workers": 32,
+                    "timesteps_per_iteration": 1000,
+                    "min_time_s_per_reporting": 10,
+                    "lr": 0.001,
+                    "optimizer": {"num_replay_buffer_shards": 3},
+                    "replay_buffer_config": {
+                        "capacity": 20000,
+                        "learning_starts": 100,
+                    },
+                    "target_network_update_freq": 500,
+                    "exploration_config": {
+                        "type": "EpsilonGreedy",
+                        "initial_epsilon": 1.0,
+                        "final_epsilon": 0.05,
+                        "warmup_timesteps": 100,
+                        "epsilon_timesteps": 1000,
+                    },
                 }
             )
 
         custom_model = MoleculeQModel
 
     else:
-        extra_config = {}
+        extra_config = {"num_workers": 35}
         custom_model = MoleculeModel
 
     tune.run(
@@ -79,7 +108,6 @@ if __name__ == "__main__":
                     },
                 },
                 "num_gpus": 1 if num_gpus >= 1 else 0,
-                "num_workers": 30,
                 "framework": "tf2",
                 "eager_tracing": True,
                 "batch_mode": "complete_episodes",
