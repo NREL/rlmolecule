@@ -7,7 +7,7 @@ from rlmolecule.policy.model import policy_model
 
 @pytest.fixture
 def single_layer_model(qed_root: MoleculeState):
-    return policy_model(qed_root.preprocessor, features=8, num_heads=2, num_messages=1)
+    return policy_model(qed_root.preprocessor, features=8, num_messages=1)
 
 
 @pytest.fixture

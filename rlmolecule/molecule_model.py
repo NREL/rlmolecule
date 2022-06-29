@@ -15,14 +15,20 @@ class BaseMoleculeModel(GraphModel):
         *args,
         preprocessor: Optional[MolPreprocessor] = None,
         features: int = 64,
-        num_heads: int = 4,
         num_messages: int = 3,
         input_dtype: str = "int64",
+        max_atoms: Optional[int] = None,
+        max_bonds: Optional[int] = None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.base_model = policy_model(
-            preprocessor, features, num_heads, num_messages, input_dtype
+            preprocessor=preprocessor,
+            features=features,
+            num_messages=num_messages,
+            input_dtype=input_dtype,
+            max_atoms=max_atoms,
+            max_bonds=max_bonds,
         )
 
     def forward_vertex(

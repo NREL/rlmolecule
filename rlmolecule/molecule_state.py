@@ -32,6 +32,7 @@ class MoleculeState(Vertex):
         max_num_actions: int = 20,
         max_num_bonds: Optional[int] = None,
         preprocessor: Union[Type[nfp.preprocessing.MolPreprocessor], str, None] = None,
+        warn: bool = True,
     ) -> None:
         """
         :param molecule: an RDKit molecule specifying the current state
@@ -40,6 +41,7 @@ class MoleculeState(Vertex):
         :param smiles: An optional smiles string for the molecule; must match
         `molecule`.
         :param max_num_actions: The maximum number of next states to consider.
+        :param warm: whether to warn if more than the max_num_actions are possible.
         """
         super().__init__()
         self._builder: any = builder
@@ -50,6 +52,7 @@ class MoleculeState(Vertex):
         self._smiles: str = MolToSmiles(self._molecule) if smiles is None else smiles
         self._forced_terminal: bool = force_terminal
         self.max_num_actions = max_num_actions
+        self._warn = warn
 
         if preprocessor is None or isinstance(preprocessor, str):
             self.preprocessor = load_preprocessor(preprocessor)
@@ -66,10 +69,11 @@ class MoleculeState(Vertex):
 
         next_molecules = list(self.builder(self.molecule))
         if len(next_molecules) >= self.max_num_actions:
-            logger.warning(
-                f"{self} has {len(next_molecules) + 1} next actions when the "
-                f"maximum is {self.max_num_actions}"
-            )
+            if self._warn:
+                logger.warning(
+                    f"{self} has {len(next_molecules) + 1} next actions when the "
+                    f"maximum is {self.max_num_actions}"
+                )
             next_molecules = random.sample(next_molecules, self.max_num_actions - 1)
 
         next_actions = [self.new(molecule) for molecule in next_molecules]
@@ -114,7 +118,10 @@ class MoleculeState(Vertex):
         )
 
     def new(
-        self, molecule: Mol, force_terminal: bool = False, smiles: Optional[str] = None,
+        self,
+        molecule: Mol,
+        force_terminal: bool = False,
+        smiles: Optional[str] = None,
     ) -> V:
         return self.__class__(
             molecule,
