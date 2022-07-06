@@ -24,11 +24,14 @@ parser.add_argument(
 
 cache_dir = Path(os.environ["LOCAL_SCRATCH"], "pstjohn")
 
+
+max_atoms = 40
+
 qed_state = QEDState(
     rdkit.Chem.MolFromSmiles("C"),
-    builder=MoleculeBuilder(max_atoms=40, cache_dir=cache_dir),
+    builder=MoleculeBuilder(max_atoms=max_atoms, cache_dir=cache_dir, gdb_filter=False),
     smiles="C",
-    max_num_actions=32,
+    max_num_actions=128,
     warn=False,
 )
 
@@ -88,6 +91,23 @@ if __name__ == "__main__":
     else:
         extra_config = {"num_workers": 35}
         custom_model = MoleculeModel
+
+        if args.run == "PPO":
+            extra_config.update(
+                {
+                    "lr_schedule": [[0, 1e-2], [10_000, 1e-3], [50_000, 1e-4]],
+                    "gamma": 1.0,  # finite horizon problem, we want total reward-to-go?
+                    # "entropy_coeff": tune.grid_search([0.05]),
+                    "entropy_coeff_schedule": [
+                        [0, 0.05],
+                        [50_000, 0.01],
+                        [75_000, 0.001],
+                    ],
+                    "rollout_fragment_length": max_atoms + 1,
+                    "num_sgd_iter": 10,
+                    "sgd_minibatch_size": 128,
+                }
+            )
 
         if args.run == "IMPALA":
             extra_config.update({"vtrace_drop_last_ts": False})

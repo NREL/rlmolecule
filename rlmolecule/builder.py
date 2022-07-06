@@ -47,6 +47,7 @@ class MoleculeBuilder:
         cache_dir: Optional[str] = None,
         num_shards: int = 1,
         parallel: bool = False,
+        gdb_filter: bool = True,
     ) -> None:
         """A class to build molecules according to a number of different options
 
@@ -88,9 +89,10 @@ class MoleculeBuilder:
             AddNewAtomsAndBonds(atom_additions),
         ]
 
-        parallel_stack = [
-            GdbFilter(),
-        ]
+        parallel_stack = []
+
+        if gdb_filter:
+            parallel_stack += [GdbFilter()]
 
         if sa_score_threshold is not None:
             parallel_stack += [SAScoreFilter(sa_score_threshold, min_atoms)]

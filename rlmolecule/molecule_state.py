@@ -41,7 +41,7 @@ class MoleculeState(Vertex):
         :param smiles: An optional smiles string for the molecule; must match
         `molecule`.
         :param max_num_actions: The maximum number of next states to consider.
-        :param warm: whether to warn if more than the max_num_actions are possible.
+        :param warn: whether to warn if more than the max_num_actions are possible.
         """
         super().__init__()
         self._builder: any = builder
@@ -64,6 +64,12 @@ class MoleculeState(Vertex):
         return self.new(MolFromSmiles("C"))
 
     def _get_children(self) -> Sequence[V]:
+        """TODO: should have an option not to yield terminal states that have already
+        been explored. That would require us to cache terminal states (both
+        `forced_terminal` and those without children) and prune those from the search
+        tree before down-selecting to max_num_actions.
+        """
+
         if self.forced_terminal:
             return []
 
