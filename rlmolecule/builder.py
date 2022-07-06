@@ -7,8 +7,8 @@ from multiprocessing import Pool
 from typing import Dict, Iterable, List, Optional
 
 import numpy as np
+import ray
 import rdkit
-from diskcache import Cache, FanoutCache
 from rdkit import Chem, RDConfig, RDLogger
 from rdkit.Chem.EnumerateStereoisomers import (
     EnumerateStereoisomers,
@@ -17,6 +17,7 @@ from rdkit.Chem.EnumerateStereoisomers import (
 from rdkit.Chem.MolStandardize import rdMolStandardize
 from rdkit.Chem.rdDistGeom import EmbedMolecule
 
+from rlmolecule.actors import RayCache
 from rlmolecule.gdb_filters import check_all_filters
 
 sys.path.append(os.path.join(RDConfig.RDContribDir, "SA_Score"))
@@ -44,8 +45,7 @@ class MoleculeBuilder:
         canonicalize_tautomers: bool = False,
         sa_score_threshold: Optional[float] = None,
         try_embedding: bool = False,
-        cache_dir: Optional[str] = None,
-        num_shards: int = 1,
+        cache: bool = True,
         parallel: bool = False,
         gdb_filter: bool = True,
     ) -> None:
@@ -65,20 +65,19 @@ class MoleculeBuilder:
         # Not the most elegant solution, these are carried and referenced by
         # MoleculeState, but are not used internally
         self.parallel = parallel
+        self.cache = cache
         self.max_atoms = max_atoms
         self.min_atoms = min_atoms
 
-        if cache_dir is not None:
-            if num_shards == 1:
-                cache = Cache(directory=cache_dir)
+        if self.cache:
+            if ray.is_initialized():
+                self._builder_cache = RayCache.options(
+                    name="builder_cache", get_if_exists=True
+                ).remote()
+                self._using_ray = True
             else:
-                cache = FanoutCache(directory=cache_dir, shards=num_shards)
-
-            self.cached_call = cache.memoize()(self.call)
-
-        else:
-            self.mem = None
-            self.cached_call = None
+                self._builder_cache = {}
+                self._using_ray = False
 
         self.transformation_stack = []
 
@@ -131,11 +130,29 @@ class MoleculeBuilder:
         return list(inputs)
 
     def __call__(self, parent_molecule: rdkit.Chem.Mol) -> Iterable[rdkit.Chem.Mol]:
-        if self.cached_call is None:
-            return self.call(parent_molecule)
+
+        if self.cache:
+            smiles = rdkit.Chem.MolToSmiles(parent_molecule)
+            try:
+                if self._using_ray:
+                    result = ray.get(self._builder_cache.get.remote(smiles))
+                    if result is None:
+                        raise KeyError
+                else:
+                    return self._builder_cache[smiles]
+
+            except KeyError:
+                if self._using_ray:
+                    result = self.call(parent_molecule)
+                    self._builder_cache.put.remote(smiles, result)
+                    return result
+
+                else:
+                    self._builder_cache[smiles] = self.call(parent_molecule)
+                    return self._builder_cache[smiles]
 
         else:
-            return self.cached_call(parent_molecule)
+            return self.call(parent_molecule)
 
     def __getstate__(self):
         attributes = self.__dict__

@@ -13,7 +13,7 @@ if not tf1.executing_eagerly():
     tf1.enable_eager_execution()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def ray_init():
     ray.init(num_cpus=1, local_mode=True)
     yield None
@@ -37,5 +37,8 @@ def tmpdirname():
 @pytest.fixture
 def qed_root(builder: MoleculeBuilder) -> QEDState:
     return QEDState(
-        rdkit.Chem.MolFromSmiles("C"), builder, smiles="C", max_num_actions=20,
+        rdkit.Chem.MolFromSmiles("C"),
+        builder,
+        smiles="C",
+        max_num_actions=20,
     )

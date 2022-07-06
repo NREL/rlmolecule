@@ -1,6 +1,5 @@
-from tempfile import TemporaryDirectory
-
 import pytest
+import ray
 import rdkit
 from rdkit.Chem.rdmolfiles import MolFromSmiles, MolToSmiles
 from rlmolecule.builder import MoleculeBuilder, count_stereocenters
@@ -74,13 +73,21 @@ def test_builder():
     assert next_mols
 
 
-def test_cache():
-    with TemporaryDirectory() as tempdir:
-        next_mols = to_smiles(MoleculeBuilder(cache_dir=tempdir)(MolFromSmiles("C=CC")))
-        next_mols = to_smiles(
-            MoleculeBuilder(cache_dir=tempdir, num_shards=2)(MolFromSmiles("C=CC"))
-        )
+def test_local_cache():
+    builder = MoleculeBuilder(cache=True)
+    assert not builder._using_ray
+    assert "C=CC" not in builder._builder_cache
+    next_mols = to_smiles(builder(MolFromSmiles("C=CC")))
+    assert "C=CC" in builder._builder_cache
+    assert next_mols
 
+
+def test_ray_cache(ray_init):
+    builder = MoleculeBuilder(cache=True)
+    assert builder._using_ray
+    assert ray.get(builder._builder_cache.get.remote("C=CC")) is None
+    next_mols = to_smiles(builder(MolFromSmiles("C=CC")))
+    assert ray.get(builder._builder_cache.get.remote("C=CC")) is not None
     assert next_mols
 
 

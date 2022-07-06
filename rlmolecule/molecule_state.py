@@ -124,7 +124,10 @@ class MoleculeState(Vertex):
         )
 
     def new(
-        self, molecule: Mol, force_terminal: bool = False, smiles: Optional[str] = None,
+        self,
+        molecule: Mol,
+        force_terminal: bool = False,
+        smiles: Optional[str] = None,
     ) -> V:
         return self.__class__(
             molecule,
@@ -162,3 +165,7 @@ class MoleculeState(Vertex):
         delegates to the SMILES string
         """
         return f"{self.smiles}{' (t)' if self._forced_terminal else ''}"
+
+    @property
+    def terminal(self) -> bool:
+        return super().terminal
