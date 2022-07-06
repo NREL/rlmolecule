@@ -74,21 +74,23 @@ def test_builder():
 
 
 def test_local_cache():
+    next_mols = to_smiles(MoleculeBuilder()(MolFromSmiles("C=CC")))
     builder = MoleculeBuilder(cache=True)
     assert not builder._using_ray
     assert "C=CC" not in builder._builder_cache
-    next_mols = to_smiles(builder(MolFromSmiles("C=CC")))
+    next_mols_cache = to_smiles(builder(MolFromSmiles("C=CC")))
     assert "C=CC" in builder._builder_cache
-    assert next_mols
+    assert set(next_mols) == set(next_mols_cache)
 
 
 def test_ray_cache(ray_init):
+    next_mols = to_smiles(MoleculeBuilder()(MolFromSmiles("C=CC")))
     builder = MoleculeBuilder(cache=True)
     assert builder._using_ray
     assert ray.get(builder._builder_cache.get.remote("C=CC")) is None
-    next_mols = to_smiles(builder(MolFromSmiles("C=CC")))
+    next_mols_cache = to_smiles(builder(MolFromSmiles("C=CC")))
     assert ray.get(builder._builder_cache.get.remote("C=CC")) is not None
-    assert next_mols
+    assert set(next_mols) == set(next_mols_cache)
 
 
 def test_tautomers():

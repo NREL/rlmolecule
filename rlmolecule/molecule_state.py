@@ -1,13 +1,15 @@
 import logging
 import random
-from typing import Dict, Optional, Sequence, Type, Union
+from typing import Dict, Optional, Sequence, Set, Type, Union
 
 import gym
 import nfp
 import numpy as np
+import ray
 from graphenv.vertex import V, Vertex
 from rdkit.Chem import Mol, MolFromSmiles, MolToSmiles
 
+from rlmolecule.actors import RaySetCache
 from rlmolecule.builder import MoleculeBuilder
 from rlmolecule.policy.preprocessor import load_preprocessor
 
@@ -33,6 +35,8 @@ class MoleculeState(Vertex):
         max_num_bonds: Optional[int] = None,
         preprocessor: Union[Type[nfp.preprocessing.MolPreprocessor], str, None] = None,
         warn: bool = True,
+        prune_terminal_states: bool = False,
+        terminal_cache: Optional[Union[RaySetCache, Set]] = None,
     ) -> None:
         """
         :param molecule: an RDKit molecule specifying the current state
@@ -53,11 +57,23 @@ class MoleculeState(Vertex):
         self._forced_terminal: bool = force_terminal
         self.max_num_actions = max_num_actions
         self._warn = warn
+        self.prune_terminal_states = prune_terminal_states
 
         if preprocessor is None or isinstance(preprocessor, str):
             self.preprocessor = load_preprocessor(preprocessor)
         else:
             self.preprocessor = preprocessor
+
+        self._terminal_cache = terminal_cache
+        if self.prune_terminal_states and self._terminal_cache is None:
+            if ray.is_initialized():
+                self._terminal_cache = RaySetCache.options(
+                    name="terminal_cache", get_if_exists=True
+                ).remote()
+                self._using_ray = True
+            else:
+                self._terminal_cache = set()
+                self._using_ray = False
 
     @property
     def root(self) -> V:
@@ -74,6 +90,18 @@ class MoleculeState(Vertex):
             return []
 
         next_molecules = list(self.builder(self.molecule))
+
+        if self.prune_terminal_states:
+            smiles_list = [MolToSmiles(mol) for mol in next_molecules]
+            if self._using_ray:
+                to_prune = ray.get(self._terminal_cache.contains.remote(smiles_list))
+            else:
+                to_prune = [smiles in self._terminal_cache for smiles in smiles_list]
+
+            next_molecules = [
+                mol for mol, contained in zip(next_molecules, to_prune) if not contained
+            ]
+
         if len(next_molecules) >= self.max_num_actions:
             if self._warn:
                 logger.warning(
@@ -83,9 +111,22 @@ class MoleculeState(Vertex):
             next_molecules = random.sample(next_molecules, self.max_num_actions - 1)
 
         next_actions = [self.new(molecule) for molecule in next_molecules]
-        next_actions.append(
-            self.new(self.molecule, force_terminal=True, smiles=self.smiles)
-        )
+
+        if self.prune_terminal_states:
+            if self._using_ray:
+                add_self = not ray.get(
+                    self._terminal_cache.contains.remote([self.smiles + " (t)"])
+                )[0]
+            else:
+                add_self = (self.smiles + " (t)") not in self._terminal_cache
+
+        else:
+            add_self = True
+
+        if add_self:
+            next_actions.append(
+                self.new(self.molecule, force_terminal=True, smiles=self.smiles)
+            )
 
         logger.debug(f"Returning {len(next_actions)} for state {self.smiles}")
 
@@ -129,7 +170,7 @@ class MoleculeState(Vertex):
         force_terminal: bool = False,
         smiles: Optional[str] = None,
     ) -> V:
-        return self.__class__(
+        new = self.__class__(
             molecule,
             self.builder,
             force_terminal,
@@ -138,7 +179,11 @@ class MoleculeState(Vertex):
             max_num_bonds=self.max_num_bonds,
             preprocessor=self.preprocessor,
             warn=self._warn,
+            prune_terminal_states=self.prune_terminal_states,
+            terminal_cache=self._terminal_cache,
         )
+        new._using_ray = getattr(self, "_using_ray", None)
+        return new
 
     @property
     def forced_terminal(self) -> bool:
@@ -168,4 +213,11 @@ class MoleculeState(Vertex):
 
     @property
     def terminal(self) -> bool:
-        return super().terminal
+        is_terminal = super().terminal
+        if is_terminal and self.prune_terminal_states:
+            if self._using_ray:
+                self._terminal_cache.add.remote(repr(self))
+            else:
+                self._terminal_cache.add(repr(self))
+
+        return is_terminal

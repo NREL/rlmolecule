@@ -1,6 +1,9 @@
+import numpy as np
 import pytest
 import rdkit
+from graphenv.graph_env import GraphEnv
 from rlmolecule.builder import MoleculeBuilder
+from rlmolecule.examples.qed import QEDState
 from rlmolecule.molecule_state import MoleculeState
 
 
@@ -22,6 +25,56 @@ def test_next_actions(propane: MoleculeState):
     assert len(butanes) == 1
     assert butanes[0].forced_terminal is False
     assert next_actions[-1].forced_terminal is True
+
+
+def test_prune_terminal(builder):
+
+    qed_root = QEDState(
+        rdkit.Chem.MolFromSmiles("C"),
+        builder,
+        smiles="C",
+        max_num_actions=20,
+        prune_terminal_states=True,
+    )
+
+    env = GraphEnv({"state": qed_root, "max_num_children": qed_root.max_num_actions})
+    assert repr(env.state.children[-1]) == "C (t)"
+
+    # select the terminal state
+    obs, reward, terminal, info = env.step(len(env.state.children) - 1)
+    assert terminal
+    assert np.isclose(reward, 0.3597849378839701)
+
+    obs = env.reset()
+    obs, reward, terminal, info = env.step(len(env.state.children) - 1)
+    assert not terminal
+    assert np.isclose(reward, 0)
+
+
+def test_prune_terminal_ray(builder, ray_init):
+
+    qed_root = QEDState(
+        rdkit.Chem.MolFromSmiles("C"),
+        builder,
+        smiles="C",
+        max_num_actions=20,
+        prune_terminal_states=True,
+    )
+
+    assert qed_root._using_ray
+
+    env = GraphEnv({"state": qed_root, "max_num_children": qed_root.max_num_actions})
+    assert repr(env.state.children[-1]) == "C (t)"
+
+    # select the terminal state
+    obs, reward, terminal, info = env.step(len(env.state.children) - 1)
+    assert terminal
+    assert np.isclose(reward, 0.3597849378839701)
+
+    obs = env.reset()
+    obs, reward, terminal, info = env.step(len(env.state.children) - 1)
+    assert not terminal
+    assert np.isclose(reward, 0)
 
 
 def test_observation_space(propane: MoleculeState):

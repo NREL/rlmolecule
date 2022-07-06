@@ -17,7 +17,7 @@ from rdkit.Chem.EnumerateStereoisomers import (
 from rdkit.Chem.MolStandardize import rdMolStandardize
 from rdkit.Chem.rdDistGeom import EmbedMolecule
 
-from rlmolecule.actors import RayCache
+from rlmolecule.actors import RayDictCache
 from rlmolecule.gdb_filters import check_all_filters
 
 sys.path.append(os.path.join(RDConfig.RDContribDir, "SA_Score"))
@@ -45,7 +45,7 @@ class MoleculeBuilder:
         canonicalize_tautomers: bool = False,
         sa_score_threshold: Optional[float] = None,
         try_embedding: bool = False,
-        cache: bool = True,
+        cache: bool = False,
         parallel: bool = False,
         gdb_filter: bool = True,
     ) -> None:
@@ -71,7 +71,7 @@ class MoleculeBuilder:
 
         if self.cache:
             if ray.is_initialized():
-                self._builder_cache = RayCache.options(
+                self._builder_cache = RayDictCache.options(
                     name="builder_cache", get_if_exists=True
                 ).remote()
                 self._using_ray = True
