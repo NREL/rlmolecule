@@ -22,23 +22,24 @@ parser.add_argument(
     "--run", type=str, default="DQN", help="The RLlib-registered algorithm to use."
 )
 
-cache_dir = Path(os.environ["LOCAL_SCRATCH"], "pstjohn")
+
+ray.init(dashboard_host="0.0.0.0")
 
 
 max_atoms = 40
 
 qed_state = QEDState(
     rdkit.Chem.MolFromSmiles("C"),
-    builder=MoleculeBuilder(max_atoms=max_atoms, cache_dir=cache_dir, gdb_filter=False),
+    builder=MoleculeBuilder(max_atoms=max_atoms, cache=True, gdb_filter=False),
     smiles="C",
-    max_num_actions=128,
+    max_num_actions=32,
     warn=False,
+    prune_terminal_states=True,
 )
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    ray.init(dashboard_host="0.0.0.0")
 
     if args.run in ["DQN", "APEX"]:
         extra_config = {
