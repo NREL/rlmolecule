@@ -6,7 +6,7 @@ dependencies:
   - python<=3.9
   - rdkit
   - pytest
-  - lru-cache
+  - lru-dict
   - pip
   - pip:
       - nfp
