@@ -12,7 +12,11 @@ class RayDictCache:
         self._dict[key] = ray.put(value)
 
     def get(self, key):
-        return self._dict.get(key, None)
+        ref = self._dict.get(key, None)
+        if ref is not None:
+            return ray.get(ref)
+        else:
+            return None
 
 
 @ray.remote

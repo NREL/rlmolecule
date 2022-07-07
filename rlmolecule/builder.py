@@ -138,6 +138,8 @@ class MoleculeBuilder:
                     result = ray.get(self._builder_cache.get.remote(smiles))
                     if result is None:
                         raise KeyError
+                    else:
+                        return result
                 else:
                     return self._builder_cache[smiles]
 

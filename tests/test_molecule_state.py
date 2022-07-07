@@ -51,17 +51,18 @@ def test_prune_terminal(builder):
     assert np.isclose(reward, 0)
 
 
-def test_prune_terminal_ray(builder, ray_init):
+def test_prune_terminal_ray(ray_init):
 
     qed_root = QEDState(
         rdkit.Chem.MolFromSmiles("C"),
-        builder,
+        MoleculeBuilder(max_atoms=5, cache=True),
         smiles="C",
         max_num_actions=20,
         prune_terminal_states=True,
     )
 
     assert qed_root._using_ray
+    assert qed_root.builder._using_ray
 
     env = GraphEnv({"state": qed_root, "max_num_children": qed_root.max_num_actions})
     assert repr(env.state.children[-1]) == "C (t)"
