@@ -17,7 +17,7 @@ from rdkit.Chem.EnumerateStereoisomers import (
 from rdkit.Chem.MolStandardize import rdMolStandardize
 from rdkit.Chem.rdDistGeom import EmbedMolecule
 
-from rlmolecule.actors import RayDictCache
+from rlmolecule.actors import get_builder_cache
 from rlmolecule.gdb_filters import check_all_filters
 
 sys.path.append(os.path.join(RDConfig.RDContribDir, "SA_Score"))
@@ -68,12 +68,11 @@ class MoleculeBuilder:
         self.cache = cache
         self.max_atoms = max_atoms
         self.min_atoms = min_atoms
+        self._using_ray = None
 
         if self.cache:
             if ray.is_initialized():
-                self._builder_cache = RayDictCache.options(
-                    name="builder_cache", get_if_exists=True
-                ).remote()
+                self._builder_cache = get_builder_cache()
                 self._using_ray = True
             else:
                 self._builder_cache = {}
@@ -158,8 +157,13 @@ class MoleculeBuilder:
 
     def __getstate__(self):
         attributes = self.__dict__
-        attributes["cached_call"] = None
+        attributes["_builder_cache"] = None
         return attributes
+
+    def __setstate__(self, d):
+        if d["_using_ray"]:
+            d["_builder_cache"] = get_builder_cache()
+        self.__dict__ = d
 
 
 class BaseTransformer(ABC):

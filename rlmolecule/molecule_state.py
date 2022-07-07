@@ -1,6 +1,6 @@
 import logging
 import random
-from typing import Dict, Optional, Sequence, Set, Type, Union
+from typing import Any, Dict, Optional, Sequence, Type, Union
 
 import gym
 import nfp
@@ -9,7 +9,7 @@ import ray
 from graphenv.vertex import V, Vertex
 from rdkit.Chem import Mol, MolFromSmiles, MolToSmiles
 
-from rlmolecule.actors import RaySetCache
+from rlmolecule.actors import get_terminal_cache
 from rlmolecule.builder import MoleculeBuilder
 from rlmolecule.policy.preprocessor import load_preprocessor
 
@@ -36,7 +36,7 @@ class MoleculeState(Vertex):
         preprocessor: Union[Type[nfp.preprocessing.MolPreprocessor], str, None] = None,
         warn: bool = True,
         prune_terminal_states: bool = False,
-        terminal_cache: Optional[Union[RaySetCache, Set]] = None,
+        terminal_cache: Optional[Any] = None,
     ) -> None:
         """
         :param molecule: an RDKit molecule specifying the current state
@@ -58,6 +58,7 @@ class MoleculeState(Vertex):
         self.max_num_actions = max_num_actions
         self._warn = warn
         self.prune_terminal_states = prune_terminal_states
+        self._using_ray = None
 
         if preprocessor is None or isinstance(preprocessor, str):
             self.preprocessor = load_preprocessor(preprocessor)
@@ -67,9 +68,7 @@ class MoleculeState(Vertex):
         self._terminal_cache = terminal_cache
         if self.prune_terminal_states and self._terminal_cache is None:
             if ray.is_initialized():
-                self._terminal_cache = RaySetCache.options(
-                    name="terminal_cache", get_if_exists=True
-                ).remote()
+                self._terminal_cache = get_terminal_cache()
                 self._using_ray = True
             else:
                 self._terminal_cache = set()
@@ -221,3 +220,13 @@ class MoleculeState(Vertex):
                 self._terminal_cache.add(repr(self))
 
         return is_terminal
+
+    def __getstate__(self):
+        attributes = self.__dict__
+        attributes["_terminal_cache"] = None
+        return attributes
+
+    def __setstate__(self, d):
+        if d["_using_ray"]:
+            d["_terminal_cache"] = get_terminal_cache()
+        self.__dict__ = d
