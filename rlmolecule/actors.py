@@ -36,6 +36,8 @@ class RaySetCache:
         self._set = set()
 
     def add(self, key: Any):
+        if not str(key).endswith(" (t)"):
+            print(f"pruning non-terminal state {key}")
         self._set.add(key)
 
     def contains(self, keys: List[Any]):
