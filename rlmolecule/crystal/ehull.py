@@ -44,12 +44,20 @@ def convex_hull_stability(comp: Composition,
     :param competing_phases: list of competing phases used to 
         construct the convex hull for the elements of the given composition
     """
+    # first make sure the composition is in the reduced form
+    comp = comp.reduced_composition
+    # convert the predicted energyperatom to total energy
     energy = predicted_energy * comp.num_atoms
     entry = PDEntry(comp, energy)
     elements = set(comp.elements)
 
+    # get the entries that have the same or a subset of elements.
+    # Since we're including DFT relaxed energies in the competing phases,
+    # also don't include entries that match the composition and predicted energy exactly
+    # since we are trying to compute the decomposition energy for that structure
     curr_entries = [e for e in competing_phases
-                    if len(set(e.composition.elements) - elements) == 0]
+                    if len(set(e.composition.elements) - elements) == 0
+                    and e != entry]
     phase_diagram = PhaseDiagram(curr_entries, elements=elements)
 
     decomp, decomp_energy = phase_diagram.get_decomp_and_e_above_hull(

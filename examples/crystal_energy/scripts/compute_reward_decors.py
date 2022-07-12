@@ -50,24 +50,42 @@ class AtomicNumberPreprocessor(PymatgenPreprocessor):
         return self._max_atomic_num
 
 
-def load_competing_phases(competing_phases_file):
-    df_competing_phases = pd.read_csv(competing_phases_file)
-    print(f"\t{len(df_competing_phases)} lines")
-    print(df_competing_phases.head(2))
+def setup_competing_phases(competing_phases_files):
+    if not isinstance(competing_phases_files, list):
+        competing_phases_files = [competing_phases_files]
+    all_competing_phases = [load_competing_phases(f) for f in competing_phases_files]
 
-    df_competing_phases['energy'] = (
-        df_competing_phases.energyperatom *
-        df_competing_phases.sortedformula.apply(lambda x: Composition(x).num_atoms)
+    # also add the individual elements
+    competing_phases = pd.concat([pd.Series(fere_entries)] + all_competing_phases).reset_index()[0]
+    return competing_phases
+
+
+def load_competing_phases(competing_phases_file):
+    print(f"Reading {competing_phases_file}")
+    df = pd.read_csv(competing_phases_file)
+    print(f"\t{len(df)} lines")
+    print(df.head(2))
+
+    assert ('sortedformula' in df.columns or 'comp' in df.columns) \
+        and ('energyperatom' in df.columns or 'predicted_energy' in df.columns)
+    if 'sortedformula' not in df.columns:
+        df.rename(columns={'comp': 'sortedformula'}, inplace=True)
+    if 'energyperatom' not in df.columns:
+        df.rename(columns={'predicted_energy': 'energyperatom'}, inplace=True)
+    print("columns after renaming:", df.columns)
+
+    df['energy'] = (
+        df.energyperatom *
+        df.sortedformula.apply(lambda x: Composition(x).num_atoms)
     )
     # convert the dataframe to a list of PDEntries used to create the convex hull
-    pd_entries = df_competing_phases.apply(
+    pd_entries = df.apply(
         lambda row: PDEntry(Composition(row.sortedformula),
                             row.energy),
         axis=1
     )
     print(f"\t{len(pd_entries)} entries")
-    competing_phases = pd.concat([pd.Series(fere_entries), pd_entries]).reset_index()[0]
-    return competing_phases
+    return pd_entries
 
 
 def read_structures_file(structures_file):
@@ -223,6 +241,33 @@ def load_model(model_file):
                                               custom_objects={**custom_objects,
                                                               **{'RBFExpansion': RBFExpansion}})
     return energy_model
+
+
+def get_comp_type(comp):
+    """ Get the composition type from a composition
+        e.g., Na1Y1Al2F2Br8 => _1_1_2_2_8
+    """
+    comp = Composition(comp)
+    ele_to_stoich = comp.to_data_dict['unit_cell_composition']
+    comp_type = '_' + '_'.join(str(int(s)) for s in sorted(ele_to_stoich.values()))
+    return comp_type
+
+
+def get_decor_id(strc_id):
+    """ Convert a structure ID back into a decoration ID
+    structure id: <comp> _ <prototype ID> _ <decoration idx>
+    decoration id: <comp | <comp_type> | <cyrstal_sys> | <prototype ID> | <decoration idx>
+    e.g., Li3Y1Br6_icsd_053533_1 -> Li3Y1Br6|_1_3_6|trigonal|icsd_053533|1
+    """
+    strc_id = strc_id.split("_")
+    comp = strc_id[0]
+    comp_type = get_comp_type(comp)
+    proto_id = "_".join(strc_id[1:-1])
+    # proto_id = "icsd_" + strc_id.split("_")[2]
+    crystal_sys = proto_to_crystal_sys[proto_id]
+    decor = strc_id[-1]
+    decor_id = "|".join([comp, comp_type, crystal_sys, proto_id, decor])
+    return decor_id
     
 
 if __name__ == "__main__":
@@ -249,12 +294,13 @@ if __name__ == "__main__":
     run_config = RunConfig(args.config)
     run_id = run_config.run_id
 
+    prob_config = run_config.problem_config
     # Dataframe containing competing phases from NRELMatDB
-    print("Loading inputs/competing_phases.csv")
-    competing_phases = load_competing_phases("inputs/competing_phases.csv")
+    competing_phases_file = "inputs/competing_phases.csv"
+    competing_phases = setup_competing_phases(prob_config.get('competing_phases_files',
+                                                              competing_phases_file))
 
     # load the icsd prototype structures
-    prob_config = run_config.problem_config
     prototypes_file = "../../rlmolecule/crystal/inputs/icsd_prototypes_lt50atoms_lt100dist.json.gz"
     prototypes_file = prob_config.get('prototypes_file', prototypes_file)
     prototype_structures = read_structures_file(prototypes_file)
@@ -263,6 +309,8 @@ if __name__ == "__main__":
     oxidation_remover = OxidationStateRemovalTransformation()
     prototype_structures = {s_id: oxidation_remover.apply_transformation(s)
                             for s_id, s in prototype_structures.items()}
+    proto_to_crystal_sys = {proto_id.split('|')[-1]: proto_id.split('|')[1]
+                            for proto_id in prototype_structures.keys()}
 
     energy_model = None
     preprocessor = None
@@ -273,9 +321,11 @@ if __name__ == "__main__":
     decor_ids = set()
     if args.decor_ids_file is not None:
         for decor_ids_file in args.decor_ids_file:
-            states = set(pd.read_csv(decor_ids_file, header=None)[0])
-            decor_ids.update(states)
-            print(f"{len(states)} states read from {decor_ids_file}")
+            decorations = set(pd.read_csv(decor_ids_file, header=None)[0])
+            if '|' not in list(decorations)[0]:
+                decorations = set(get_decor_id(s_id) for s_id in decorations)
+            decor_ids.update(decorations)
+            print(f"{len(decorations)} states read from {decor_ids_file}")
         print(f"{len(decor_ids)} total")
 
     main(decor_ids)
