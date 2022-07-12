@@ -1,3 +1,4 @@
+import csv
 from typing import Any, List
 
 import ray
@@ -42,6 +43,17 @@ class RaySetCache:
 
     def contains(self, keys: List[Any]):
         return [key in self._set for key in keys]
+
+
+@ray.remote
+class CSVActorWriter:
+    def __init__(self, filename: str) -> None:
+        self._filename = filename
+
+    def write(self, row):
+        with open(self._filename, "w", newline="") as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(row)
 
 
 def get_builder_cache(max_size: int = int(1e5)):

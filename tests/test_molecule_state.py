@@ -80,3 +80,20 @@ def test_prune_terminal_ray(ray_init):
 
 def test_observation_space(propane: MoleculeState):
     assert propane.observation_space.contains(propane.observation)
+
+
+def test_csv_writer(ray_init):
+
+    qed_root = QEDState(
+        rdkit.Chem.MolFromSmiles("C"),
+        MoleculeBuilder(max_atoms=5, cache=True),
+        smiles="CCC",
+        max_num_actions=20,
+        prune_terminal_states=True,
+        force_terminal=True,
+        filename="test.csv",
+    )
+    qed_root.reward
+
+    with open("test.csv", "r") as f:
+        assert f.readline().startswith("CCC,")
