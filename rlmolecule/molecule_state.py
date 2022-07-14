@@ -79,11 +79,6 @@ class MoleculeState(Vertex):
         return self.new(MolFromSmiles("C"))
 
     def _get_children(self) -> Sequence[V]:
-        """TODO: should have an option not to yield terminal states that have already
-        been explored. That would require us to cache terminal states (both
-        `forced_terminal` and those without children) and prune those from the search
-        tree before down-selecting to max_num_actions.
-        """
 
         if self.forced_terminal:
             return []

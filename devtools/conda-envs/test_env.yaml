@@ -6,7 +6,6 @@ dependencies:
   - python<=3.9
   - rdkit
   - pytest
-  - pytest-cov
   - lru-dict
   - pip
   - pip:
