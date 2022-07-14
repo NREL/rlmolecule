@@ -161,20 +161,24 @@ class MoleculeState(Vertex):
     def new(
         self,
         molecule: Mol,
+        *args,
         force_terminal: bool = False,
         smiles: Optional[str] = None,
+        **kwargs,
     ) -> V:
         new = self.__class__(
             molecule,
             self.builder,
             force_terminal,
             smiles,
+            *args,
             max_num_actions=self.max_num_actions,
             max_num_bonds=self.max_num_bonds,
             preprocessor=self.preprocessor,
             warn=self._warn,
             prune_terminal_states=self.prune_terminal_states,
             terminal_cache=self._terminal_cache,
+            **kwargs,
         )
         new._using_ray = getattr(self, "_using_ray", None)
         return new
