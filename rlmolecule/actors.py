@@ -1,3 +1,4 @@
+import atexit
 import csv
 from typing import Any, List
 
@@ -49,20 +50,22 @@ class RaySetCache:
 class CSVActorWriter:
     def __init__(self, filename: str) -> None:
         self._filename = filename
+        self._filehandle = open(self._filename, "w", newline="")
+        self._writer = csv.writer(self._filehandle)
+        atexit.register(lambda: self.close())
 
     def write(self, row):
-        with open(self._filename, "w", newline="") as csvfile:
-            csvwriter = csv.writer(csvfile)
-            csvwriter.writerow(row)
+        self._writer.writerow(row)
+
+    def close(self):
+        self._filehandle.close()
 
 
 def get_builder_cache(max_size: int = int(1e5)):
-    return RayLRUCache.options(
-        name="builder_cache", lifetime="detached", get_if_exists=True
-    ).remote(max_size)
+    return RayLRUCache.options(name="builder_cache", get_if_exists=True).remote(
+        max_size
+    )
 
 
 def get_terminal_cache():
-    return RaySetCache.options(
-        name="terminal_cache", lifetime="detached", get_if_exists=True
-    ).remote()
+    return RaySetCache.options(name="terminal_cache", get_if_exists=True).remote()

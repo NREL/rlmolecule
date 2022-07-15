@@ -95,5 +95,7 @@ def test_csv_writer(ray_init):
     )
     qed_root.reward
 
+    qed_root.csv_writer.close.remote()
+
     with open("test.csv", "r") as f:
         assert f.readline().startswith("CCC,")
