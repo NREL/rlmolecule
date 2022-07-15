@@ -62,10 +62,12 @@ class CSVActorWriter:
 
 
 def get_builder_cache(max_size: int = int(1e5)):
-    return RayLRUCache.options(name="builder_cache", get_if_exists=True).remote(
-        max_size
-    )
+    return RayLRUCache.options(
+        name="builder_cache", lifetime="detached", get_if_exists=True
+    ).remote(max_size)
 
 
 def get_terminal_cache():
-    return RaySetCache.options(name="terminal_cache", get_if_exists=True).remote()
+    return RaySetCache.options(
+        name="terminal_cache", lifetime="detached", get_if_exists=True
+    ).remote()
