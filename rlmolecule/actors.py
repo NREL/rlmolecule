@@ -51,7 +51,7 @@ class CSVActorWriter:
         self._filename = filename
 
     def write(self, row):
-        with open(self._filename, "w", newline="") as csvfile:
+        with open(self._filename, "a", newline="") as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(row)
 
