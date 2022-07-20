@@ -77,6 +77,11 @@ def setup_argparser():
                         type=pathlib.Path,
                         required=True,
                         help='BDE model for computing the Bond Dissociation Energy')
+    parser.add_argument('--tfserving_hostname',
+                        '-H',
+                        action="store",
+                        default="localhost",
+                        help='For rollout workers, this specifies where to access TFServing (if it is available)')
 
     return parser
 
