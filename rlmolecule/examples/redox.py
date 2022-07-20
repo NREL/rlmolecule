@@ -1,6 +1,11 @@
 import logging
 from typing import Optional
+import rdkit
+from rdkit import Chem
+from typing import Tuple
+from typing import Dict, Optional
 
+import tensorflow as tf
 import ray
 import sys
 from rlmolecule.actors import CSVActorWriter
@@ -10,14 +15,12 @@ from rlmolecule.policy.preprocessor import load_preprocessor
 
 logger = logging.getLogger(__name__)
 
-# TODO update/incorporate this code
 sys.path.append("/projects/rlmolecule/pstjohn/models/20201031_bde/")
 from preprocess_inputs import preprocessor as bde_preprocessor
 
 bde_preprocessor.from_json(
     "/projects/rlmolecule/pstjohn/models/20201031_bde/preprocessor.json"
 )
-
 
 def get_csv_logger(filename):
     return CSVActorWriter.options(
@@ -56,6 +59,8 @@ class RedoxState(MoleculeState):
             self.csv_writer = get_csv_logger(filename)
         else:
             self.csv_writer = None
+            
+        print(self.stability_model, self.redox_model, self.bde_model)
 
     def new(self, *args, **kwargs):
         return super().new(
@@ -69,7 +74,7 @@ class RedoxState(MoleculeState):
             if self.csv_writer is not None:
                 self.csv_writer.write.remote([self.smiles, reward, stats])
             else:
-                logger.info(f"Redox: {self.smiles} - {reward} - stats")
+                logger.info(f"Redox: {self.smiles} - {reward} - {stats}")
             return reward
         else:
             return 0.0
