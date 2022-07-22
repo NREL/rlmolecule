@@ -71,3 +71,9 @@ def get_terminal_cache():
     return RaySetCache.options(
         name="terminal_cache", lifetime="detached", get_if_exists=True
     ).remote()
+
+
+def get_csv_logger(filename: str):
+    return CSVActorWriter.options(
+        name="csv_logger", lifetime="detached", get_if_exists=True
+    ).remote(filename)
