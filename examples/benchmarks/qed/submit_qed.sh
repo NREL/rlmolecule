@@ -9,4 +9,5 @@
 
 module load cudnn/8.1.1/cuda-11.2
 conda activate graphenv
+
 python run_qed.py
