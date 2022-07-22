@@ -1,7 +1,3 @@
-# TODO:
-# * clean up action caching
-# * clean up CSV reward logging
-
 import logging
 import random
 from dataclasses import dataclass
@@ -23,6 +19,14 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class MoleculeData:
+    """A dataclass used to hold configuration parameters and make it easier to pass
+    options between root nodes and child nodes. A single copy of this class will exist
+    per environment, and is passed between parent / child / root nodes.
+
+    By default, this class holds ray actor handles used to log final molecules to a CSV
+    file for post-processing.
+    """
+
     builder: Type[MoleculeBuilder]
     max_num_actions: int = 20
     max_num_bonds: Optional[int] = None
@@ -52,6 +56,12 @@ class MoleculeData:
             self.csv_writer = get_csv_logger(self.log_reward_filepath)
 
     def log_reward(self, row: List):
+        """Log the given row to the CSV logger actor class.
+
+        Args:
+            row (List): The row to log, typically a (SMILES, reward) pair, although any
+            data that can be written to a file is fine.
+        """
         logger.info(f"REWARD: {row}")
         if self.csv_writer is not None:
             self.csv_writer.write.remote(row)
@@ -65,18 +75,20 @@ class MoleculeState(Vertex):
         smiles: Optional[str] = None,
         force_terminal: bool = False,
     ) -> None:
-        """
-        A state implementation which uses simple transformations (such as adding a bond)
-        to define a graph of molecules that can be navigated.
+        """A state implementation which uses simple transformations (such as adding a
+        bond) to define a graph of molecules that can be navigated.
 
         Molecules are stored as rdkit Mol instances, and the rdkit-generated SMILES
         string is also stored for efficient hashing.
 
-        :param molecule: an RDKit molecule specifying the current state
-        :param builder: A MoleculeConfig class
-        :param force_terminal: Whether to force this molecule to be a terminal state
-        :param smiles: An optional smiles string for the molecule; must match
-        `molecule`.
+        Args:
+            molecule (Mol): an RDKit molecule specifying the current state
+            data (Type[MoleculeData]): A dataclass for the given environment. Must
+                contain at minimum a `.builder` attribute used to build child molecules.
+            smiles (Optional[str], optional): An optional smiles string for the
+                molecule; must match `molecule`. Defaults to None.
+            force_terminal (bool, optional): Whether to force this molecule to be a
+                terminal state. Defaults to False.
         """
         super().__init__()
         self._molecule: Mol = molecule
@@ -89,6 +101,14 @@ class MoleculeState(Vertex):
         return self.new(MolFromSmiles("C"))
 
     def _get_children(self) -> Sequence[V]:
+        """Generates a list of new MoleculeStates that represent possible next actions
+        for the environment. If there is more than the maximum number of actions, this
+        function will sample the next actions down to the maximum allowed number.
+
+        Returns:
+            Sequence[V]: A list of next actions, some of which (usually the last)
+                represent terminal states.
+        """
 
         if self.forced_terminal:
             # No children from a molecule that's flagged as a terminal state, this
@@ -111,9 +131,25 @@ class MoleculeState(Vertex):
         return next_actions
 
     def _get_terminal_actions(self) -> Sequence[V]:
+        """Yield terminal actions from the current state. Useful to overwrite if final
+        actions are different than the steps of molecule construction (i.e., adding a
+        radical to a fully constructed molecule)
+
+        Returns:
+            Sequence[V]: A list of terminal states
+        """
         return [self.new(self.molecule, force_terminal=True, smiles=self.smiles)]
 
-    def _prune_next_actions(self, next_actions: Sequence[V]):
+    def _prune_next_actions(self, next_actions: Sequence[V]) -> Sequence[V]:
+        """Use the ray actor handle in self.data (or a simple set) to find terminal
+        states that have already been evaluated and remove them from the search tree.
+
+        Args:
+            next_actions (Sequence[V]): A list of MoleculeStates to be pruned
+
+        Returns:
+            Sequence[V]: A pruned list of MoleculeStates
+        """
         smiles_list = [repr(mol) for mol in next_actions]
         if self.data.using_ray:
             to_prune = ray.get(self.data.terminal_cache.contains.remote(smiles_list))
@@ -212,6 +248,12 @@ class MoleculeState(Vertex):
 
     @property
     def terminal(self) -> bool:
+        """Checks if the given state is terminal. If true, adds this state to the
+        terminal_cache to prevent it from being chosen again
+
+        Returns:
+            bool: whether the state is terminal. Delegates to Vertex.terminal
+        """
         is_terminal = super().terminal
         if is_terminal and self.data.prune_terminal_states:
             if self.data.using_ray:

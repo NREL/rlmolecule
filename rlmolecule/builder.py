@@ -51,15 +51,25 @@ class MoleculeBuilder:
     ) -> None:
         """A class to build molecules according to a number of different options
 
-        :param max_atoms: Maximum number of heavy atoms
-        :param min_atoms: minimum number of heavy atoms
-        :param atom_additions: potential atom types to consider. Defaults to
-         ('C', 'H', 'O')
-        :param stereoisomers: whether to consider stereoisomers different molecules
-        :param sa_score_threshold: If set, don't construct molecules greater than a
-        given sa_score.
-        :param try_embedding: Try to get a 3D embedding of the molecule, and if this
-         fails, remote it.
+        Args:
+            max_atoms (int, optional): Maximum number of heavy atoms. Defaults to 10.
+            min_atoms (int, optional): minimum number of heavy atoms. Defaults to 4.
+            atom_additions (Optional[List], optional): potential atom types to consider.
+                Defaults to ('C', 'H', 'O')
+            stereoisomers (bool, optional): whether to consider stereoisomers different
+                molecules. Defaults to False.
+            canonicalize_tautomers (bool, optional): Whether to use RDKit's tautomer
+                canonicalization functionality. Defaults to False.
+            sa_score_threshold (Optional[float], optional): If set, don't construct
+            molecules greater than a given sa_score. Defaults to None.
+            try_embedding (bool, optional): Try to get a 3D embedding of the molecule,
+                and if this fails, remote it. Defaults to False.
+            cache (bool, optional): Whether to cache molecule building for a given
+                SMILES input to speed up subsequent evaluations. Defaults to False.
+            parallel (bool, optional): (Experimental) whether to try multiprocessing to
+                speed up execution for large molecules. Defaults to False.
+            gdb_filter (bool, optional): Whether to apply filters from the gdb17 paper.
+                Defaults to True.
         """
 
         # Not the most elegant solution, these are carried and referenced by
