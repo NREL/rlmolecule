@@ -1,17 +1,21 @@
 import os
 from pathlib import Path
+
 from typing import Dict
+
 
 import ray
 import rdkit
 from graphenv.graph_env import GraphEnv
 from ray import tune
 from ray.rllib.utils.framework import try_import_tf
+
 from ray.tune.registry import register_env
 from rlmolecule.builder import MoleculeBuilder
 from rlmolecule.examples.qed import QEDState
 from rlmolecule.molecule_model import MoleculeModel
 from rlmolecule.molecule_state import MoleculeData
+
 from rlmolecule.policy.preprocessor import load_preprocessor
 
 tf1, tf, tfv = try_import_tf()
@@ -60,6 +64,7 @@ if __name__ == "__main__":
         "PPO",
         config=dict(
             **{
+
                 "env": "QEDGraphEnv",
                 "model": {
                     "custom_model": custom_model,
@@ -82,6 +87,5 @@ if __name__ == "__main__":
             },
         ),
         local_dir=Path(output_directory, "ray_results"),
-    )
 
     ray.shutdown()
