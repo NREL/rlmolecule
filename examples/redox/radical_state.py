@@ -5,7 +5,6 @@ from examples.redox.models import expand_inputs
 from examples.redox.models import preprocessor as redox_preprocessor
 from examples.redox.models import redox_model, stability_model
 from examples.redox.radical_builder import build_radicals
-from graphenv import tf
 from graphenv.vertex import V
 from rdkit import Chem
 from rlmolecule.molecule_state import MoleculeState
@@ -181,7 +180,3 @@ class RadicalState(MoleculeState):
             return max(1 - 3 * (abs(target - upper_lim) / span), 0)
         else:
             return 1
-
-    @tf.function(experimental_relax_shapes=True)
-    def predict(model: "tf.keras.Model", inputs):
-        return model.predict_step(inputs)
