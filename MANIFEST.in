@@ -1,3 +1,1 @@
-include versioneer.py
-include rlmolecule/_version.py
 include rlmolecule/policy/preprocessor.json
