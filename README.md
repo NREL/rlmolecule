@@ -1,4 +1,5 @@
 [![DOI](https://zenodo.org/badge/289305827.svg)](https://zenodo.org/badge/latestdoi/289305827)
+[![PyPI version](https://badge.fury.io/py/rlmolecule.svg)](https://badge.fury.io/py/rlmolecule)
 
 # rlmolecule
 
