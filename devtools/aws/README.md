@@ -51,18 +51,14 @@ The code from this repo should be already cloned on the head node (that is part 
 
 The output should include a series of tables with the column named: `episode_reward_max`. The value under that column should increase as the training progresses and evantually reach the value around 0.93.
 
-### `*(local)*` Access Tensorboard:
+### `*(local)*` Access TensorBoard:
 
-TBD
+For this step, you might want to use a separate terminal window. To see the produced results throuth TensorBoard dashboard, run (this will start the dashboard on the head node and alse set up the port forwaring for port 6006):
 
-### `*(local)*` Access Ray's dashboard:
+`# ray exec qed.yml 'tensorboard --logdir=/home/ray/ray_results --port 6006 --bind_all' -p 6006 --no-config-cache`
 
-TBD
+Leave this terminal window to continue running this command and open your browser to navigate to: `localhost:6006`. That should display TensorBoard and show the latest training results for QED. 
 
 ### `*(local)*` Terminate the cluster
 
-TBD
-
-### Common pitfalls
-
-TBD
+`# ray down qed.yml`
