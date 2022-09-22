@@ -41,17 +41,21 @@ For troubleshooting, run the following command to follow along the steps in the 
 
 `# tail -f /tmp/ray/session_latest/logs/monitor.out`
 
-### `*(ray head)*` Run QED example
+### `*(ray head)*` Run QED example:
+
+Before proceeding with this step, make sure that all launched instances are configured (i.e., `Healthy`, as described under the previous step).
+
+The code from this repo should be already cloned on the head node (that is part of the confuguration process defined in `qed.yml` file). Run the QED example:
+
+`# python ~/rlmolecule/examples/benchmarks/qed/run_qed_aws.py`
+
+The output should include a series of tables with the column named: `episode_reward_max`. The value under that column should increase as the training progresses and evantually reach the value around 0.93.
+
+### `*(local)*` Access Tensorboard:
 
 TBD
 
-Describe an alternative way, with launching it from local environment
-
-### `*(local)*` Access Tensorboard
-
-TBD
-
-### `*(local)*` Access Ray's dashboard
+### `*(local)*` Access Ray's dashboard:
 
 TBD
 
