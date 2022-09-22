@@ -37,7 +37,8 @@ docker:
     #worker_run_options: []
 
 # If a node is idle for this many minutes, it will be removed.
-idle_timeout_minutes: 5
+# Increased to accomodate for slower builds (i.e. envs with more dependencies and longer setups)  
+idle_timeout_minutes: 15
 
 # Cloud-provider specific configuration.
 provider:
@@ -84,8 +85,14 @@ available_node_types:
             BlockDeviceMappings:
                 - DeviceName: /dev/sda1
                   Ebs:
-                      VolumeSize: 600
+                      VolumeSize: 900 # This is increased to accomodate for builds with more dependencies
             # Additional options in the boto docs.
+            # Uncommend the following block if Ray clusters need to be built within a specific subnet
+            # NetworkInterfaces:
+            #     - DeviceIndex: 0 # Primary network interface.
+            #       SubnetId: .... # Replace with actual subnet ID
+            #       Groups:
+            #         - ... # Replace with actual security group ID
     ray.worker.default:
         # The minimum number of worker nodes of this type to launch.
         # This number should be >= 0.
@@ -117,6 +124,16 @@ available_node_types:
                 #   SpotOptions:
                 #       MaxPrice: MAX_HOURLY_PRICE
             # Additional options in the boto docs.
+            BlockDeviceMappings:
+                - DeviceName: /dev/sda1
+                  Ebs:
+                      VolumeSize: 900 # This is increased to accomodate for builds with more dependencies
+            # Uncommend the following block if Ray clusters need to be built within a specific subnet
+            # NetworkInterfaces:
+            #     - DeviceIndex: 0 # Primary network interface.
+            #       SubnetId: .... # Replace with actual subnet ID
+            #       Groups:
+            #         - ... # Replace with actual security group ID
 
 # Specify the node type of the head node (as configured above).
 head_node_type: ray.head.default
@@ -164,12 +181,11 @@ setup_commands:
     # - pip install -U "ray[default] @ https://s3-us-west-2.amazonaws.com/ray-wheels/latest/ray-2.0.0.dev0-cp37-cp37m-manylinux2014_x86_64.whl"
     - pip install nfp
     - pip install numpy tensorflow --upgrade
-    - conda update --force conda
-    - conda install -c conda-forge rdkit
-    - git clone https://github.com/NREL/graph-env.git
-    - cd graph-env && python setup.py install
+    - conda update -y --force conda
+    - conda install -y -c conda-forge rdkit
+    - pip install graphenv
     - git clone https://github.com/NREL/rlmolecule.git
-    - cd rlmolecule && python setup.py install
+    - cd rlmolecule && python setup.py develop
 
 # Custom commands that will be run on the head node after common setup.
 head_setup_commands: []

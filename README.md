@@ -1,6 +1,3 @@
-[![DOI](https://zenodo.org/badge/289305827.svg)](https://zenodo.org/badge/latestdoi/289305827)
-[![PyPI version](https://badge.fury.io/py/rlmolecule.svg)](https://badge.fury.io/py/rlmolecule)
-
 # rlmolecule
 
 ## About
@@ -26,3 +23,7 @@ batteries. Nature Machine Intelligence.
 ## Installation
 
 `pip install rlmolecule`
+
+## Running in AWS Ray clusters 
+
+Refer to the instructions available in: `devtools/aws/README.md`
