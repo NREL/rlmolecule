@@ -1,9 +1,12 @@
 import atexit
 import csv
+import logging
 from typing import Any, List
 
 import ray
 from lru import LRU
+
+logger = logging.getLogger(__name__)
 
 
 class DictCache:
@@ -39,7 +42,7 @@ class RaySetCache:
 
     def add(self, key: Any):
         if not str(key).endswith(" (t)"):
-            print(f"pruning non-terminal state {key}")
+            logger.info(f"pruning non-terminal state {key}")
         self._set.add(key)
 
     def contains(self, keys: List[Any]):
@@ -50,7 +53,7 @@ class RaySetCache:
 class CSVActorWriter:
     def __init__(self, filename: str) -> None:
         self._filename = filename
-        self._filehandle = open(self._filename, "w", newline="")
+        self._filehandle = open(self._filename, "wt", newline="", buffering=1)
         self._writer = csv.writer(self._filehandle)
         atexit.register(lambda: self.close())
 
@@ -71,3 +74,9 @@ def get_terminal_cache():
     return RaySetCache.options(
         name="terminal_cache", lifetime="detached", get_if_exists=True
     ).remote()
+
+
+def get_csv_logger(filename: str):
+    return CSVActorWriter.options(
+        name="csv_logger", lifetime="detached", get_if_exists=True
+    ).remote(filename)

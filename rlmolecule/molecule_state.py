@@ -1,6 +1,7 @@
 import logging
 import random
-from typing import Any, Dict, Optional, Sequence, Type, Union
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Sequence, Type, Union
 
 import gym
 import nfp
@@ -9,120 +10,155 @@ import ray
 from graphenv.vertex import V, Vertex
 from rdkit.Chem import Mol, MolFromSmiles, MolToSmiles
 
-from rlmolecule.actors import get_terminal_cache
+from rlmolecule.actors import get_csv_logger, get_terminal_cache
 from rlmolecule.builder import MoleculeBuilder
 from rlmolecule.policy.preprocessor import load_preprocessor
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class MoleculeData:
+    """A dataclass used to hold configuration parameters and make it easier to pass
+    options between root nodes and child nodes. A single copy of this class will exist
+    per environment, and is passed between parent / child / root nodes.
+
+    By default, this class holds ray actor handles used to log final molecules to a CSV
+    file for post-processing.
+    """
+
+    builder: Type[MoleculeBuilder]
+    max_num_actions: int = 20
+    max_num_bonds: Optional[int] = None
+    preprocessor: Union[Type[nfp.preprocessing.MolPreprocessor], str, None] = None
+    prune_terminal_states: bool = False
+    terminal_cache: Optional[Any] = None
+    using_ray: Optional[bool] = None
+    log_reward_filepath: Optional[str] = None
+
+    def __post_init__(self):
+        if self.max_num_bonds is None:
+            self.max_num_bonds = self.builder.max_atoms * 4
+
+        if self.preprocessor is None or isinstance(self.preprocessor, str):
+            self.preprocessor = load_preprocessor(self.preprocessor)
+
+        if self.prune_terminal_states and self.terminal_cache is None:
+            if ray.is_initialized():
+                self.terminal_cache = get_terminal_cache()
+                self.using_ray = True
+            else:
+                self.terminal_cache = set()
+                self.using_ray = False
+
+        self.csv_writer = None
+        if ray.is_initialized() and self.log_reward_filepath is not None:
+            self.csv_writer = get_csv_logger(self.log_reward_filepath)
+
+    def log_reward(self, row: List):
+        """Log the given row to the CSV logger actor class.
+
+        Args:
+            row (List): The row to log, typically a (SMILES, reward) pair, although any
+            data that can be written to a file is fine.
+        """
+        logger.info(f"REWARD: {row}")
+        if self.csv_writer is not None:
+            self.csv_writer.write.remote(row)
+
+
 class MoleculeState(Vertex):
-    """
-    A state implementation which uses simple transformations (such as adding a bond) to
-    define a graph of molecules that can be navigated.
-
-    Molecules are stored as rdkit Mol instances, and the rdkit-generated SMILES string
-    is also stored for efficient hashing.
-    """
-
     def __init__(
         self,
         molecule: Mol,
-        builder: Type[MoleculeBuilder],
-        force_terminal: bool = False,
+        data: Type[MoleculeData],
         smiles: Optional[str] = None,
-        max_num_actions: int = 20,
-        max_num_bonds: Optional[int] = None,
-        preprocessor: Union[Type[nfp.preprocessing.MolPreprocessor], str, None] = None,
-        warn: bool = True,
-        prune_terminal_states: bool = False,
-        terminal_cache: Optional[Any] = None,
+        force_terminal: bool = False,
     ) -> None:
-        """
-        :param molecule: an RDKit molecule specifying the current state
-        :param builder: A MoleculeConfig class
-        :param force_terminal: Whether to force this molecule to be a terminal state
-        :param smiles: An optional smiles string for the molecule; must match
-        `molecule`.
-        :param max_num_actions: The maximum number of next states to consider.
-        :param warn: whether to warn if more than the max_num_actions are possible.
+        """A state implementation which uses simple transformations (such as adding a
+        bond) to define a graph of molecules that can be navigated.
+
+        Molecules are stored as rdkit Mol instances, and the rdkit-generated SMILES
+        string is also stored for efficient hashing.
+
+        Args:
+            molecule (Mol): an RDKit molecule specifying the current state
+            data (Type[MoleculeData]): A dataclass for the given environment. Must
+                contain at minimum a `.builder` attribute used to build child molecules.
+            smiles (Optional[str], optional): An optional smiles string for the
+                molecule; must match `molecule`. Defaults to None.
+            force_terminal (bool, optional): Whether to force this molecule to be a
+                terminal state. Defaults to False.
         """
         super().__init__()
-        self._builder: any = builder
-        self.max_num_bonds = (
-            builder.max_atoms * 4 if max_num_bonds is None else max_num_bonds
-        )
         self._molecule: Mol = molecule
         self._smiles: str = MolToSmiles(self._molecule) if smiles is None else smiles
         self._forced_terminal: bool = force_terminal
-        self.max_num_actions = max_num_actions
-        self._warn = warn
-        self.prune_terminal_states = prune_terminal_states
-        self._using_ray = None
-
-        if preprocessor is None or isinstance(preprocessor, str):
-            self.preprocessor = load_preprocessor(preprocessor)
-        else:
-            self.preprocessor = preprocessor
-
-        self._terminal_cache = terminal_cache
-        if self.prune_terminal_states and self._terminal_cache is None:
-            if ray.is_initialized():
-                self._terminal_cache = get_terminal_cache()
-                self._using_ray = True
-            else:
-                self._terminal_cache = set()
-                self._using_ray = False
+        self.data = data
 
     @property
     def root(self) -> V:
         return self.new(MolFromSmiles("C"))
 
     def _get_children(self) -> Sequence[V]:
+        """Generates a list of new MoleculeStates that represent possible next actions
+        for the environment. If there is more than the maximum number of actions, this
+        function will sample the next actions down to the maximum allowed number.
+
+        Returns:
+            Sequence[V]: A list of next actions, some of which (usually the last)
+                represent terminal states.
+        """
 
         if self.forced_terminal:
+            # No children from a molecule that's flagged as a terminal state, this
+            # makes the Vertex.terminal call evaluate to True
             return []
 
-        next_molecules = list(self.builder(self.molecule))
+        next_actions = [self.new(molecule) for molecule in self.builder(self.molecule)]
+        next_actions.extend(self._get_terminal_actions())
 
-        if self.prune_terminal_states:
-            smiles_list = [MolToSmiles(mol) for mol in next_molecules]
-            if self._using_ray:
-                to_prune = ray.get(self._terminal_cache.contains.remote(smiles_list))
-            else:
-                to_prune = [smiles in self._terminal_cache for smiles in smiles_list]
+        if self.data.prune_terminal_states:
+            next_actions = self._prune_next_actions(next_actions)
 
-            next_molecules = [
-                mol for mol, contained in zip(next_molecules, to_prune) if not contained
-            ]
-
-        if len(next_molecules) >= self.max_num_actions:
-            if self._warn:
-                logger.warning(
-                    f"{self} has {len(next_molecules) + 1} next actions when the "
-                    f"maximum is {self.max_num_actions}"
-                )
-            next_molecules = random.sample(next_molecules, self.max_num_actions - 1)
-
-        next_actions = [self.new(molecule) for molecule in next_molecules]
-
-        if self.prune_terminal_states:
-            if self._using_ray:
-                add_self = not ray.get(
-                    self._terminal_cache.contains.remote([self.smiles + " (t)"])
-                )[0]
-            else:
-                add_self = (self.smiles + " (t)") not in self._terminal_cache
-
-        else:
-            add_self = True
-
-        if add_self:
-            next_actions.append(
-                self.new(self.molecule, force_terminal=True, smiles=self.smiles)
+        if len(next_actions) >= self.max_num_actions:
+            logger.info(
+                f"{self} has {len(next_actions) + 1} next actions when the "
+                f"maximum is {self.max_num_actions}"
             )
+            next_actions = random.sample(next_actions, self.max_num_actions)
 
-        logger.debug(f"Returning {len(next_actions)} for state {self.smiles}")
+        return next_actions
+
+    def _get_terminal_actions(self) -> Sequence[V]:
+        """Yield terminal actions from the current state. Useful to overwrite if final
+        actions are different than the steps of molecule construction (i.e., adding a
+        radical to a fully constructed molecule)
+
+        Returns:
+            Sequence[V]: A list of terminal states
+        """
+        return [self.new(self.molecule, force_terminal=True, smiles=self.smiles)]
+
+    def _prune_next_actions(self, next_actions: Sequence[V]) -> Sequence[V]:
+        """Use the ray actor handle in self.data (or a simple set) to find terminal
+        states that have already been evaluated and remove them from the search tree.
+
+        Args:
+            next_actions (Sequence[V]): A list of MoleculeStates to be pruned
+
+        Returns:
+            Sequence[V]: A pruned list of MoleculeStates
+        """
+        smiles_list = [repr(mol) for mol in next_actions]
+        if self.data.using_ray:
+            to_prune = ray.get(self.data.terminal_cache.contains.remote(smiles_list))
+        else:
+            to_prune = [smiles in self.data.terminal_cache for smiles in smiles_list]
+
+        next_actions = [
+            mol for mol, contained in zip(next_actions, to_prune) if not contained
+        ]
 
         return next_actions
 
@@ -130,7 +166,7 @@ class MoleculeState(Vertex):
         return self.preprocessor(
             self.molecule,
             max_num_nodes=self.builder.max_atoms,
-            max_num_edges=self.max_num_bonds,
+            max_num_edges=self.data.max_num_bonds,
         )
 
     @property
@@ -146,13 +182,13 @@ class MoleculeState(Vertex):
                 "bond": gym.spaces.Box(
                     low=0,
                     high=self.preprocessor.bond_classes,
-                    shape=(self.max_num_bonds,),
+                    shape=(self.data.max_num_bonds,),
                     dtype=int,
                 ),
                 "connectivity": gym.spaces.Box(
                     low=0,
                     high=self.builder.max_atoms,
-                    shape=(self.max_num_bonds, 2),
+                    shape=(self.data.max_num_bonds, 2),
                     dtype=int,
                 ),
             }
@@ -162,25 +198,18 @@ class MoleculeState(Vertex):
         self,
         molecule: Mol,
         *args,
-        force_terminal: bool = False,
         smiles: Optional[str] = None,
+        force_terminal: bool = False,
         **kwargs,
     ) -> V:
         new = self.__class__(
             molecule,
-            self.builder,
-            force_terminal,
-            smiles,
+            self.data,
+            smiles=smiles,
+            force_terminal=force_terminal,
             *args,
-            max_num_actions=self.max_num_actions,
-            max_num_bonds=self.max_num_bonds,
-            preprocessor=self.preprocessor,
-            warn=self._warn,
-            prune_terminal_states=self.prune_terminal_states,
-            terminal_cache=self._terminal_cache,
             **kwargs,
         )
-        new._using_ray = getattr(self, "_using_ray", None)
         return new
 
     @property
@@ -189,7 +218,11 @@ class MoleculeState(Vertex):
 
     @property
     def builder(self) -> any:
-        return self._builder
+        return self.data.builder
+
+    @property
+    def preprocessor(self) -> any:
+        return self.data.preprocessor
 
     @property
     def smiles(self) -> str:
@@ -203,6 +236,10 @@ class MoleculeState(Vertex):
     def num_atoms(self) -> int:
         return self.molecule.GetNumAtoms()
 
+    @property
+    def max_num_actions(self) -> int:
+        return self.data.max_num_actions
+
     def __repr__(self) -> str:
         """
         delegates to the SMILES string
@@ -211,21 +248,17 @@ class MoleculeState(Vertex):
 
     @property
     def terminal(self) -> bool:
+        """Checks if the given state is terminal. If true, adds this state to the
+        terminal_cache to prevent it from being chosen again
+
+        Returns:
+            bool: whether the state is terminal. Delegates to Vertex.terminal
+        """
         is_terminal = super().terminal
-        if is_terminal and self.prune_terminal_states:
-            if self._using_ray:
-                self._terminal_cache.add.remote(repr(self))
+        if is_terminal and self.data.prune_terminal_states:
+            if self.data.using_ray:
+                self.data.terminal_cache.add.remote(repr(self))
             else:
-                self._terminal_cache.add(repr(self))
+                self.data.terminal_cache.add(repr(self))
 
         return is_terminal
-
-    def __getstate__(self):
-        attributes = self.__dict__
-        attributes["_terminal_cache"] = None
-        return attributes
-
-    def __setstate__(self, d):
-        if d["_using_ray"]:
-            d["_terminal_cache"] = get_terminal_cache()
-        self.__dict__ = d

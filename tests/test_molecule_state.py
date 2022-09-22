@@ -1,16 +1,23 @@
+import csv
+import logging
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
 import numpy as np
 import pytest
 import rdkit
 from graphenv.graph_env import GraphEnv
 from rlmolecule.builder import MoleculeBuilder
 from rlmolecule.examples.qed import QEDState
-from rlmolecule.molecule_state import MoleculeState
+from rlmolecule.molecule_state import MoleculeData, MoleculeState
 
 
 @pytest.fixture
 def propane(builder: MoleculeBuilder) -> MoleculeState:
     return MoleculeState(
-        rdkit.Chem.MolFromSmiles("CCC"), builder=builder, force_terminal=False
+        rdkit.Chem.MolFromSmiles("CCC"),
+        MoleculeData(builder),
+        force_terminal=False,
     )
 
 
@@ -31,10 +38,8 @@ def test_prune_terminal(builder):
 
     qed_root = QEDState(
         rdkit.Chem.MolFromSmiles("C"),
-        builder,
+        MoleculeData(builder, max_num_actions=20, prune_terminal_states=True),
         smiles="C",
-        max_num_actions=20,
-        prune_terminal_states=True,
     )
 
     env = GraphEnv({"state": qed_root, "max_num_children": qed_root.max_num_actions})
@@ -55,13 +60,15 @@ def test_prune_terminal_ray(ray_init):
 
     qed_root = QEDState(
         rdkit.Chem.MolFromSmiles("C"),
-        MoleculeBuilder(max_atoms=5, cache=True),
+        MoleculeData(
+            MoleculeBuilder(max_atoms=5, cache=True),
+            max_num_actions=20,
+            prune_terminal_states=True,
+        ),
         smiles="C",
-        max_num_actions=20,
-        prune_terminal_states=True,
     )
 
-    assert qed_root._using_ray
+    assert qed_root.data.using_ray
     assert qed_root.builder._using_ray
 
     env = GraphEnv({"state": qed_root, "max_num_children": qed_root.max_num_actions})
@@ -82,20 +89,31 @@ def test_observation_space(propane: MoleculeState):
     assert propane.observation_space.contains(propane.observation)
 
 
-def test_csv_writer(ray_init):
+def test_csv_writer(ray_init, caplog):
+    caplog.set_level(logging.INFO)
 
-    qed_root = QEDState(
-        rdkit.Chem.MolFromSmiles("C"),
-        MoleculeBuilder(max_atoms=5, cache=True),
-        smiles="CCC",
-        max_num_actions=20,
-        prune_terminal_states=True,
-        force_terminal=True,
-        filename="test.csv",
-    )
-    qed_root.reward
+    with TemporaryDirectory() as tempdir:
 
-    qed_root.csv_writer.close.remote()
+        data = MoleculeData(
+            MoleculeBuilder(max_atoms=5, cache=True),
+            max_num_actions=20,
+            prune_terminal_states=True,
+            log_reward_filepath=Path(tempdir, "test.csv"),
+        )
 
-    with open("test.csv", "r") as f:
-        assert f.readline().startswith("CCC,")
+        state = QEDState(rdkit.Chem.MolFromSmiles("CCC"), data, force_terminal=True)
+        state.reward
+
+        state = QEDState(rdkit.Chem.MolFromSmiles("CCO"), data, force_terminal=True)
+        state.reward
+
+        state.data.csv_writer.close.remote()
+
+        with open(Path(tempdir, "test.csv")) as f:
+            csvdata = list(csv.reader(f))
+
+        assert csvdata[0][0] == "CCC"
+        assert np.isclose(float(csvdata[0][1]), 0.3854706587740357)
+
+        assert csvdata[1][0] == "CCO"
+        assert np.isclose(float(csvdata[1][1]), 0.40680796565539457)

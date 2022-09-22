@@ -20,14 +20,12 @@ from rlmolecule.policy.preprocessor import load_preprocessor
 
 tf1, tf, tfv = try_import_tf()
 num_gpus = len(tf.config.list_physical_devices("GPU"))
-#print(f"{num_gpus = }")
+print(f"{num_gpus = }")
 
-output_directory = Path("/home/ray")
+output_directory = Path("/scratch", os.environ["USER"])
 Path(output_directory, "qed").mkdir(exist_ok=True)
 
-#ray.init(dashboard_host="0.0.0.0")
-# Ray will be already launched in AWS Ray clusters
-ray.init(address="auto")
+ray.init(dashboard_host="0.0.0.0")
 
 max_atoms = 40
 
@@ -88,6 +86,6 @@ if __name__ == "__main__":
                 "train_batch_size": 4000,
             },
         ),
-        local_dir=Path(output_directory, "ray_results"))
+        local_dir=Path(output_directory, "ray_results"),
 
     ray.shutdown()

@@ -1,4 +1,5 @@
-from ._version import get_versions
-
-__version__ = get_versions()["version"]
-del get_versions
+try:
+    from ._version import __version__, __version_tuple__
+except ImportError:
+    __version__ = "unknown version"
+    __version_tuple__ = (0, 0, "unknown version")

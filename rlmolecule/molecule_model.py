@@ -21,6 +21,19 @@ class BaseMoleculeModel(GraphModel):
         max_bonds: Optional[int] = None,
         **kwargs,
     ):
+        """Create a GNN policy model used to guide the RL search
+
+        Args:
+            preprocessor (Optional[MolPreprocessor], optional): A filename or
+                initialized preprocessor used to create integer labels for atoms or
+                bonds. Defaults to loading a pre-defined json configuration.
+
+            features (int, optional): width of message passing layers. Defaults to 64.
+            num_messages (int, optional): depth of message passing layers. Defaults to 3
+            input_dtype (str, optional): input layer dtype. Defaults to "int64".
+            max_atoms (Optional[int], optional): Atom input size. Defaults to None.
+            max_bonds (Optional[int], optional): Bond input size. Defaults to None.
+        """
         super().__init__(*args, **kwargs)
         self.base_model = policy_model(
             preprocessor=preprocessor,
