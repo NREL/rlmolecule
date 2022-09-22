@@ -154,3 +154,4 @@ examples/code_ocean/builder_cache
 
 qed_results.csv
 test.csv
+rlmolecule/_version.py

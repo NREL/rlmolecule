@@ -7,6 +7,7 @@ from ray.tune.registry import register_env
 from rlmolecule.builder import MoleculeBuilder
 from rlmolecule.examples.qed import QEDState
 from rlmolecule.molecule_model import MoleculeModel
+from rlmolecule.molecule_state import MoleculeData
 from rlmolecule.policy.preprocessor import load_preprocessor
 
 
@@ -34,24 +35,30 @@ def ppo_config():
 
 
 def test_ppo(ray_init, ppo_config):
+    def create_env(config):
 
-    qed_root = QEDState(
-        rdkit.Chem.MolFromSmiles("C"),
-        MoleculeBuilder(max_atoms=5, cache=True),
-        smiles="C",
-        max_num_actions=20,
-        prune_terminal_states=True,
-    )
+        data = MoleculeData(
+            MoleculeBuilder(max_atoms=5, cache=True),
+            max_num_actions=20,
+            prune_terminal_states=True,
+        )
+
+        qed_root = QEDState(
+            rdkit.Chem.MolFromSmiles("C"),
+            data=data,
+            smiles="C",
+        )
+
+        return GraphEnv(
+            {"state": qed_root, "max_num_children": qed_root.max_num_actions}
+        )
 
     ModelCatalog.register_custom_model("MoleculeModel", MoleculeModel)
-    register_env("GraphEnv", lambda config: GraphEnv(config))
+
+    register_env("QEDGraphEnv", lambda config: create_env(config))
 
     config = {
-        "env": "GraphEnv",
-        "env_config": {
-            "state": qed_root,
-            "max_num_children": qed_root.max_num_actions,
-        },
+        "env": "QEDGraphEnv",
         "model": {
             "custom_model": "MoleculeModel",
             "custom_model_config": {

@@ -6,6 +6,7 @@ import rdkit
 from ray.rllib.utils.framework import try_import_tf
 from rlmolecule.builder import MoleculeBuilder
 from rlmolecule.examples.qed import QEDState
+from rlmolecule.molecule_state import MoleculeData
 
 tf1, tf, tfv = try_import_tf(error=True)
 assert tfv == 2
@@ -38,7 +39,6 @@ def tmpdirname():
 def qed_root(builder: MoleculeBuilder) -> QEDState:
     return QEDState(
         rdkit.Chem.MolFromSmiles("C"),
-        builder,
+        data=MoleculeData(builder, max_num_actions=20),
         smiles="C",
-        max_num_actions=20,
     )

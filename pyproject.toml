@@ -1,0 +1,11 @@
+[build-system]
+requires = ["setuptools>=40.8.0", "wheel", "setuptools_scm[toml]>=6.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "rlmolecule/_version.py"
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]
