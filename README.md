@@ -23,3 +23,7 @@ batteries. Nature Machine Intelligence.
 ## Installation
 
 `pip install rlmolecule`
+
+## Running in AWS Ray clusters 
+
+Refer to the instructions available in: `devtools/aws/README.md`
