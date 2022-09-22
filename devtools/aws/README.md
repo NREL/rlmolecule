@@ -51,6 +51,12 @@ The code from this repo should be already cloned on the head node (that is part 
 
 The output should include a series of tables with the column named: `episode_reward_max`. The value under that column should increase as the training progresses and evantually reach the value around 0.93.
 
+**Alternatively**, you can run the same command without being on the head node (`*(local)*`, as with the rest of the commands) by using:
+
+`# ray exec qed.yml 'python ~/rlmolecule/examples/benchmarks/qed/run_qed_aws.py' --no-config-cache`
+
+With either `*(local)*` or `*(ray head)*` version of this command, you would want to leave it running for some time to see reasonable rewards (and explore the results through TensorBoard, as described below). 
+
 ### `*(local)*` Access TensorBoard:
 
 For this step, you might want to use a separate terminal window. To see the produced results throuth TensorBoard dashboard, run (this will start the dashboard on the head node and alse set up the port forwaring for port 6006):
