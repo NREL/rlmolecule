@@ -1,4 +1,3 @@
-[![DOI](https://zenodo.org/badge/289305827.svg)](https://zenodo.org/badge/latestdoi/289305827)
 # rlmolecule
 
 ## About
