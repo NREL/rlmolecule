@@ -1,7 +1,7 @@
 import os
 from typing import Optional
 
-import rdkit
+import rdkit.Chem
 
 # from nfp.preprocessing.mol_preprocessor import MolPreprocessor
 from nfp.preprocessing import MolPreprocessor
@@ -66,7 +66,7 @@ def load_preprocessor(saved_preprocessor_file: Optional[str] = None) -> MolPrepr
 
     if not saved_preprocessor_file:
         saved_preprocessor_file = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "preprocessor.json"
+            os.path.dirname(os.path.abspath(__file__)), "data", "preprocessor.json"
         )
 
     preprocessor.from_json(saved_preprocessor_file)
