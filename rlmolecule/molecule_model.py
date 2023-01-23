@@ -3,7 +3,7 @@ from typing import Dict, Optional, Tuple
 from graphenv import tf
 from graphenv.graph_model import GraphModel
 from nfp.preprocessing import MolPreprocessor
-from ray.rllib.agents.dqn.distributional_q_tf_model import DistributionalQTFModel
+from ray.rllib.algorithms.dqn.distributional_q_tf_model import DistributionalQTFModel
 from ray.rllib.models.tf.tf_modelv2 import TFModelV2
 
 from rlmolecule.policy.model import policy_model
