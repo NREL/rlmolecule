@@ -28,7 +28,7 @@ def molecule_env(qed_root: MoleculeState):
 
 def test_policy_model(molecule_env, single_layer_model):
 
-    observation, reward, terminal, info = molecule_env.step(0)
+    observation, reward, terminal, truncated, info = molecule_env.step(0)
 
     preprocessor = get_preprocessor(molecule_env.observation_space)
     obs = preprocessor(molecule_env.observation_space).transform(observation)
