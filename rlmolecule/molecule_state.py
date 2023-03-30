@@ -3,7 +3,7 @@ import random
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Type, Union
 
-import gym
+import gymnasium as gym
 import nfp
 import numpy as np
 import ray

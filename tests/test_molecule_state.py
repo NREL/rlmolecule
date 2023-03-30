@@ -46,12 +46,12 @@ def test_prune_terminal(builder):
     assert repr(env.state.children[-1]) == "C (t)"
 
     # select the terminal state
-    obs, reward, terminal, info = env.step(len(env.state.children) - 1)
+    obs, reward, terminal, truncated, info = env.step(len(env.state.children) - 1)
     assert terminal
     assert np.isclose(reward, 0.3597849378839701)
 
-    obs = env.reset()
-    obs, reward, terminal, info = env.step(len(env.state.children) - 1)
+    obs, info = env.reset()
+    obs, reward, terminal, truncated, info = env.step(len(env.state.children) - 1)
     assert not terminal
     assert np.isclose(reward, 0)
 
@@ -75,12 +75,12 @@ def test_prune_terminal_ray(ray_init):
     assert repr(env.state.children[-1]) == "C (t)"
 
     # select the terminal state
-    obs, reward, terminal, info = env.step(len(env.state.children) - 1)
+    obs, reward, terminal, truncated, info = env.step(len(env.state.children) - 1)
     assert terminal
     assert np.isclose(reward, 0.3597849378839701)
 
-    obs = env.reset()
-    obs, reward, terminal, info = env.step(len(env.state.children) - 1)
+    obs, info = env.reset()
+    obs, reward, terminal, truncated, info = env.step(len(env.state.children) - 1)
     assert not terminal
     assert np.isclose(reward, 0)
 
