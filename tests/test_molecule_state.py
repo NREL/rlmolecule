@@ -112,8 +112,9 @@ def test_csv_writer(ray_init, caplog):
         with open(Path(tempdir, "test.csv")) as f:
             csvdata = list(csv.reader(f))
 
-        assert csvdata[0][0] == "CCC"
-        assert np.isclose(float(csvdata[0][1]), 0.3854706587740357)
+        # start at the second row to account for the header row
+        assert csvdata[1][0] == "CCC"
+        assert np.isclose(float(csvdata[1][1]), 0.3854706587740357)
 
-        assert csvdata[1][0] == "CCO"
-        assert np.isclose(float(csvdata[1][1]), 0.40680796565539457)
+        assert csvdata[2][0] == "CCO"
+        assert np.isclose(float(csvdata[2][1]), 0.40680796565539457)
