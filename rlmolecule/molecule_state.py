@@ -54,6 +54,8 @@ class MoleculeData:
         self.csv_writer = None
         if ray.is_initialized() and self.log_reward_filepath is not None:
             self.csv_writer = get_csv_logger(self.log_reward_filepath)
+            # add a header line
+            self.csv_writer.write.remote(["smiles", "reward"])
 
     def log_reward(self, row: List):
         """Log the given row to the CSV logger actor class.
