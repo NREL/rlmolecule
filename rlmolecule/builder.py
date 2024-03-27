@@ -63,7 +63,7 @@ class MoleculeBuilder:
             sa_score_threshold (Optional[float], optional): If set, don't construct
             molecules greater than a given sa_score. Defaults to None.
             try_embedding (bool, optional): Try to get a 3D embedding of the molecule,
-                and if this fails, remote it. Defaults to False.
+                and if this fails, remove it. Defaults to False.
             cache (bool, optional): Whether to cache molecule building for a given
                 SMILES input to speed up subsequent evaluations. Defaults to False.
             parallel (bool, optional): (Experimental) whether to try multiprocessing to
