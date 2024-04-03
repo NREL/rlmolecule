@@ -61,7 +61,7 @@ def test_prune_terminal_ray(ray_init):
     qed_root = QEDState(
         rdkit.Chem.MolFromSmiles("C"),
         MoleculeData(
-            MoleculeBuilder(max_atoms=5, cache=True),
+            MoleculeBuilder(max_atoms=5, min_atoms=1, cache=True),
             max_num_actions=20,
             prune_terminal_states=True,
         ),
@@ -95,7 +95,7 @@ def test_csv_writer(ray_init, caplog):
     with TemporaryDirectory() as tempdir:
 
         data = MoleculeData(
-            MoleculeBuilder(max_atoms=5, cache=True),
+            MoleculeBuilder(max_atoms=5, min_atoms=1, cache=True),
             max_num_actions=20,
             prune_terminal_states=True,
             log_reward_filepath=Path(tempdir, "test.csv"),

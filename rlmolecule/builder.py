@@ -53,7 +53,7 @@ class MoleculeBuilder:
 
         Args:
             max_atoms (int, optional): Maximum number of heavy atoms. Defaults to 10.
-            min_atoms (int, optional): minimum number of heavy atoms. Defaults to 4.
+            min_atoms (int, optional): Minimum number of heavy atoms. Defaults to 4.
             atom_additions (Optional[List], optional): potential atom types to consider.
                 Defaults to ('C', 'N', 'O')
             stereoisomers (bool, optional): whether to consider stereoisomers different
