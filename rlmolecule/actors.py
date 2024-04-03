@@ -4,7 +4,7 @@ import logging
 from typing import Any, List
 
 import ray
-from lru import LRU
+from pylru import lrucache
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class RayDictCache(DictCache):
 @ray.remote
 class RayLRUCache(DictCache):
     def __init__(self, max_size: int = int(1e5)):
-        self._dict = LRU(max_size)
+        self._dict = lrucache(max_size)
 
 
 @ray.remote
