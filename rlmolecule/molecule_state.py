@@ -30,7 +30,6 @@ class MoleculeData:
     builder: Type[MoleculeBuilder]
     max_num_actions: int = 20
     max_num_bonds: Optional[int] = None
-    min_num_atoms: int = 4
     preprocessor: Union[Type[nfp.preprocessing.MolPreprocessor], str, None] = None
     prune_terminal_states: bool = False
     terminal_cache: Optional[Any] = None
@@ -119,20 +118,23 @@ class MoleculeState(Vertex):
             return []
 
         next_actions = [self.new(molecule) for molecule in self.builder(self.molecule)]
-
-        if len(next_actions) >= self.max_num_actions:
-            logger.info(
-                f"{self} has {len(next_actions) + 1} next actions when the "
-                f"maximum is {self.max_num_actions}"
-            )
-            next_actions = random.sample(next_actions, self.max_num_actions)
             
         # Only add the terminal state as an action if there are enough atoms
-        if self.molecule.num_atoms >= self.min_num_atoms:
-            next_actions.extend(self._get_terminal_actions())
+        terminal_actions = [] 
+        if self.num_atoms >= self.min_num_atoms:
+            terminal_actions = self._get_terminal_actions()
 
-        if self.data.prune_terminal_states:
-            next_actions = self._prune_next_actions(next_actions)
+            if self.data.prune_terminal_states:
+                terminal_actions = self._prune_next_actions(terminal_actions)
+
+        if len(next_actions) + len(terminal_actions) >= self.max_num_actions:
+            logger.info(
+                f"{self} has {len(next_actions) + 1 + len(terminal_actions)} next actions when the "
+                f"maximum is {self.max_num_actions}"
+            )
+            next_actions = random.sample(next_actions, self.max_num_actions - len(terminal_actions))
+
+        next_actions.extend(terminal_actions)
             
         return next_actions
 
@@ -249,7 +251,7 @@ class MoleculeState(Vertex):
 
     @property
     def min_num_atoms(self) -> int:
-        return self.data.min_num_atoms
+        return self.builder.min_atoms
 
     def __repr__(self) -> str:
         """

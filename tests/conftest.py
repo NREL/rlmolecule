@@ -23,7 +23,7 @@ def ray_init():
 
 @pytest.fixture
 def builder() -> MoleculeBuilder:
-    return MoleculeBuilder(max_atoms=5)
+    return MoleculeBuilder(max_atoms=5, min_atoms=1)
 
 
 @pytest.fixture(scope="class")
