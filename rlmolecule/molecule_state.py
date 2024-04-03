@@ -30,6 +30,7 @@ class MoleculeData:
     builder: Type[MoleculeBuilder]
     max_num_actions: int = 20
     max_num_bonds: Optional[int] = None
+    min_num_atoms: int = 4
     preprocessor: Union[Type[nfp.preprocessing.MolPreprocessor], str, None] = None
     prune_terminal_states: bool = False
     terminal_cache: Optional[Any] = None
@@ -118,10 +119,6 @@ class MoleculeState(Vertex):
             return []
 
         next_actions = [self.new(molecule) for molecule in self.builder(self.molecule)]
-        next_actions.extend(self._get_terminal_actions())
-
-        if self.data.prune_terminal_states:
-            next_actions = self._prune_next_actions(next_actions)
 
         if len(next_actions) >= self.max_num_actions:
             logger.info(
@@ -129,7 +126,14 @@ class MoleculeState(Vertex):
                 f"maximum is {self.max_num_actions}"
             )
             next_actions = random.sample(next_actions, self.max_num_actions)
+            
+        # Only add the terminal state as an action if there are enough atoms
+        if self.molecule.num_atoms >= self.min_num_atoms:
+            next_actions.extend(self._get_terminal_actions())
 
+        if self.data.prune_terminal_states:
+            next_actions = self._prune_next_actions(next_actions)
+            
         return next_actions
 
     def _get_terminal_actions(self) -> Sequence[V]:
@@ -145,6 +149,7 @@ class MoleculeState(Vertex):
     def _prune_next_actions(self, next_actions: Sequence[V]) -> Sequence[V]:
         """Use the ray actor handle in self.data (or a simple set) to find terminal
         states that have already been evaluated and remove them from the search tree.
+        Useful to force the builder to continually make new molecules.
 
         Args:
             next_actions (Sequence[V]): A list of MoleculeStates to be pruned
@@ -241,6 +246,10 @@ class MoleculeState(Vertex):
     @property
     def max_num_actions(self) -> int:
         return self.data.max_num_actions
+
+    @property
+    def min_num_atoms(self) -> int:
+        return self.data.min_num_atoms
 
     def __repr__(self) -> str:
         """
